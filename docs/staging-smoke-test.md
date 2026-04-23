@@ -1,5 +1,28 @@
 # Staging Smoke Test
 
+## RC1 Cloud Staging Preflight
+
+- Attempt date: 2026-04-23
+- Current main: `576f94b5cb5be3bc9a9b06875c8d1b3289e36dad`
+- Backend Vercel project: `multi-millionaire-api-staging`
+- Backend project ID: `prj_YygiIoNfVrCIPAgo8niV981tDypb`
+- Backend deployment config: prepared through `server/api/index.ts` and `server/vercel.json`
+- Frontend project: `dist`
+- Frontend preview access strategy: keep Vercel Authentication enabled for now.
+
+RC1 cloud staging is blocked before deployment because the Vercel Neon
+Marketplace integration requires terms acceptance before a Postgres resource can
+be provisioned. No persistent cloud database was created, no cloud migrations
+were executed, and no real cloud staging smoke test was run.
+
+Required manual action:
+
+1. Accept Neon Marketplace terms for team `348421501-qqcoms-projects`:
+   `https://vercel.com/348421501-qqcoms-projects/~/integrations/accept-terms/neon?source=cli`
+2. Retry Neon provisioning from `server/`:
+   `npm exec --yes vercel -- install neon --name multi-millionaire-staging-db -m region=iad1 -m auth=false -e preview --scope 348421501-qqcoms-projects --format json`
+3. Pull env vars, run migrations and seed against the cloud `DATABASE_URL`, deploy backend, rebuild frontend with `VITE_API_BASE_URL` pointing to the backend URL, then rerun the full smoke test.
+
 ## RC0 Environment
 
 - Repository: `tii-mom/multi-millionaire`
