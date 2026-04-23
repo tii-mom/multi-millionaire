@@ -60,3 +60,23 @@ export interface SquadLeaderboardRow {
   total_locked: string;
   rank: number;
 }
+
+export interface RewardSummary {
+  pending_amount: string;
+  approved_amount: string;
+  claimed_amount: string;
+}
+
+export interface RewardLedger {
+  id: string;
+  beneficiary_user_id: string;
+  source_user_id: string;
+  source_position_id: string;
+  wave_id: number;
+  reward_type: string;
+  gross_amount: string;
+  final_amount: string;
+  status: 'pending' | 'approved' | 'claimed' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}

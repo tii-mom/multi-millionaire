@@ -3,6 +3,8 @@ import type {
   AuthResult,
   BootstrapData,
   Position,
+  RewardLedger,
+  RewardSummary,
   SquadLeaderboardRow,
   Wave,
 } from "./types";
@@ -91,6 +93,22 @@ export const api = {
 
   joinSquad(waveId: number, squadId: number, token: string) {
     return requestJson(`/v1/waves/${waveId}/squads/${squadId}/join`, {
+      method: "POST",
+      token,
+    });
+  },
+
+  rewardSummary(token: string) {
+    return requestJson<RewardSummary>("/v1/rewards/summary", { token });
+  },
+
+  listRewards(token: string, status?: RewardLedger["status"]) {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return requestJson<RewardLedger[]>(`/v1/rewards${query}`, { token });
+  },
+
+  claimReward(ledgerId: string, token: string) {
+    return requestJson<RewardLedger>(`/v1/rewards/${ledgerId}/claim`, {
       method: "POST",
       token,
     });
