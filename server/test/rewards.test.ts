@@ -70,6 +70,11 @@ jest.mock('../src/models/rewardModel', () => ({
   markRewardClaimed: jest.fn(),
 }));
 
+jest.mock('../src/models/riskModel', () => ({
+  createRiskFlag: jest.fn(),
+  hasBlockingRiskForRewardClaim: jest.fn().mockResolvedValue(false),
+}));
+
 const queryMock = query as jest.Mock;
 const createPositionMock = createPosition as jest.Mock;
 const getReferralMock = getReferral as jest.Mock;

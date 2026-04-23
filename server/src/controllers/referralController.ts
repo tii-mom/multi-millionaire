@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { findByEmail } from '../models/userModel';
 import { getReferral, upsertReferral } from '../models/referralModel';
+import { createRiskFlag } from '../models/riskModel';
 
 /**
  * Confirm or update a referral. The inviter is supplied as an email address in
@@ -28,6 +29,13 @@ export async function confirmReferral(req: Request, res: Response, next: NextFun
     }
     // Prevent self referral
     if (inviter.id === user.id) {
+      await createRiskFlag({
+        entityType: 'user',
+        entityId: user.id,
+        flagType: 'self_referral_attempt',
+        severity: 'high',
+        note: `Self referral attempted with ${inviterEmail}`,
+      });
       return res.status(400).json({ request_id: req.id || '', error: { code: 'SELF_REFERRAL', message: 'Cannot refer yourself' } });
     }
     const updated = await upsertReferral(user.id, inviter.id);
