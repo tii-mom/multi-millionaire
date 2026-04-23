@@ -1,92 +1,77 @@
-# Project 72H Production Backend
+# Project 72H API Server
 
-This repository contains a production‑ready backend for the **Project 72H** social lock‑up platform. It is built using [Node.js](https://nodejs.org/) with [Express](https://expressjs.com/) and TypeScript, and uses [PostgreSQL](https://www.postgresql.org/) as the primary datastore.
+This is the Express + TypeScript API for the Project 72H / Millionaire Path MVP. It stores wave, pass, deposit, referral, squad, reward, and risk-review data in PostgreSQL.
 
-## Features
+## Current Contract Status
 
-* **Express API** following the previously defined API specification. Includes endpoints for bootstrap information, waves, passes and initial referral handling.
-* **TypeScript** with strict typing and clean project structure.
-* **Database Layer** using the `pg` library with simple model classes to query and persist data.
-* **Environment Configuration** loaded from `.env` files via [dotenv](https://github.com/motdotla/dotenv).
-* **Testing** via [Jest](https://jestjs.io/) and [supertest](https://github.com/visionmedia/supertest) with an example API test.
-* **Docker Support** including `Dockerfile` and `docker-compose.yml` for running the app and a PostgreSQL instance together.
+The current backend is not connected to real smart contracts.
 
-## Getting Started
+- `POST /v1/waves/:waveId/deposit` is an off-chain recorded deposit stub. It writes a `positions` row and creates a fake `onchain_position_id` so the MVP can exercise downstream product logic.
+- `POST /v1/rewards/:ledgerId/claim` is an off-chain reward claim stub. It only moves a reward ledger from `approved` to `claimed`.
+- Reward batches are schema-only in Sprint 1. No Merkle root is published on-chain.
+- Real vault, lock, settlement, and reward distributor contracts are planned for Sprint 2.
 
-### Prerequisites
+Do not represent Sprint 1 deposits or reward claims as real on-chain locks or real token transfers.
 
-* Node.js 18+
-* npm or yarn
-* PostgreSQL 13+
+## Setup
 
-### Development Setup
-
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-2. Copy the example environment file and adjust the values for your setup:
-
-   ```bash
-   cp .env.sample .env
-   # edit .env as needed
-   ```
-
-3. Generate the database schema:
-
-   ```bash
-   psql "$DATABASE_URL" -f migrations/001_init.sql
-   ```
-
-4. Start the development server:
-
-   ```bash
-   npm run dev
-   ```
-
-   This will compile TypeScript on the fly using `ts-node` through nodemon and serve the API at `http://localhost:4000` by default.
-
-5. Run tests:
-
-   ```bash
-   npm test
-   ```
-
-### Docker
-
-For convenience you can run the app and a PostgreSQL database together using Docker Compose. This is helpful for local development or deploying to environments where Docker is available.
+Prerequisites: Node.js 18+, npm, and PostgreSQL 13+.
 
 ```bash
-docker-compose up --build
+npm install
+cp .env.example .env
 ```
 
-This will build the Node.js image, create a PostgreSQL database and expose the API on port 4000.
+Apply migrations in order:
 
-## Structure
+```bash
+psql "$DATABASE_URL" -f migrations/001_init.sql
+psql "$DATABASE_URL" -f migrations/002_squads.sql
+psql "$DATABASE_URL" -f migrations/003_rewards.sql
+psql "$DATABASE_URL" -f migrations/004_risk.sql
+```
 
-* `src/` – TypeScript source files
-  * `index.ts` – Application entry point
-  * `server.ts` – Express server configuration
-  * `db.ts` – Database connection helper
-  * `models/` – Simple database models
-  * `controllers/` – Route handlers implementing business logic
-  * `routes/` – Express routers composing endpoints
-* `test/` – Jest and supertest integration tests
+Run locally:
 
-## API Endpoints
+```bash
+npm run dev
+```
 
-* `GET /` – health check.
-* `GET /v1/app/bootstrap` – app configuration, current wave and latest price.
-* `POST /v1/auth/register` – create an email/password account.
-* `POST /v1/auth/login` – login and receive a JWT.
-* `GET /v1/waves/current` – current wave.
-* `POST /v1/waves/:waveId/passes` – claim a Rush Pass.
-* `POST /v1/waves/:waveId/deposit-precheck` – authenticated deposit precheck.
-* `POST /v1/waves/:waveId/deposit` – authenticated demo deposit record.
-* `GET /v1/prices/latest` – latest confirmed administrator price.
+Build and test:
 
-## Note
+```bash
+npm run build
+npm test
+```
 
-This codebase is a working baseline. To run in production you must complete the model implementations and route handlers according to the detailed product requirement document. This includes validation, additional business rules, comprehensive error handling, and more integration tests. The current implementation is intentionally minimal but organised to allow incremental development.
+## Environment Variables
+
+- `DATABASE_URL`: PostgreSQL connection string.
+- `JWT_SECRET`: JWT signing secret.
+- `PORT`: server port, default `4000`.
+- `CHAIN_ID`: chain identifier shown by bootstrap.
+- `TOKEN_ADDRESS`: 72H token address placeholder.
+- `VAULT_ADDRESS`: future vault/lock contract address.
+- `ORACLE_ADDRESS`: future price oracle contract address.
+- `REWARD_DISTRIBUTOR_ADDRESS`: future reward distributor address.
+- `ADMIN_EMAILS`: comma-separated emails allowed to access `/v1/risk/*`.
+- `HIGH_RISK_DEPOSIT_THRESHOLD`: raw amount threshold for the `high_value_first_lock` automatic risk flag.
+
+## API Areas
+
+- `app`: bootstrap data for the frontend.
+- `auth`: register/login and JWT issuance.
+- `waves`: wave lookup, pass claim, deposit precheck, and deposit recording.
+- `referrals`: inviter binding before first qualifying deposit.
+- `prices`: latest confirmed price.
+- `squads`: squad creation, membership, and leaderboard data.
+- `rewards`: reward summaries, ledgers, and claim stub.
+- `risk`: admin risk flag review APIs.
+
+## Known MVP Limits
+
+- No wallet binding or signature verification.
+- No production admin UI.
+- No real chain transaction validation.
+- No on-chain reward transfer.
+- Risk rules are intentionally simple and should be treated as review gates, not complete fraud detection.
