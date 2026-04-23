@@ -90,7 +90,7 @@ Backend:
 - `PORT`: API port, default `4000`.
 - `CHAIN_ID`: display/config value for future chain integration.
 - `TOKEN_ADDRESS`: 72H token address placeholder.
-- `VAULT_ADDRESS`: future lock contract address.
+- `LOCK_VAULT_ADDRESS`: future lock contract address.
 - `ORACLE_ADDRESS`: future price/oracle contract address.
 - `REWARD_DISTRIBUTOR_ADDRESS`: future reward distributor contract address.
 - `ADMIN_EMAILS`: comma-separated admin emails for risk review APIs.

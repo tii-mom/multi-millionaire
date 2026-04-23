@@ -1,12 +1,16 @@
 import express from 'express';
 import { register, login } from '../controllers/authController';
+import { requireFields } from '../middlewares/validation';
+import { createRouteRateLimiter } from '../middlewares/rateLimit';
 
 const router = express.Router();
+const authRateLimit = createRouteRateLimiter('AUTH_RATE_LIMIT', 15 * 60 * 1000, 10);
 
 // POST /v1/auth/register
-router.post('/register', register);
+router.use(authRateLimit);
+router.post('/register', requireFields('body', ['email', 'password']), register);
 
 // POST /v1/auth/login
-router.post('/login', login);
+router.post('/login', requireFields('body', ['email', 'password']), login);
 
 export default router;
