@@ -1,142 +1,108 @@
 # Staging Smoke Test
 
-## RC1 Cloud Staging Result
-
-- Verification date: 2026-04-23
-- Current main used for staging: `9edf7985f4f87c2553554fc1e4549aa8ccfc88fa`
-- Backend staging URL: `https://multi-millionaire-api-staging.vercel.app`
-- Frontend staging URL: `https://dist-348421501-2064-348421501-qqcoms-projects.vercel.app`
-- Backend project: `multi-millionaire-api-staging`
-- Backend project ID: `prj_YygiIoNfVrCIPAgo8niV981tDypb`
-- Frontend project: `dist`
-- Frontend access strategy: Vercel Authentication disabled on staging so browser-origin fetches can reach the backend API.
-- Backend access strategy: Vercel Authentication disabled on staging for the same reason.
-- Database: Neon preview Postgres provisioned and connected successfully.
-- Migrations: `001_init.sql` -> `004_risk.sql` applied in order.
-- Seed: `npm run seed:dev` completed successfully against the cloud Postgres.
-
-Cloud smoke passed in order:
-
-| Step | Expected Result | Actual Result | Status |
-| --- | --- | --- | --- |
-| Register | `201` and JWT returned | Browser register created the account and stored a token | Pass |
-| Login | `200` and JWT returned | Browser logout/login returned `Signed in.` | Pass |
-| Claim pass | `200` and pass record returned | `POST /v1/waves/1/passes` created a claimed pass | Pass |
-| Create squad | `201`, creator becomes captain | Squad `1` created with captain membership | Pass |
-| Join squad | `201` and membership created | `member@example.com` joined squad `1` | Pass |
-| Deposit precheck | `200`, wave live and price available | `ok=true`, live wave, confirmed price loaded | Pass |
-| Deposit | `201`, off-chain position recorded | Qualifying position recorded for `amount_raw=1` | Pass |
-| Squad activation | Joined member becomes activated after qualifying deposit | Squad `1` showed `activated_member_count=1` | Pass |
-| Referral reward generate | Approved direct referral reward appears for captain | Approved direct referral reward created for the inviter | Pass |
-| Reward summary/list | Approved reward visible | Summary/list returned the approved ledger | Pass |
-| Reward claim | `200`, reward status becomes `claimed` | First claim was blocked by risk, then succeeded after resolution | Pass |
-| Risk flag trigger | Risk flag created on the reward source position | Admin-created `position` flag returned `open` | Pass |
-| Risk block | Open risk blocks related reward claim | Claim returned `409 RISK_REVIEW_REQUIRED` | Pass |
-| Risk resolve | Admin resolves flag | `PATCH /v1/risk/flags/:id` moved the flag to `resolved` | Pass |
-| Claim again | Claim allowed after risk resolution | Blocked reward claimed successfully | Pass |
-
-Result ids:
-
-- Squad: `1`
-- Reward ledger: `1903cc11-a393-45ac-aa8d-9f17c8940f00`
-- Risk flag: `b6ce0870-4c84-4aef-b4e4-390c237ca876`
-
-Boundary notes:
-
-- `POST /v1/waves/:waveId/deposit` remains an off-chain recorded deposit stub.
-- `POST /v1/rewards/:ledgerId/claim` remains an off-chain status update stub.
-- No on-chain settlement or live contract execution occurred in this smoke.
-
-## RC0 Environment
+## Cloudflare RC1 Evidence
 
 - Repository: `tii-mom/multi-millionaire`
-- Release marker: `staging-rc0-20260423`
-- Commit: `2ae4ee61ec71f18dd1bac2bb4dd8f800804f360c`
-- Frontend staging preview: `https://dist-8fikii6do-348421501-qqcoms-projects.vercel.app`
-- Frontend deployment ID: `dpl_AeKNDvNeN6mrJ4Z21d7zPgx2ZcNv`
-- Backend smoke URL: `http://127.0.0.1:4100`
-- Database: local PostgreSQL on port `5432`
-- Database name: `mm_staging_rc0`
+- Date: `2026-04-24`
+- Backend staging URL: `https://multi-millionaire-api-staging.348421501.workers.dev`
+- Frontend staging URL: `https://staging.multi-millionaire-staging.pages.dev`
+- Database route: `Hyperdrive + existing Postgres`
+- Smoke run id: `cf-20260424-rc1-final`
+- Smoke status: `pass`
 - Runtime: `NODE_ENV=staging`
-- High-risk threshold for this run: `5000`
+- High-risk threshold used in smoke: `1000000`
 
-The Vercel frontend preview was deployed successfully and reported `Ready`, but
-the team project has Vercel Authentication enabled. Unauthenticated requests to
-the preview URL return `401`. The full API smoke test was therefore executed
-against the staging backend URL above.
+This document separates:
 
-## Migration Result
+1. Real Cloudflare smoke evidence against the deployed Cloudflare backend URL
+2. Earlier local rehearsal evidence against the prepared origin database
 
-Migrations were applied in strict numeric order through `npm run migrate:up`:
+Only the first one counts as Cloudflare RC1 evidence.
 
-1. `server/migrations/001_init.sql`
-2. `server/migrations/002_squads.sql`
-3. `server/migrations/003_rewards.sql`
-4. `server/migrations/004_risk.sql`
+## Real Cloudflare Smoke Result
 
-Verification from `schema_migrations`:
+Command used:
 
-- `001_init.sql`
-- `002_squads.sql`
-- `003_rewards.sql`
-- `004_risk.sql`
+```bash
+cd server
+API_BASE_URL=https://multi-millionaire-api-staging.348421501.workers.dev \
+SMOKE_RUN_ID=cf-20260424-rc1-final \
+npm run smoke
+```
 
-Seed result:
+Top-level result:
 
-- `npm run seed:dev` completed successfully.
-- Seeded users: `admin@example.com`, `member@example.com`, `risk@example.com`.
-- Baseline seed counts: `users=3`, `waves=1`, `price_rounds=1`.
+- `status: pass`
+- `started_at: 2026-04-23T16:47:57.134Z`
+- `finished_at: 2026-04-23T16:48:16.492Z`
+- `duration_ms: 19358`
 
-## Smoke Test Accounts
+## Real Cloudflare Smoke Steps
 
-- Captain: `rc0-captain-1776947153866@example.com`
-- Member: `rc0-member-1776947153866@example.com`
-- Risk member: `rc0-risk-1776947153866@example.com`
-- Admin: `admin@example.com`
+| Step | Actual Result | Status |
+| --- | --- | --- |
+| Health check | `GET /health` returned `200`, `status=ok` | Pass |
+| Readiness check | `GET /ready` returned `200`, `status=ready`, `database=ok` | Pass |
+| Register | Captain/member/risk users registered with `201` | Pass |
+| Login | Captain and admin login returned `200` | Pass |
+| Claim pass | Captain claimed wave `1` pass | Pass |
+| Create squad | `201`, `squad_id=2`, initial squad status `open` | Pass |
+| Join squad | Member joined squad `2` as `joined_pending` | Pass |
+| Confirm referral | Member referral saved as `pending` | Pass |
+| Deposit precheck | `200`, `ok=true`, wave status `live` | Pass |
+| Deposit | `201`, qualifying position `2417b2a7-8e9a-4422-b95c-a62e47582bee` created | Pass |
+| Squad activation | Verified indirectly through the qualifying deposit path completing and the downstream reward path becoming available | Pass |
+| Referral reward generate | Verified by approved reward `e10a63d3-11c7-47a5-a8b6-c2b2c31ce477` appearing after the qualifying deposit | Pass |
+| Reward summary/list | Summary returned `approved_amount=10`; approved reward list contained the new ledger | Pass |
+| Reward claim | First reward claim returned `200`, status became `claimed` | Pass |
+| Risk trigger | High-value deposit `2000000` created risk position `f0df2d35-e92a-43e0-887c-0b354dff8716` | Pass |
+| Risk block | Claim returned `409` with `RISK_REVIEW_REQUIRED` while flag was open | Pass |
+| Risk resolve | Admin resolved risk flag `ded87b81-298b-4d8c-9f4c-e8da207a8730` | Pass |
+| Claim retry after risk resolve | Previously blocked reward claim returned `200`, status became `claimed` | Pass |
 
-## Smoke Test Steps
+## Real Cloudflare Smoke IDs
 
-| Step | Expected Result | Actual Result | Status |
-| --- | --- | --- | --- |
-| Health check | `200`, service status `ok` | `200`, status `ok` | Pass |
-| Readiness check | `200`, database status `ok` | `200`, status `ready`, database `ok` | Pass |
-| Register | `201` and JWT returned | Captain/member/risk users registered with `201` | Pass |
-| Login | `200` and JWT returned | Captain and admin login returned `200` | Pass |
-| Claim pass | `200` and pass record returned | Captain claimed wave `1` pass | Pass |
-| Create squad | `201`, creator becomes captain | `201`, `squadId=1`, captain member row created | Pass |
-| Join squad | `201` and membership created | Member joined squad `1` as `joined_pending` | Pass |
-| Confirm referral | `200`, member bound to captain inviter | Member referral saved as `pending` | Pass |
-| Deposit precheck | `200`, wave live and price available | `200`, `ok=true` | Pass |
-| Deposit | `201`, off-chain position recorded | `201`, amount `1000`, qualifying position recorded | Pass |
-| Squad activation | Joined member becomes activated after qualifying deposit | Squad leaderboard showed `activated_member_count >= 1`, `total_locked=1000` | Pass |
-| Referral reward generate | Approved direct referral reward appears for captain | Approved ledger created with `final_amount=10` | Pass |
-| Reward summary/list | Approved reward visible | Summary `approved_amount=10`; approved list returned one ledger | Pass |
-| Reward claim | `200`, reward status becomes `claimed` | First reward claimed successfully | Pass |
-| Risk flag trigger | High-value qualifying first lock creates risk flag | Risk member deposit `10000` created `high_value_first_lock` flag | Pass |
-| Risk block | Open risk blocks related reward claim | Claim returned `409` with `RISK_REVIEW_REQUIRED` | Pass |
-| Risk resolve | Admin resolves flag | `PATCH /v1/risk/flags/:id` returned status `resolved` | Pass |
-| Claim again | Claim allowed after risk resolution | Blocked reward claimed successfully; final claimed amount `110` | Pass |
+- Wave: `1`
+- Pass: `a8960ae2-80b9-4c17-bef9-d232acbdb655`
+- Squad: `2`
+- Standard reward ledger: `e10a63d3-11c7-47a5-a8b6-c2b2c31ce477`
+- Risk position: `f0df2d35-e92a-43e0-887c-0b354dff8716`
+- Risk flag: `ded87b81-298b-4d8c-9f4c-e8da207a8730`
+- Risk-blocked reward ledger: `6304f74c-2c28-4ab8-8aeb-944fcee523ee`
 
-## Result IDs
+## Root Cause Fixed During This Thread
 
-- Squad: `1`
-- First reward ledger: `ae8401d9-cf82-471f-bdfb-8b90da353a13`
-- Risk-blocked reward ledger: `d8daedd7-e66e-4bbc-8b52-1a3fca9651ac`
-- High-value risk flag: `16aa57ff-c01d-4dc1-9bf1-7f07c131bca5`
+The first Cloudflare smoke attempt failed after registration:
 
-## Problem Record
+- `register`: pass
+- immediate `login`: fail with `401 INVALID_CREDENTIALS`
 
-1. The frontend preview deployment is protected by Vercel Authentication.
-   - Impact: unauthenticated browser/curl access to the preview URL returns `401`.
-   - Result: deployment status is `Ready`; API smoke was completed against the staging backend URL.
+Root cause:
 
-2. The Codex fallback deployment endpoint no longer returns claimable preview URLs.
-   - Impact: fallback script returned guidance to use the Vercel CLI instead of a preview URL.
-   - Result: deployed with authenticated Vercel CLI and explicit `--target preview`.
+- Hyperdrive caching was enabled
+- register path first queried `findByEmail(email)` and cached the empty result
+- immediate login queried the same email and hit that stale empty lookup
+
+Fix:
+
+- staging Hyperdrive caching was changed to `disabled`
+
+After that update, login and the rest of the real Cloudflare smoke passed.
+
+## Local Rehearsal Evidence
+
+Before the final Hyperdrive binding, the prepared Postgres origin was also
+verified locally. This remains useful evidence but is not counted as the
+Cloudflare smoke run:
+
+- local backend URL: `http://127.0.0.1:4100`
+- migrations `001 -> 004`: pass
+- `seed:dev`: pass
+- local smoke result: pass
 
 ## Boundary Notes
 
-- No real chain lock occurred in this smoke run.
+- No real chain lock occurred in this smoke.
 - `POST /v1/waves/:waveId/deposit` remains an off-chain recorded deposit stub.
 - `POST /v1/rewards/:ledgerId/claim` remains an off-chain status update stub.
 - Risk blocking and release are verified through `risk_flags` state, not on-chain settlement.

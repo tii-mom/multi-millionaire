@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import routes from './routes';
 import { query } from './db';
+import { jsonBodyParser } from './middlewares/jsonBody';
 import { errorLogger, requestLogger } from './middlewares/logging';
 
 // Load environment variables at startup
@@ -41,8 +42,8 @@ app.use(cors({
   credentials: true,
 }));
 
-// JSON body parser
-app.use(express.json());
+// Use a local JSON parser so the API works in both Node and Workers runtimes.
+app.use(jsonBodyParser);
 
 // Assign simple request ID for logging and correlation
 app.use((req, res, next) => {
