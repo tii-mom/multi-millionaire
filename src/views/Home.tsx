@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ArrowRight, KeyRound, LogOut, Wallet, Target, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { api } from "@/src/lib/api";
 
 interface HomeProps {
   tokenPrice: number;
@@ -26,11 +27,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
     async function loadBootstrap() {
       try {
-        const response = await fetch("/v1/app/bootstrap");
-        if (!response.ok) return;
-        const json = await response.json();
-        if (!cancelled && json.data?.current_wave?.wave_id) {
-          setWaveId(Number(json.data.current_wave.wave_id));
+        const data = await api.bootstrap();
+        if (!cancelled && data.current_wave?.wave_id) {
+          setWaveId(Number(data.current_wave.wave_id));
         }
       } catch {
         // The API is optional while developing the standalone frontend.
@@ -64,16 +63,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     setApiError(null);
 
     try {
-      const response = await fetch(`/v1/auth/${mode}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error?.message || `${mode} failed.`);
-      }
-      persistToken(json.data.token);
+      const result = mode === "register" ? await api.register(email, password) : await api.login(email, password);
+      persistToken(result.token);
       toast.success(mode === "register" ? "Account created." : "Signed in.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Authentication failed.";
@@ -113,28 +104,12 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     setApiError(null);
 
     try {
-      const precheckResponse = await fetch(`/v1/waves/${waveId}/deposit-precheck`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      const precheckJson = await precheckResponse.json();
-      if (!precheckResponse.ok || !precheckJson.data?.ok) {
-        const reasons = precheckJson.data?.reasons?.join(", ");
-        throw new Error(reasons || precheckJson.error?.message || "Deposit precheck failed.");
+      const precheck = await api.depositPrecheck(waveId, authToken);
+      if (!precheck.ok) {
+        throw new Error(precheck.reasons?.join(", ") || "Deposit precheck failed.");
       }
 
-      const depositResponse = await fetch(`/v1/waves/${waveId}/deposit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ amount: val.toString() }),
-      });
-      const depositJson = await depositResponse.json();
-      if (!depositResponse.ok) {
-        throw new Error(depositJson.error?.message || "Deposit failed.");
-      }
+      await api.deposit(waveId, val.toString(), authToken);
 
       setMyDeposit((p: number) => p + val);
       setInputValue("");

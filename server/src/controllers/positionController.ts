@@ -3,6 +3,7 @@ import { getLatestConfirmedPrice } from '../models/priceModel';
 import { getCurrentWave, getWaveById } from '../models/waveModel';
 import { createPosition } from '../models/positionModel';
 import { lockReferral } from '../models/referralModel';
+import { activateSquadMember } from '../models/squadModel';
 import { query } from '../db';
 
 /**
@@ -49,10 +50,12 @@ export async function depositPrecheck(req: Request, res: Response, next: NextFun
 }
 
 /**
- * Placeholder for deposit endpoint.
+ * Off-chain recorded deposit endpoint.
  *
- * A full implementation would accept a signed transaction or call the smart
- * contract on behalf of the user.  This stub simply returns a 501 status.
+ * Sprint 1 does not perform a real on-chain token lock. A full implementation
+ * should accept or verify a signed transaction and derive the position ID from
+ * the chain receipt. This MVP stub records a database position and triggers
+ * downstream product rules only.
  */
 export async function deposit(req: Request, res: Response, next: NextFunction) {
   try {
@@ -65,13 +68,22 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
     if (!amount) {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'Amount is required' } });
     }
+    let amountRaw: bigint;
+    try {
+      amountRaw = BigInt(amount);
+    } catch {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'Amount must be a whole-number raw token amount' } });
+    }
+    if (amountRaw <= BigInt(0)) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'Amount must be greater than zero' } });
+    }
     // Ensure the wave is valid and live
     const wave = await getWaveById(waveId);
     if (!wave || wave.status !== 'live') {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WAVE', message: 'Wave is not live' } });
     }
     // Determine if deposit qualifies for activation
-    const qualifies = BigInt(amount) >= BigInt(wave.min_lock_amount);
+    const qualifies = amountRaw >= BigInt(wave.min_lock_amount);
     // Determine if this is user's first qualifying deposit for this wave. Count positions qualifying for activation.
     const existing = await query<{ count: string }>(
       `SELECT COUNT(*) FROM positions WHERE user_id = $1 AND qualifies_for_activation = TRUE`,
@@ -97,6 +109,9 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
     // If first qualifying deposit, lock referral
     if (isFirst) {
       await lockReferral(user.id);
+    }
+    if (qualifies) {
+      await activateSquadMember(waveId, user.id);
     }
     return res.status(201).json({ request_id: req.id || '', data: position });
   } catch (err) {
