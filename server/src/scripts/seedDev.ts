@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { closePool, query } from '../db';
 
 const SALT_ROUNDS = 10;
@@ -39,4 +39,3 @@ main()
   .finally(async () => {
     await closePool();
   });
-

@@ -1,21 +1,49 @@
-import { Pool, PoolClient, QueryResultRow } from 'pg';
+import { Client, Pool, PoolClient, QueryResultRow } from 'pg';
 import dotenv from 'dotenv';
+import { getHyperdriveConnectionString } from './runtime';
 
 // Load environment variables from .env file. If the file does not exist,
 // dotenv will silently ignore it. In production you should set these variables
 // via your process manager or orchestration tool (e.g. Docker secrets).
 dotenv.config();
 
-// Create a single pool instance to be shared throughout the app. This avoids
-// exhausting the database connection limit under load.
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // Optional: configure SSL for production deployments (e.g. Heroku)
-  ssl:
-    process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : undefined,
-});
+let pool: Pool | null = null;
+let poolConnectionString: string | null = null;
+
+function getDatabaseConnectionString() {
+  const hyperdriveConnectionString = getHyperdriveConnectionString();
+  if (hyperdriveConnectionString) {
+    return hyperdriveConnectionString;
+  }
+
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (databaseUrl) {
+    return databaseUrl;
+  }
+
+  throw new Error('DATABASE_URL or HYPERDRIVE binding is required');
+}
+
+function getOrCreatePool(connectionString: string) {
+  if (!pool || poolConnectionString !== connectionString) {
+    if (pool) {
+      void pool.end();
+    }
+
+    pool = new Pool({
+      connectionString,
+      // Keep the existing Node deployment behavior. Hyperdrive provides its
+      // own connection endpoint and does not need the Node SSL override.
+      ssl:
+        process.env.NODE_ENV === 'production' && !getHyperdriveConnectionString()
+          ? { rejectUnauthorized: false }
+          : undefined,
+    });
+    poolConnectionString = connectionString;
+  }
+
+  return pool;
+}
 
 function logDbEvent(level: 'info' | 'error', payload: Record<string, unknown>) {
   const entry = {
@@ -39,8 +67,12 @@ function logDbEvent(level: 'info' | 'error', payload: Record<string, unknown>) {
 // transactions and pooled connections.
 export async function query<T extends QueryResultRow = QueryResultRow>(text: string, params?: any[]): Promise<{ rows: T[] }> {
   const start = Date.now();
+  const hyperdriveConnectionString = getHyperdriveConnectionString();
+  const connectionString = getDatabaseConnectionString();
   try {
-    const result = await pool.query<T>(text, params);
+    const result = hyperdriveConnectionString
+      ? await queryWithHyperdrive<T>(connectionString, text, params)
+      : await getOrCreatePool(connectionString).query<T>(text, params);
     const duration = Date.now() - start;
     if (process.env.NODE_ENV !== 'production') {
       logDbEvent('info', { duration_ms: duration, rows: result.rowCount, text });
@@ -60,14 +92,37 @@ export async function query<T extends QueryResultRow = QueryResultRow>(text: str
 
 // Expose a method to gracefully shut down the pool when the process exits.
 export async function closePool() {
-  await pool.end();
+  if (pool) {
+    await pool.end();
+    pool = null;
+    poolConnectionString = null;
+  }
 }
 
 export async function withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+  if (getHyperdriveConnectionString()) {
+    throw new Error('withClient is only supported for the Node/Postgres pool path');
+  }
+
+  const client = await getOrCreatePool(getDatabaseConnectionString()).connect();
   try {
     return await fn(client);
   } finally {
     client.release();
+  }
+}
+
+async function queryWithHyperdrive<T extends QueryResultRow = QueryResultRow>(
+  connectionString: string,
+  text: string,
+  params?: any[]
+) {
+  const client = new Client({ connectionString });
+
+  try {
+    await client.connect();
+    return await client.query<T>(text, params);
+  } finally {
+    await client.end();
   }
 }
