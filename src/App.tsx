@@ -8,12 +8,33 @@ import Home from "./views/Home";
 import Team from "./views/Team";
 import Rewards from "./views/Rewards";
 import Share from "./views/Share";
+import Admin from "./views/Admin";
 import BottomNav from "./components/BottomNav";
 import { Toaster } from "@/src/components/ui/sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 
 export default function App() {
+  const isAdminRoute = window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
+
+  if (isAdminRoute) {
+    return (
+      <>
+        <Admin />
+        <Toaster
+          toastOptions={{
+            className: "bg-[#111] border-white/10 text-white font-mono text-xs rounded-2xl",
+          }}
+          position="top-center"
+        />
+      </>
+    );
+  }
+
+  return <MainApp />;
+}
+
+function MainApp() {
   const [activeTab, setActiveTab] = useState("home");
   const [direction, setDirection] = useState(0); // For animating tabs
 
