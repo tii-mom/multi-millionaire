@@ -8,9 +8,11 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "jest --runInBand",
+    "check:env": "ts-node src/scripts/checkEnv.ts",
     "migrate:up": "ts-node src/scripts/migrate.ts up",
     "migrate:reset": "ts-node src/scripts/migrate.ts reset",
-    "seed:dev": "ts-node src/scripts/seedDev.ts"
+    "seed:dev": "ts-node src/scripts/seedDev.ts",
+    "smoke": "ts-node src/scripts/smoke.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
