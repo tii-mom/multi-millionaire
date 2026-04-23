@@ -6,7 +6,7 @@
 - Date: `2026-04-24`
 - Backend staging URL: `https://multi-millionaire-api-staging.348421501.workers.dev`
 - Frontend staging URL: `https://staging.multi-millionaire-staging.pages.dev`
-- Database route: `Hyperdrive + existing Postgres`
+- Database route: `Hyperdrive -> VPC Service -> Tunnel -> existing local Postgres`
 - Smoke run id: `cf-20260424-rc1-final`
 - Smoke status: `pass`
 - Runtime: `NODE_ENV=staging`
@@ -99,6 +99,15 @@ Cloudflare smoke run:
 - migrations `001 -> 004`: pass
 - `seed:dev`: pass
 - local smoke result: pass
+
+## RC1 Classification
+
+- Internal RC1 candidate: `yes`
+  - reason: real Cloudflare smoke `cf-20260424-rc1-final` passed against the
+    deployed Cloudflare backend URL
+- Sustainable RC1 environment: `no`
+  - reason: the staging database origin still depends on the local PostgreSQL
+    process plus the local Cloudflare Tunnel on this machine
 
 ## Boundary Notes
 

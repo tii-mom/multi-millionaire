@@ -7,7 +7,8 @@ replace a real Cloudflare staging smoke run against the deployed backend URL.
 
 ## Current Cloudflare Status
 
-As of `2026-04-24`, the Cloudflare staging line satisfies the gate:
+As of `2026-04-24`, the Cloudflare staging line satisfies the functional RC1
+candidate gate:
 
 - backend staging URL is live:
   `https://multi-millionaire-api-staging.348421501.workers.dev`
@@ -17,7 +18,23 @@ As of `2026-04-24`, the Cloudflare staging line satisfies the gate:
 - backend `GET /ready`: `200`
 - readiness database status: `ok`
 - Hyperdrive binding is live and backed by existing Postgres
+- Hyperdrive origin is still the local tunnel-backed Postgres route:
+  `Hyperdrive -> VPC Service -> Tunnel -> this machine`
 - real Cloudflare smoke run `cf-20260424-rc1-final`: `pass`
+
+This is enough for current internal RC1 candidate validation. It is not yet
+enough to call staging a sustainable RC1 environment.
+
+## Sustainability Gate
+
+For the environment to be called a sustainable RC1 environment, staging must
+move from the current local-origin route to `Hyperdrive + managed Postgres`.
+
+- Single blocker:
+  `No managed Postgres instance and connection string are provisioned for
+  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be run
+  on a persistent origin.`
+- Tracking doc: `docs/cloudflare/persistent-db-plan.md`
 
 ## Entry Criteria
 
@@ -98,4 +115,6 @@ Keep these with the RC1 record:
 
 ## Current Decision
 
-Current result: Cloudflare RC1 gate passes.
+Current result: Cloudflare internal RC1 candidate gate passes, but the
+sustainable RC1 environment gate remains blocked by the missing managed
+Postgres origin.

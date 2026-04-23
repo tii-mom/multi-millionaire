@@ -28,6 +28,9 @@ contains the Cloudflare backend staging host, not a Vercel/Neon endpoint.
 - Real Cloudflare smoke result:
   - run id: `cf-20260424-rc1-final`
   - status: `pass`
+- Functional assessment:
+  - internal RC1 candidate validation: `pass`
+  - sustainable RC1 environment: `blocked`
 
 ## Working Database Route
 
@@ -91,6 +94,15 @@ migrated to D1.
   - `member@example.com`
   - `risk@example.com`
 
+## Sustainability Assessment
+
+- Single blocker:
+  `No managed Postgres instance and connection string are provisioned for
+  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be
+  rerun on a persistent origin.`
+- The persistent cutover plan and fallback operating notes are tracked in
+  `docs/cloudflare/persistent-db-plan.md`.
+
 ## Commands Used
 
 Workers VPC Service:
@@ -146,6 +158,10 @@ npm run smoke
 
 ## RC1 State
 
-- Current blocker count: `0`
-- Current status: Cloudflare staging is usable
-- RC1 recommendation: ready to enter Cloudflare RC1
+- Current blocker count: `1`
+- Current status: Cloudflare staging is usable for internal RC1 candidate
+  validation
+- Sustainable RC1 status: not yet achieved
+- Stub boundary: deposit and reward claim remain off-chain stubs
+- RC1 recommendation: acceptable as an internal RC1 candidate, not yet a
+  sustainable RC1 environment
