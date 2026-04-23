@@ -4,6 +4,9 @@ import { Users, Crown, Sparkles, Plus, Target, Loader2, UserPlus } from "lucide-
 import { motion } from "motion/react";
 import { api } from "@/src/lib/api";
 import type { SquadLeaderboardRow } from "@/src/lib/types";
+import EmptyState from "@/src/components/ui/EmptyState";
+import ErrorState from "@/src/components/ui/ErrorState";
+import LoadingCard from "@/src/components/ui/LoadingCard";
 
 interface TeamProps {
   tokenPrice: number;
@@ -22,10 +25,12 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
   const [waveId, setWaveId] = useState<number | null>(null);
   const [squads, setSquads] = useState<SquadLeaderboardRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadSquads = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const wave = await api.currentWave();
       if (!wave?.wave_id) {
@@ -38,6 +43,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
       setSquads(rows);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load squads.";
+      setLoadError(message);
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -106,19 +112,19 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
   };
 
   return (
-    <div className="px-6 flex flex-col gap-6 pb-10">
+    <div className="flex flex-col gap-4 px-4 pb-8 sm:gap-6 sm:px-6 sm:pb-10">
       {/* Squad Header */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl relative overflow-hidden group">
+      <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.02] p-4 backdrop-blur-xl sm:rounded-[24px] sm:p-6 group">
         <div className="absolute -right-10 -top-10 w-32 h-32 bg-[#DBFF00]/10 blur-3xl rounded-full" />
 
-        <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className="relative z-10 mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-white/50">
             <Users className="w-5 h-5" />
             <span className="text-[11px] uppercase tracking-widest font-mono">
               {topSquad ? topSquad.name : "Wave Squads"}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[#DBFF00] bg-[#DBFF00]/10 px-3 py-1.5 rounded-full text-[10px] font-mono border border-[#DBFF00]/20 font-semibold tracking-wider">
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-1.5 font-mono text-[10px] font-semibold tracking-wider text-[#DBFF00]">
             <Sparkles className="w-3 h-3" /> {topSquad ? `Rank #${topSquad.rank}` : "No Rank"}
           </div>
         </div>
@@ -151,7 +157,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
           </motion.div>
 
           {/* Custom Goal Input */}
-          <div className="flex items-center gap-2 mb-5">
+          <div className="mb-5 flex items-center gap-2">
             <input
               type="number"
               value={goalInput}
@@ -198,9 +204,9 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
       </div>
 
       {/* Create Action */}
-      <div className="w-full bg-white/[0.02] border border-dashed border-white/20 rounded-[20px] p-4 backdrop-blur-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+      <div className="w-full rounded-[20px] border border-dashed border-white/20 bg-white/[0.02] p-4 backdrop-blur-sm">
+        <div className="flex flex-col gap-3 min-[420px]:flex-row min-[420px]:items-center">
+          <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 min-[420px]:flex">
             <Plus className="w-4 h-4 text-[#DBFF00]" />
           </div>
           <input
@@ -213,7 +219,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
             type="button"
             onClick={handleCreateSquad}
             disabled={isSubmitting || !waveId}
-            className="bg-[#DBFF00] text-black px-4 py-2.5 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-[#c4e600] transition-colors active:scale-[0.98] disabled:opacity-60"
+            className="flex items-center justify-center rounded-[14px] bg-[#DBFF00] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-black transition-colors hover:bg-[#c4e600] active:scale-[0.98] disabled:opacity-60 min-[420px]:shrink-0"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
           </button>
@@ -221,7 +227,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
       </div>
 
       {/* Leaderboard */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-2 backdrop-blur-xl">
+      <div className="rounded-[20px] border border-white/10 bg-white/[0.02] p-2 backdrop-blur-xl sm:rounded-[24px]">
         <h3 className="text-[11px] uppercase tracking-[0.2em] font-mono text-white/50 p-4 pb-2 flex items-center gap-2">
           <Crown className="w-4 h-4 text-[#DBFF00]/80" />
           Squad Leaderboard
@@ -229,21 +235,28 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
 
         <div className="flex flex-col gap-1 mt-2">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 text-white/40 font-mono text-xs py-8">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading squads
-            </div>
+            <LoadingCard title="Loading squads" description="Refreshing current Wave leaderboard." rows={3} />
+          ) : loadError ? (
+            <ErrorState title="Squads unavailable" message={loadError} onRetry={loadSquads} />
+          ) : !waveId ? (
+            <EmptyState
+              title="No active wave"
+              description="Squads open when the backend reports an active Wave."
+              actionLabel="Check again"
+              onAction={loadSquads}
+            />
           ) : squads.length === 0 ? (
-            <div className="text-center text-white/40 font-mono text-xs py-8 uppercase tracking-widest">
-              No squads in this wave yet
-            </div>
+            <EmptyState
+              title="No squads yet"
+              description="Create the first squad for this Wave, then invite members to join."
+            />
           ) : (
             squads.map((squad, i) => {
               const locked = Number(squad.total_locked || 0);
               return (
                 <div
                   key={squad.id}
-                  className={`flex items-center justify-between p-4 rounded-[16px] transition-colors ${
+                  className={`flex flex-col gap-3 rounded-[16px] p-4 transition-colors min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between ${
                     i === 0
                       ? "bg-[#DBFF00]/5 border border-[#DBFF00]/20"
                       : "hover:bg-white/[0.03] border border-transparent"
@@ -264,7 +277,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-3 min-[420px]:justify-end">
                     <div className="font-mono text-sm text-right flex flex-col items-end">
                       <span className="tabular-nums font-semibold tracking-tight">${formatNumber(locked * tokenPrice)}</span>
                       <span className="text-[9px] text-white/40 tabular-nums uppercase tracking-widest mt-0.5">
