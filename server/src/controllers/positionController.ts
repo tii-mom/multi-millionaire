@@ -1,0 +1,105 @@
+import { Request, Response, NextFunction } from 'express';
+import { getLatestConfirmedPrice } from '../models/priceModel';
+import { getCurrentWave, getWaveById } from '../models/waveModel';
+import { createPosition } from '../models/positionModel';
+import { lockReferral } from '../models/referralModel';
+import { query } from '../db';
+
+/**
+ * Deposit precheck endpoint.
+ *
+ * Examines whether the user may deposit into the current wave.  In this stub
+ * implementation it merely returns the current wave settings and latest price.
+ * A full implementation should verify the user’s inviter binding, squad
+ * membership and wind up any qualifying rules.
+ */
+export async function depositPrecheck(req: Request, res: Response, next: NextFunction) {
+  try {
+    const wave = await getCurrentWave();
+    const price = await getLatestConfirmedPrice();
+    if (!wave || !price) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'NO_WAVE_OR_PRICE', message: 'No active wave or price data available' } });
+    }
+    // Basic precheck: ensure wave is live and price is fresh. For now we only check status.
+    const ok = wave.status === 'live';
+    const reasons: string[] = [];
+    if (!ok) {
+      reasons.push('Wave not live');
+    }
+    return res.json({
+      request_id: req.id || '',
+      data: {
+        ok,
+        reasons,
+        wave_status: wave.status,
+        min_lock_amount: wave.min_lock_amount,
+        price: price,
+        referral: null,
+        squad: null,
+        wallet: {
+          bound: !!req.user,
+          primary_wallet: null,
+        },
+        notes: [],
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * Placeholder for deposit endpoint.
+ *
+ * A full implementation would accept a signed transaction or call the smart
+ * contract on behalf of the user.  This stub simply returns a 501 status.
+ */
+export async function deposit(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
+    }
+    const waveId = Number(req.params.waveId);
+    const { amount } = req.body;
+    if (!amount) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'Amount is required' } });
+    }
+    // Ensure the wave is valid and live
+    const wave = await getWaveById(waveId);
+    if (!wave || wave.status !== 'live') {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WAVE', message: 'Wave is not live' } });
+    }
+    // Determine if deposit qualifies for activation
+    const qualifies = BigInt(amount) >= BigInt(wave.min_lock_amount);
+    // Determine if this is user's first qualifying deposit for this wave. Count positions qualifying for activation.
+    const existing = await query<{ count: string }>(
+      `SELECT COUNT(*) FROM positions WHERE user_id = $1 AND qualifies_for_activation = TRUE`,
+      [user.id]
+    );
+    const isFirst = qualifies && existing.rows[0].count === '0';
+    // Generate a fake on-chain position ID. In a real implementation this would come from the transaction receipt.
+    const onchainPositionId = (Date.now() + Math.floor(Math.random() * 1000)).toString();
+    // For demonstration, we treat latest confirmed price as entry price.
+    const price = await getLatestConfirmedPrice();
+    const entryPrice = price ? price.price : '0';
+    const unlockMultiplierBps = 15000;
+    const position = await createPosition(
+      user.id,
+      waveId,
+      amount,
+      onchainPositionId,
+      entryPrice,
+      unlockMultiplierBps,
+      qualifies,
+      isFirst
+    );
+    // If first qualifying deposit, lock referral
+    if (isFirst) {
+      await lockReferral(user.id);
+    }
+    return res.status(201).json({ request_id: req.id || '', data: position });
+  } catch (err) {
+    return next(err);
+  }
+}

@@ -1,30 +1,151 @@
-import { useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowRight, Wallet, Target, Loader2 } from "lucide-react";
+import { ArrowRight, KeyRound, LogOut, Wallet, Target, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue }: any) {
+interface HomeProps {
+  tokenPrice: number;
+  myDeposit: number;
+  setMyDeposit: Dispatch<SetStateAction<number>>;
+  targetValue: number;
+}
+
+export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue }: HomeProps) {
   const [inputValue, setInputValue] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem("auth_token"));
+  const [waveId, setWaveId] = useState<number | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const availableBalance = 2450000 - myDeposit; // Make balance strictly dynamic according to local storage changes
 
-  const handleDeposit = () => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBootstrap() {
+      try {
+        const response = await fetch("/v1/app/bootstrap");
+        if (!response.ok) return;
+        const json = await response.json();
+        if (!cancelled && json.data?.current_wave?.wave_id) {
+          setWaveId(Number(json.data.current_wave.wave_id));
+        }
+      } catch {
+        // The API is optional while developing the standalone frontend.
+      }
+    }
+
+    loadBootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const persistToken = (token: string) => {
+    setAuthToken(token);
+    localStorage.setItem("auth_token", token);
+  };
+
+  const clearToken = () => {
+    setAuthToken(null);
+    localStorage.removeItem("auth_token");
+    toast.message("Signed out.");
+  };
+
+  const authenticate = async (mode: "register" | "login") => {
+    if (!email || !password) {
+      setApiError("Email and password are required.");
+      return;
+    }
+
+    setAuthLoading(true);
+    setApiError(null);
+
+    try {
+      const response = await fetch(`/v1/auth/${mode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error?.message || `${mode} failed.`);
+      }
+      persistToken(json.data.token);
+      toast.success(mode === "register" ? "Account created." : "Signed in.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Authentication failed.";
+      setApiError(message);
+      toast.error(message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleDeposit = async () => {
     const val = Number(inputValue);
     if (!val || val <= 0) {
       toast.error("Enter a valid amount");
+      return;
+    }
+    if (!Number.isInteger(val)) {
+      toast.error("Use a whole-number 72H amount for this MVP backend.");
       return;
     }
     if (val > availableBalance) {
       toast.error("Insufficient balance");
       return;
     }
+    if (!authToken) {
+      setApiError("Register or sign in before submitting a lock.");
+      toast.error("Sign in required before locking 72H.");
+      return;
+    }
+    if (!waveId) {
+      setApiError("No active Wave loaded from backend.");
+      toast.error("No active Wave available.");
+      return;
+    }
+
     setIsConfirming(true);
-    setTimeout(() => {
+    setApiError(null);
+
+    try {
+      const precheckResponse = await fetch(`/v1/waves/${waveId}/deposit-precheck`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const precheckJson = await precheckResponse.json();
+      if (!precheckResponse.ok || !precheckJson.data?.ok) {
+        const reasons = precheckJson.data?.reasons?.join(", ");
+        throw new Error(reasons || precheckJson.error?.message || "Deposit precheck failed.");
+      }
+
+      const depositResponse = await fetch(`/v1/waves/${waveId}/deposit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ amount: val.toString() }),
+      });
+      const depositJson = await depositResponse.json();
+      if (!depositResponse.ok) {
+        throw new Error(depositJson.error?.message || "Deposit failed.");
+      }
+
       setMyDeposit((p: number) => p + val);
       setInputValue("");
+      toast.success(`Backend lock recorded for ${val.toLocaleString()} 72H.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Deposit failed.";
+      setApiError(message);
+      toast.error(message);
+    } finally {
       setIsConfirming(false);
-      toast.success(`Tx Confirmed! Locked ${val.toLocaleString()} 72H successfully.`);
-    }, 1500); // Simulated Web3 Delay
+    }
   };
 
   const currentFiatValue = myDeposit * tokenPrice;
@@ -33,6 +154,80 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
   return (
     <div className="px-6 flex flex-col gap-6 pb-10">
+      {/* Account Section */}
+      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-5 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute -left-10 -top-10 w-24 h-24 bg-[#DBFF00]/10 blur-3xl rounded-full" />
+        <div className="relative z-10 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-white/60">
+              <KeyRound className="w-4 h-4 text-[#DBFF00]" />
+              <span className="text-[10px] uppercase tracking-[0.2em] font-mono">Account Access</span>
+            </div>
+            <div className={`text-[9px] uppercase tracking-widest font-mono ${authToken ? "text-[#DBFF00]" : "text-white/35"}`}>
+              {authToken ? "Signed In" : "Required"}
+            </div>
+          </div>
+
+          {!authToken ? (
+            <div className="grid gap-3">
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Email"
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-sm placeholder:text-white/20"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-sm placeholder:text-white/20"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => authenticate("register")}
+                  disabled={authLoading}
+                  className="bg-[#DBFF00] text-black rounded-2xl py-3 text-xs font-bold uppercase tracking-widest disabled:opacity-60"
+                >
+                  Register
+                </button>
+                <button
+                  type="button"
+                  onClick={() => authenticate("login")}
+                  disabled={authLoading}
+                  className="bg-white/10 text-white rounded-2xl py-3 text-xs font-bold uppercase tracking-widest border border-white/10 disabled:opacity-60"
+                >
+                  Login
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-white/35 font-mono">Current Wave</div>
+                <div className="font-mono text-sm text-white/80">{waveId ? `#${waveId}` : "Loading..."}</div>
+              </div>
+              <button
+                type="button"
+                onClick={clearToken}
+                className="flex items-center gap-2 text-white/50 hover:text-white text-xs uppercase tracking-widest font-mono"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Logout
+              </button>
+            </div>
+          )}
+
+          {apiError && (
+            <div className="text-[10px] font-mono text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+              {apiError}
+            </div>
+          )}
+        </div>
+      </div>
+      
       
       {/* Progress Section */}
       <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl relative overflow-hidden group">
@@ -179,7 +374,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             {isConfirming ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Confirming Tx...</span>
+                <span>Submitting Lock...</span>
               </>
             ) : (
               <>
@@ -192,7 +387,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           <div className="flex items-center justify-between w-full mt-2">
             <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 font-mono flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-              72H Lock • Earn Yield
+              72H Lock • Gas paid by user
             </p>
             {/* Network Pulse Tracker */}
             <div className="flex items-center gap-1.5 opacity-50">
