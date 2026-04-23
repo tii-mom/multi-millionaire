@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import Home from "./views/Home";
 import Team from "./views/Team";
+import Rewards from "./views/Rewards";
 import Share from "./views/Share";
 import BottomNav from "./components/BottomNav";
 import { Toaster } from "@/src/components/ui/sonner";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [direction, setDirection] = useState(0); // For animating tabs
-  
+
   // App Global State (Persistent locally)
   const [tokenPrice, setTokenPrice] = useState(1.42);
   const [myDeposit, setMyDeposit] = useState(() => {
@@ -33,7 +34,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("72h_goal", squadGoal.toString()), [squadGoal]);
 
   const handleSetTab = (newTab: string) => {
-    const tabs = ["home", "team", "share"];
+    const tabs = ["home", "team", "rewards", "share"];
     const currIndex = tabs.indexOf(activeTab);
     const newIndex = tabs.indexOf(newTab);
     setDirection(newIndex > currIndex ? 1 : -1);
@@ -76,7 +77,7 @@ export default function App() {
         <div className="grain-overlay" />
         {/* Scanlines Effect */}
         <div className="scanlines" />
-        
+
         {/* Background Video */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
           <video
@@ -94,15 +95,15 @@ export default function App() {
 
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100%] h-[200px] bg-gradient-to-b from-[#DBFF00]/10 to-transparent blur-[50px] pointer-events-none z-0" />
-        
+
         {/* Web3 Wallet Simulator (Mock) */}
-        <div 
+        <div
           onClick={() => toast.success("Wallet fully synchronized. 18ms latency.")}
           className="absolute top-4 right-6 flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 z-20 backdrop-blur-md cursor-pointer hover:bg-white/10 transition-colors shadow-lg group"
         >
           <div className="w-1.5 h-1.5 rounded-full bg-[#DBFF00] shadow-[0_0_8px_#DBFF00] group-hover:animate-ping" />
           <span className="text-[10px] font-mono text-white/80 tracking-widest pl-0.5">0x3F<span className="opacity-50">...</span>b9A</span>
-          
+
           <div className="absolute top-full mt-2 right-0 bg-[#111] border border-white/10 rounded-xl p-2.5 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 min-w-[120px] shadow-2xl">
              <div className="flex justify-between items-center text-[9px] font-mono mb-1 text-white/50">
                <span>Status</span>
@@ -133,7 +134,7 @@ export default function App() {
               </svg>
             </div>
             <div className="text-[#DBFF00] font-mono text-[17px] font-medium flex items-center gap-2 tabular-nums">
-              <motion.span 
+              <motion.span
                 key={tokenPrice}
                 initial={{ opacity: 0.5, color: "#fff" }}
                 animate={{ opacity: 1, color: "#DBFF00" }}
@@ -151,8 +152,8 @@ export default function App() {
         <main className="flex-1 overflow-y-auto overflow-x-hidden z-10 pb-28 pt-2 no-scrollbar scroll-smooth relative">
           <AnimatePresence mode="popLayout" custom={direction} initial={false}>
             {activeTab === "home" && (
-              <motion.div 
-                key="home" 
+              <motion.div
+                key="home"
                 custom={direction}
                 variants={variants}
                 initial="initial" animate="animate" exit="exit"
@@ -163,8 +164,8 @@ export default function App() {
               </motion.div>
             )}
             {activeTab === "team" && (
-              <motion.div 
-                key="team" 
+              <motion.div
+                key="team"
                 custom={direction}
                 variants={variants}
                 initial="initial" animate="animate" exit="exit"
@@ -174,9 +175,21 @@ export default function App() {
                 <Team tokenPrice={tokenPrice} myDeposit={myDeposit} squadGoal={squadGoal} setSquadGoal={setSquadGoal} />
               </motion.div>
             )}
+            {activeTab === "rewards" && (
+              <motion.div
+                key="rewards"
+                custom={direction}
+                variants={variants}
+                initial="initial" animate="animate" exit="exit"
+                transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+                className="w-full absolute left-0 top-0 mb-28"
+              >
+                <Rewards />
+              </motion.div>
+            )}
             {activeTab === "share" && (
-              <motion.div 
-                key="share" 
+              <motion.div
+                key="share"
                 custom={direction}
                 variants={variants}
                 initial="initial" animate="animate" exit="exit"
@@ -191,7 +204,7 @@ export default function App() {
 
         <BottomNav activeTab={activeTab} setActiveTab={handleSetTab} />
       </div>
-      <Toaster 
+      <Toaster
         toastOptions={{
           className: "bg-[#111] border-white/10 text-white font-mono text-xs rounded-2xl",
         }}

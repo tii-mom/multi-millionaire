@@ -1,9 +1,10 @@
-import { Home as HomeIcon, Users, Share2 } from "lucide-react";
+import { Gift, Home as HomeIcon, Users, Share2 } from "lucide-react";
 
 export default function BottomNav({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) {
   const tabs = [
     { id: "home", label: "Deposit", icon: HomeIcon },
     { id: "team", label: "Squad", icon: Users },
+    { id: "rewards", label: "Reward", icon: Gift },
     { id: "share", label: "Share", icon: Share2 },
   ];
 

@@ -2,9 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import { getLatestConfirmedPrice } from '../models/priceModel';
 import { getCurrentWave, getWaveById } from '../models/waveModel';
 import { createPosition } from '../models/positionModel';
-import { lockReferral } from '../models/referralModel';
+import { getReferral, lockReferral } from '../models/referralModel';
+import { createRewardLedger } from '../models/rewardModel';
 import { activateSquadMember } from '../models/squadModel';
 import { query } from '../db';
+
+function calculateDirectReward(amountRaw: string, rewardRateBps: number, perInviteCapRaw: string): { grossAmount: string; finalAmount: string } {
+  const grossAmount = (BigInt(amountRaw) * BigInt(rewardRateBps)) / BigInt(10000);
+  const cap = BigInt(perInviteCapRaw || '0');
+  const finalAmount = cap > BigInt(0) && grossAmount > cap ? cap : grossAmount;
+  return { grossAmount: grossAmount.toString(), finalAmount: finalAmount.toString() };
+}
 
 /**
  * Deposit precheck endpoint.
@@ -106,6 +114,21 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
       qualifies,
       isFirst
     );
+    if (qualifies && isFirst) {
+      const referral = await getReferral(user.id);
+      if (referral?.inviter_user_id && referral.inviter_user_id !== user.id) {
+        const rewardAmounts = calculateDirectReward(amount, wave.direct_reward_rate_bps, wave.per_invite_cap);
+        await createRewardLedger({
+          beneficiaryUserId: referral.inviter_user_id,
+          sourceUserId: user.id,
+          sourcePositionId: position.id,
+          waveId,
+          grossAmount: rewardAmounts.grossAmount,
+          finalAmount: rewardAmounts.finalAmount,
+          status: 'approved',
+        });
+      }
+    }
     // If first qualifying deposit, lock referral
     if (isFirst) {
       await lockReferral(user.id);
