@@ -1,64 +1,95 @@
 # Staging Smoke Test
 
-## Environment Info
+## RC0 Environment
 
 - Repository: `tii-mom/multi-millionaire`
-- Branch: `codex/post-sprint1-stabilization-a`
-- Frontend URL: `http://localhost:3000/`
-- Backend URL: `http://localhost:4000/`
+- Release marker: `staging-rc0-20260423`
+- Commit: `2ae4ee61ec71f18dd1bac2bb4dd8f800804f360c`
+- Frontend staging preview: `https://dist-8fikii6do-348421501-qqcoms-projects.vercel.app`
+- Frontend deployment ID: `dpl_AeKNDvNeN6mrJ4Z21d7zPgx2ZcNv`
+- Backend smoke URL: `http://127.0.0.1:4100`
 - Database: local PostgreSQL on port `5432`
-- Database name: `millionaire`
-- Migrations applied in order: `001_init.sql` -> `002_squads.sql` -> `003_rewards.sql` -> `004_risk.sql`
-- Test accounts used during the smoke run:
-  - `admin@example.com` / `Password123!`
-  - `member@example.com` / `Password123!`
-  - `risk@example.com` / `Password123!`
+- Database name: `mm_staging_rc0`
+- Runtime: `NODE_ENV=staging`
+- High-risk threshold for this run: `5000`
 
-## Migration Order
+The Vercel frontend preview was deployed successfully and reported `Ready`, but
+the team project has Vercel Authentication enabled. Unauthenticated requests to
+the preview URL return `401`. The full API smoke test was therefore executed
+against the staging backend URL above.
+
+## Migration Result
+
+Migrations were applied in strict numeric order through `npm run migrate:up`:
 
 1. `server/migrations/001_init.sql`
 2. `server/migrations/002_squads.sql`
 3. `server/migrations/003_rewards.sql`
 4. `server/migrations/004_risk.sql`
 
+Verification from `schema_migrations`:
+
+- `001_init.sql`
+- `002_squads.sql`
+- `003_rewards.sql`
+- `004_risk.sql`
+
+Seed result:
+
+- `npm run seed:dev` completed successfully.
+- Seeded users: `admin@example.com`, `member@example.com`, `risk@example.com`.
+- Baseline seed counts: `users=3`, `waves=1`, `price_rounds=1`.
+
+## Smoke Test Accounts
+
+- Captain: `rc0-captain-1776947153866@example.com`
+- Member: `rc0-member-1776947153866@example.com`
+- Risk member: `rc0-risk-1776947153866@example.com`
+- Admin: `admin@example.com`
+
 ## Smoke Test Steps
 
 | Step | Expected Result | Actual Result | Status |
 | --- | --- | --- | --- |
-| Register admin user | `201` and JWT returned | `201` and JWT returned for `admin@example.com` | Pass |
-| Login admin user | `200` and JWT returned | `200` and JWT returned | Pass |
-| Claim pass | `200` and pass record returned | `200` and pass record returned | Pass |
-| Create squad | `201`, creator becomes captain, captain member row created | `201`, `squadId=1`, captain auto-added | Pass |
-| Join squad as member | `201` and membership created | `201`, member joined squad `1` | Pass |
-| Deposit precheck | `200` with wave and price snapshot | `200`, wave live and price snapshot returned | Pass |
-| Deposit qualifying amount | `201`, deposit recorded off-chain, squad activation triggered | `201`, position recorded, member activated | Pass |
-| Reward summary/list | Approved reward visible for inviter | `approved_amount=10`, approved reward listed | Pass |
-| Claim approved reward | `200`, reward status becomes claimed | `200`, reward moved to `claimed` | Pass |
-| Trigger high-value risk | `201`, `high_value_first_lock` flag created | `201`, flag created for the first qualifying lock | Pass |
-| Block reward claim on open risk | `409` with `RISK_REVIEW_REQUIRED` | `409` returned and claim blocked | Pass |
-| Resolve risk flag | `200`, flag status becomes resolved | `200`, flag resolved by admin | Pass |
-| Claim reward again | `200`, claim allowed after resolution | `200`, reward claimed after risk resolution | Pass |
+| Health check | `200`, service status `ok` | `200`, status `ok` | Pass |
+| Readiness check | `200`, database status `ok` | `200`, status `ready`, database `ok` | Pass |
+| Register | `201` and JWT returned | Captain/member/risk users registered with `201` | Pass |
+| Login | `200` and JWT returned | Captain and admin login returned `200` | Pass |
+| Claim pass | `200` and pass record returned | Captain claimed wave `1` pass | Pass |
+| Create squad | `201`, creator becomes captain | `201`, `squadId=1`, captain member row created | Pass |
+| Join squad | `201` and membership created | Member joined squad `1` as `joined_pending` | Pass |
+| Confirm referral | `200`, member bound to captain inviter | Member referral saved as `pending` | Pass |
+| Deposit precheck | `200`, wave live and price available | `200`, `ok=true` | Pass |
+| Deposit | `201`, off-chain position recorded | `201`, amount `1000`, qualifying position recorded | Pass |
+| Squad activation | Joined member becomes activated after qualifying deposit | Squad leaderboard showed `activated_member_count >= 1`, `total_locked=1000` | Pass |
+| Referral reward generate | Approved direct referral reward appears for captain | Approved ledger created with `final_amount=10` | Pass |
+| Reward summary/list | Approved reward visible | Summary `approved_amount=10`; approved list returned one ledger | Pass |
+| Reward claim | `200`, reward status becomes `claimed` | First reward claimed successfully | Pass |
+| Risk flag trigger | High-value qualifying first lock creates risk flag | Risk member deposit `10000` created `high_value_first_lock` flag | Pass |
+| Risk block | Open risk blocks related reward claim | Claim returned `409` with `RISK_REVIEW_REQUIRED` | Pass |
+| Risk resolve | Admin resolves flag | `PATCH /v1/risk/flags/:id` returned status `resolved` | Pass |
+| Claim again | Claim allowed after risk resolution | Blocked reward claimed successfully; final claimed amount `110` | Pass |
+
+## Result IDs
+
+- Squad: `1`
+- First reward ledger: `ae8401d9-cf82-471f-bdfb-8b90da353a13`
+- Risk-blocked reward ledger: `d8daedd7-e66e-4bbc-8b52-1a3fca9651ac`
+- High-value risk flag: `16aa57ff-c01d-4dc1-9bf1-7f07c131bca5`
 
 ## Problem Record
 
-1. Docker was not available in the smoke environment.
-   - Impact: the database could not be started with the repo's Docker workflow.
-   - Result: used a local Homebrew PostgreSQL cluster instead.
+1. The frontend preview deployment is protected by Vercel Authentication.
+   - Impact: unauthenticated browser/curl access to the preview URL returns `401`.
+   - Result: deployment status is `Ready`; API smoke was completed against the staging backend URL.
 
-2. The backend initially needed its Express request augmentation loaded explicitly during local startup.
-   - Impact: `req.id` access in the API entrypoint could fail to compile or boot cleanly in `ts-node` runs.
-   - Fix: load the Express type augmentation from `server/src/types/express.d.ts` in the app entrypoint.
+2. The Codex fallback deployment endpoint no longer returns claimable preview URLs.
+   - Impact: fallback script returned guidance to use the Vercel CLI instead of a preview URL.
+   - Result: deployed with authenticated Vercel CLI and explicit `--target preview`.
 
-## Fix Record
+## Boundary Notes
 
-- Switched the smoke run to a local PostgreSQL instance on port `5432`.
-- Applied migrations in the required order.
-- Confirmed that `deposit` remains an off-chain recorded stub.
-- Confirmed that `reward claim` remains an off-chain status update stub.
-- Verified that claim blocking and release still depend on `risk_flags` state, not on-chain settlement.
-
-## Notes
-
-- No real chain lock or reward transfer occurred in this smoke run.
-- The purpose of the run was to verify Sprint 1 data-driven flows before Sprint 2 contract integration.
-
+- No real chain lock occurred in this smoke run.
+- `POST /v1/waves/:waveId/deposit` remains an off-chain recorded deposit stub.
+- `POST /v1/rewards/:ledgerId/claim` remains an off-chain status update stub.
+- Risk blocking and release are verified through `risk_flags` state, not on-chain settlement.
