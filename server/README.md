@@ -25,10 +25,7 @@ cp .env.example .env
 Apply migrations in order:
 
 ```bash
-psql "$DATABASE_URL" -f migrations/001_init.sql
-psql "$DATABASE_URL" -f migrations/002_squads.sql
-psql "$DATABASE_URL" -f migrations/003_rewards.sql
-psql "$DATABASE_URL" -f migrations/004_risk.sql
+npm run migrate:up
 ```
 
 Run locally:
@@ -44,6 +41,13 @@ npm run build
 npm test
 ```
 
+Reset and seed helpers for local or staging use only:
+
+```bash
+npm run migrate:reset
+npm run seed:dev
+```
+
 ## Environment Variables
 
 - `DATABASE_URL`: PostgreSQL connection string.
@@ -51,9 +55,10 @@ npm test
 - `PORT`: server port, default `4000`.
 - `CHAIN_ID`: chain identifier shown by bootstrap.
 - `TOKEN_ADDRESS`: 72H token address placeholder.
-- `VAULT_ADDRESS`: future vault/lock contract address.
+- `LOCK_VAULT_ADDRESS`: future vault/lock contract address.
 - `ORACLE_ADDRESS`: future price oracle contract address.
 - `REWARD_DISTRIBUTOR_ADDRESS`: future reward distributor address.
+- `CORS_ALLOWED_ORIGINS`: comma-separated allowlist for browser origins.
 - `ADMIN_EMAILS`: comma-separated emails allowed to access `/v1/risk/*`.
 - `HIGH_RISK_DEPOSIT_THRESHOLD`: raw amount threshold for the `high_value_first_lock` automatic risk flag.
 

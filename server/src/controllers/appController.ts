@@ -19,7 +19,7 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
     const contracts = {
       chain_id: process.env.CHAIN_ID || 'ton-mainnet',
       token: process.env.TOKEN_ADDRESS || 'EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8',
-      vault: process.env.VAULT_ADDRESS || '',
+      vault: process.env.LOCK_VAULT_ADDRESS || process.env.VAULT_ADDRESS || '',
       oracle: process.env.ORACLE_ADDRESS || '',
       reward_distributor: process.env.REWARD_DISTRIBUTOR_ADDRESS || '',
     };
