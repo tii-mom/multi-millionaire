@@ -14,6 +14,14 @@ export function createRouteRateLimiter(prefix: string, fallbackWindowMs: number,
     max: readLimit(`${prefix}_MAX`, fallbackMax),
     standardHeaders: true,
     legacyHeaders: false,
+    validate: {
+      ip: false,
+    },
+    keyGenerator: (req: Request) => {
+      const headerValue = req.headers['cf-connecting-ip'];
+      const forwardedIp = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+      return req.ip || forwardedIp || 'unknown';
+    },
     handler: (req: Request, res: Response) => {
       return res.status(429).json({
         request_id: req.id || '',
@@ -25,4 +33,3 @@ export function createRouteRateLimiter(prefix: string, fallbackWindowMs: number,
     },
   });
 }
-
