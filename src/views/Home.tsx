@@ -1,8 +1,11 @@
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ArrowRight, KeyRound, LogOut, Wallet, Target, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "@/src/lib/api";
+import EmptyState from "@/src/components/ui/EmptyState";
+import ErrorState from "@/src/components/ui/ErrorState";
+import LoadingCard from "@/src/components/ui/LoadingCard";
 
 interface HomeProps {
   tokenPrice: number;
@@ -18,29 +21,31 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const [password, setPassword] = useState("");
   const [authToken, setAuthToken] = useState(() => localStorage.getItem("auth_token"));
   const [waveId, setWaveId] = useState<number | null>(null);
+  const [bootstrapLoading, setBootstrapLoading] = useState(true);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const availableBalance = 2450000 - myDeposit; // Make balance strictly dynamic according to local storage changes
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadBootstrap = useCallback(async () => {
+    setBootstrapLoading(true);
+    setBootstrapError(null);
 
-    async function loadBootstrap() {
-      try {
-        const data = await api.bootstrap();
-        if (!cancelled && data.current_wave?.wave_id) {
-          setWaveId(Number(data.current_wave.wave_id));
-        }
-      } catch {
-        // The API is optional while developing the standalone frontend.
-      }
+    try {
+      const data = await api.bootstrap();
+      setWaveId(data.current_wave?.wave_id ? Number(data.current_wave.wave_id) : null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load Wave state.";
+      setBootstrapError(message);
+      setWaveId(null);
+    } finally {
+      setBootstrapLoading(false);
     }
-
-    loadBootstrap();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    loadBootstrap();
+  }, [loadBootstrap]);
 
   const persistToken = (token: string) => {
     setAuthToken(token);
@@ -128,9 +133,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const needed72H = Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
 
   return (
-    <div className="px-6 flex flex-col gap-6 pb-10">
+    <div className="flex flex-col gap-4 px-4 pb-8 sm:gap-6 sm:px-6 sm:pb-10">
       {/* Account Section */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-5 backdrop-blur-xl relative overflow-hidden">
+      <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.02] p-4 backdrop-blur-xl sm:rounded-[24px] sm:p-5">
         <div className="absolute -left-10 -top-10 w-24 h-24 bg-[#DBFF00]/10 blur-3xl rounded-full" />
         <div className="relative z-10 flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -159,7 +164,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
                 placeholder="Password"
                 className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-sm placeholder:text-white/20"
               />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => authenticate("register")}
@@ -178,11 +183,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
                 </button>
               </div>
             </div>
+          ) : bootstrapLoading ? (
+            <LoadingCard title="Loading wave" description="Checking the active lock window." rows={1} className="p-3 sm:p-3" />
           ) : (
             <div className="flex items-center justify-between gap-3 rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-white/35 font-mono">Current Wave</div>
-                <div className="font-mono text-sm text-white/80">{waveId ? `#${waveId}` : "Loading..."}</div>
+                <div className="font-mono text-sm text-white/80">{waveId ? `#${waveId}` : "No active wave"}</div>
               </div>
               <button
                 type="button"
@@ -195,6 +202,25 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             </div>
           )}
 
+          {bootstrapError && (
+            <ErrorState
+              title="Wave unavailable"
+              message={bootstrapError}
+              onRetry={loadBootstrap}
+              className="p-3 sm:p-3"
+            />
+          )}
+
+          {!bootstrapLoading && !bootstrapError && !waveId && (
+            <EmptyState
+              title="No active wave"
+              description="Locks can be prepared locally, but backend submission waits for the next active Wave."
+              actionLabel="Check again"
+              onAction={loadBootstrap}
+              className="p-4"
+            />
+          )}
+
           {apiError && (
             <div className="text-[10px] font-mono text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
               {apiError}
@@ -205,15 +231,15 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       
       
       {/* Progress Section */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl relative overflow-hidden group">
+      <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.02] p-4 backdrop-blur-xl sm:rounded-[24px] sm:p-6 group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-[#DBFF00]/5 blur-[60px] rounded-full group-hover:bg-[#DBFF00]/10 transition-colors duration-500" />
         <div className="relative z-10">
-          <div className="flex justify-between items-end mb-4">
+          <div className="mb-4 flex items-end justify-between gap-3">
             <div className="flex items-center gap-2 text-white/50">
               <Target className="w-5 h-5" />
               <span className="text-[11px] uppercase tracking-widest font-mono">Millionaire Goal</span>
             </div>
-            <div className="font-mono text-[#DBFF00] font-semibold text-lg tabular-nums">
+            <div className="shrink-0 font-mono text-[#DBFF00] font-semibold text-lg tabular-nums">
               {progressPercent.toFixed(4)}%
             </div>
           </div>
@@ -236,7 +262,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       </div>
 
       {/* Dynamic Needed Tokens Box */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl flex flex-col items-center justify-center text-center relative overflow-hidden group">
+      <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.02] p-5 text-center backdrop-blur-xl sm:rounded-[24px] sm:p-6 group">
         <div className="absolute top-3 right-4 flex items-center gap-1.5">
           <span className="relative flex h-[5px] w-[5px]">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DBFF00] opacity-75"></span>
@@ -250,7 +276,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           key={needed72H}
           initial={{ opacity: 0.8, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-4xl font-mono tracking-tighter font-semibold flex items-baseline gap-2 mb-3"
+          className="mb-3 flex items-baseline gap-2 font-mono text-3xl font-semibold tracking-tighter sm:text-4xl"
         >
           <span className="bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70 tabular-nums">
             {needed72H.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -273,15 +299,15 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       </div>
 
       {/* Deposit Action */}
-      <div className="border border-white/10 rounded-[24px] overflow-hidden bg-white/[0.01] backdrop-blur-xl">
-        <div className="px-6 py-5 border-b border-white/[0.05] flex justify-between items-center bg-white/[0.02]">
+      <div className="overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.01] backdrop-blur-xl sm:rounded-[24px]">
+        <div className="flex items-center justify-between gap-4 border-b border-white/[0.05] bg-white/[0.02] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
               <Wallet className="w-4 h-4 text-[#DBFF00]" />
             </div>
             <span className="font-medium text-sm tracking-wide">My Deposit</span>
           </div>
-          <div className="font-mono text-xl tabular-nums relative overflow-hidden h-[28px] min-w-[80px] flex justify-end">
+          <div className="relative flex h-[28px] min-w-[80px] justify-end overflow-hidden font-mono text-lg tabular-nums sm:text-xl">
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.div
                 key={myDeposit}
@@ -296,12 +322,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           </div>
         </div>
         
-        <div className="p-6 flex flex-col gap-5">
+        <div className="flex flex-col gap-5 p-4 sm:p-6">
           <div className="flex flex-col gap-2 relative group">
             <div className="absolute right-5 flex items-center gap-2 top-1/2 -translate-y-1/2 z-20">
               <button 
                 onClick={() => setInputValue(availableBalance.toString())}
-                className="text-[9px] font-mono font-bold tracking-widest uppercase bg-white/5 hover:bg-[#DBFF00] hover:text-black text-[#DBFF00] px-2 py-1 rounded transition-colors active:scale-95 border border-[#DBFF00]/20"
+                disabled={isConfirming}
+                className="text-[9px] font-mono font-bold tracking-widest uppercase bg-white/5 hover:bg-[#DBFF00] hover:text-black text-[#DBFF00] px-2 py-1 rounded transition-colors active:scale-95 border border-[#DBFF00]/20 disabled:opacity-50"
               >
                 Max
               </button>
@@ -316,7 +343,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="0"
               disabled={isConfirming}
-              className="w-full bg-[#050505]/60 hover:bg-[#050505]/80 border border-white/5 rounded-2xl py-6 pl-6 pr-[120px] outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-4xl tabular-nums shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] placeholder:text-white/5 focus:bg-black/60 focus:ring-2 ring-[#DBFF00]/5 disabled:opacity-50"
+              className="w-full bg-[#050505]/60 hover:bg-[#050505]/80 border border-white/5 rounded-2xl py-5 pl-5 pr-[112px] outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-3xl tabular-nums shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] placeholder:text-white/5 focus:bg-black/60 focus:ring-2 ring-[#DBFF00]/5 disabled:opacity-50 sm:py-6 sm:pl-6 sm:pr-[120px] sm:text-4xl"
             />
             
             <div className="absolute -top-3 right-2 bg-black px-2 text-[9px] text-white/30 font-mono tracking-widest uppercase flex items-center gap-1 z-30">
@@ -359,8 +386,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             )}
           </button>
           
-          <div className="flex items-center justify-between w-full mt-2">
-            <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 font-mono flex items-center gap-2">
+          <div className="mt-2 flex w-full flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
+            <p className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
               72H Lock • Gas paid by user
             </p>

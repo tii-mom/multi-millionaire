@@ -11,6 +11,8 @@ export interface ApiErrorEnvelope {
   };
 }
 
+export type ApiErrorCode = string;
+
 export interface User {
   id: string;
   email: string;
@@ -59,6 +61,43 @@ export interface SquadLeaderboardRow {
   activated_member_count: number;
   total_locked: string;
   rank: number;
+}
+
+export interface Squad {
+  id: number;
+  wave_id: number;
+  name: string;
+  captain_user_id: string;
+  status: 'open' | 'frozen' | 'archived';
+  invite_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SquadMember {
+  id: number;
+  wave_id: number;
+  squad_id: number;
+  user_id: string;
+  role: 'captain' | 'member';
+  status: 'joined_pending' | 'activated' | 'removed';
+  joined_at: string;
+  activated_at: string | null;
+}
+
+export interface CreateSquadResult {
+  squad: Squad;
+  member: SquadMember;
+}
+
+export interface Referral {
+  id: string;
+  invitee_user_id: string;
+  inviter_user_id: string | null;
+  status: 'pending' | 'locked' | string;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RewardSummary {

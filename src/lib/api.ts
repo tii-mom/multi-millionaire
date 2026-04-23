@@ -1,5 +1,7 @@
 import type {
   ApiEnvelope,
+  ApiErrorCode,
+  ApiErrorEnvelope,
   AdminDashboard,
   AdminReward,
   AdminRiskFlag,
@@ -7,9 +9,12 @@ import type {
   AdminWave,
   AuthResult,
   BootstrapData,
+  CreateSquadResult,
   Position,
+  Referral,
   RewardLedger,
   RewardSummary,
+  SquadMember,
   SquadLeaderboardRow,
   Wave,
 } from "./types";
@@ -21,6 +26,20 @@ type RequestOptions = {
 };
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+
+export class ApiRequestError extends Error {
+  status: number;
+  code: ApiErrorCode;
+  requestId: string;
+
+  constructor(message: string, status: number, code: ApiErrorCode = "REQUEST_FAILED", requestId = "") {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+    this.requestId = requestId;
+  }
+}
 
 async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
@@ -37,10 +56,12 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
-  const payload = await response.json().catch(() => null);
+  const payload = await response.json().catch(() => null) as ApiEnvelope<T> | ApiErrorEnvelope | null;
   if (!response.ok) {
-    const message = payload?.error?.message || `Request failed with ${response.status}`;
-    throw new Error(message);
+    const errorPayload = payload as ApiErrorEnvelope | null;
+    const message = errorPayload?.error?.message || `Request failed with ${response.status}`;
+    const code = errorPayload?.error?.code || "REQUEST_FAILED";
+    throw new ApiRequestError(message, response.status, code, errorPayload?.request_id || "");
   }
 
   return (payload as ApiEnvelope<T>).data;
@@ -69,6 +90,14 @@ export const api = {
     });
   },
 
+  confirmReferral(inviterEmail: string, token: string) {
+    return requestJson<Referral>("/v1/referrals/confirm", {
+      method: "POST",
+      token,
+      body: { inviterEmail },
+    });
+  },
+
   depositPrecheck(waveId: number, token: string) {
     return requestJson<{ ok: boolean; reasons: string[] }>(`/v1/waves/${waveId}/deposit-precheck`, {
       method: "POST",
@@ -85,7 +114,7 @@ export const api = {
   },
 
   createSquad(waveId: number, name: string, token: string) {
-    return requestJson(`/v1/waves/${waveId}/squads`, {
+    return requestJson<CreateSquadResult>(`/v1/waves/${waveId}/squads`, {
       method: "POST",
       token,
       body: { name },
@@ -97,7 +126,7 @@ export const api = {
   },
 
   joinSquad(waveId: number, squadId: number, token: string) {
-    return requestJson(`/v1/waves/${waveId}/squads/${squadId}/join`, {
+    return requestJson<SquadMember>(`/v1/waves/${waveId}/squads/${squadId}/join`, {
       method: "POST",
       token,
     });
