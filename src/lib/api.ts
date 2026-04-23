@@ -1,5 +1,10 @@
 import type {
   ApiEnvelope,
+  AdminDashboard,
+  AdminReward,
+  AdminRiskFlag,
+  AdminSquad,
+  AdminWave,
   AuthResult,
   BootstrapData,
   Position,
@@ -112,5 +117,25 @@ export const api = {
       method: "POST",
       token,
     });
+  },
+
+  adminDashboard(token: string) {
+    return requestJson<AdminDashboard>("/v1/admin/dashboard", { token });
+  },
+
+  adminWaves(token: string) {
+    return requestJson<AdminWave[]>("/v1/admin/waves", { token });
+  },
+
+  adminRiskFlags(token: string) {
+    return requestJson<AdminRiskFlag[]>("/v1/admin/risk/flags", { token });
+  },
+
+  adminRewards(token: string) {
+    return requestJson<AdminReward[]>("/v1/admin/rewards", { token });
+  },
+
+  adminSquads(token: string) {
+    return requestJson<AdminSquad[]>("/v1/admin/squads", { token });
   },
 };
