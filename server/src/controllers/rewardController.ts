@@ -6,6 +6,7 @@ import {
   markRewardClaimed,
   RewardStatus,
 } from '../models/rewardModel';
+import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
 
 const allowedStatuses = new Set<RewardStatus>(['pending', 'approved', 'claimed', 'rejected']);
 
@@ -64,6 +65,11 @@ export async function claimReward(req: Request, res: Response, next: NextFunctio
     if (ledger.status !== 'approved') {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'REWARD_NOT_APPROVED', message: 'Only approved rewards can be claimed' } });
     }
+    const hasBlockingRisk = await hasBlockingRiskForRewardClaim(ledgerId, user.id);
+    if (hasBlockingRisk) {
+      return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
+    }
+
     const claimed = await markRewardClaimed(ledgerId, user.id);
     return res.json({ request_id: req.id || '', data: claimed });
   } catch (err) {

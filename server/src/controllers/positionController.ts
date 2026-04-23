@@ -4,6 +4,7 @@ import { getCurrentWave, getWaveById } from '../models/waveModel';
 import { createPosition } from '../models/positionModel';
 import { getReferral, lockReferral } from '../models/referralModel';
 import { createRewardLedger } from '../models/rewardModel';
+import { createRiskFlag } from '../models/riskModel';
 import { activateSquadMember } from '../models/squadModel';
 import { query } from '../db';
 
@@ -12,6 +13,16 @@ function calculateDirectReward(amountRaw: string, rewardRateBps: number, perInvi
   const cap = BigInt(perInviteCapRaw || '0');
   const finalAmount = cap > BigInt(0) && grossAmount > cap ? cap : grossAmount;
   return { grossAmount: grossAmount.toString(), finalAmount: finalAmount.toString() };
+}
+
+function getHighRiskDepositThreshold(): bigint | null {
+  const raw = process.env.HIGH_RISK_DEPOSIT_THRESHOLD;
+  if (!raw) return null;
+  try {
+    return BigInt(raw);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -135,6 +146,31 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
     }
     if (qualifies) {
       await activateSquadMember(waveId, user.id);
+    }
+    const recentDeposits = await query<{ count: string }>(
+      `SELECT COUNT(*)
+       FROM positions
+       WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '10 minutes'`,
+      [user.id]
+    );
+    if (Number(recentDeposits.rows[0]?.count || 0) >= 3) {
+      await createRiskFlag({
+        entityType: 'user',
+        entityId: user.id,
+        flagType: 'rapid_deposit_burst',
+        severity: 'medium',
+        note: 'User reached at least 3 deposits in 10 minutes',
+      });
+    }
+    const highRiskThreshold = getHighRiskDepositThreshold();
+    if (qualifies && isFirst && highRiskThreshold !== null && amountRaw > highRiskThreshold) {
+      await createRiskFlag({
+        entityType: 'position',
+        entityId: position.id,
+        flagType: 'high_value_first_lock',
+        severity: 'medium',
+        note: `First qualifying lock exceeded configured threshold ${highRiskThreshold.toString()}`,
+      });
     }
     return res.status(201).json({ request_id: req.id || '', data: position });
   } catch (err) {

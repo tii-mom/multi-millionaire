@@ -5,6 +5,7 @@ import authRouter from './auth';
 import referralRouter from './referral';
 import pricesRouter from './prices';
 import rewardsRouter from './rewards';
+import riskRouter from './risk';
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.use('/auth', authRouter);
 router.use('/referrals', referralRouter);
 router.use('/prices', pricesRouter);
 router.use('/rewards', rewardsRouter);
+router.use('/risk', riskRouter);
 
 export default router;
