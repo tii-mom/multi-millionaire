@@ -10,6 +10,7 @@ import Share from "./views/Share";
 import BottomNav from "./components/BottomNav";
 import { Toaster } from "@/src/components/ui/sonner";
 import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
