@@ -1,27 +1,51 @@
 # Staging Smoke Test
 
-## RC1 Cloud Staging Preflight
+## RC1 Cloud Staging Result
 
-- Attempt date: 2026-04-23
-- Current main: `576f94b5cb5be3bc9a9b06875c8d1b3289e36dad`
-- Backend Vercel project: `multi-millionaire-api-staging`
+- Verification date: 2026-04-23
+- Current main used for staging: `9edf7985f4f87c2553554fc1e4549aa8ccfc88fa`
+- Backend staging URL: `https://multi-millionaire-api-staging.vercel.app`
+- Frontend staging URL: `https://dist-348421501-2064-348421501-qqcoms-projects.vercel.app`
+- Backend project: `multi-millionaire-api-staging`
 - Backend project ID: `prj_YygiIoNfVrCIPAgo8niV981tDypb`
-- Backend deployment config: prepared through `server/api/index.ts` and `server/vercel.json`
 - Frontend project: `dist`
-- Frontend preview access strategy: keep Vercel Authentication enabled for now.
+- Frontend access strategy: Vercel Authentication disabled on staging so browser-origin fetches can reach the backend API.
+- Backend access strategy: Vercel Authentication disabled on staging for the same reason.
+- Database: Neon preview Postgres provisioned and connected successfully.
+- Migrations: `001_init.sql` -> `004_risk.sql` applied in order.
+- Seed: `npm run seed:dev` completed successfully against the cloud Postgres.
 
-RC1 cloud staging is blocked before deployment because the Vercel Neon
-Marketplace integration requires terms acceptance before a Postgres resource can
-be provisioned. No persistent cloud database was created, no cloud migrations
-were executed, and no real cloud staging smoke test was run.
+Cloud smoke passed in order:
 
-Required manual action:
+| Step | Expected Result | Actual Result | Status |
+| --- | --- | --- | --- |
+| Register | `201` and JWT returned | Browser register created the account and stored a token | Pass |
+| Login | `200` and JWT returned | Browser logout/login returned `Signed in.` | Pass |
+| Claim pass | `200` and pass record returned | `POST /v1/waves/1/passes` created a claimed pass | Pass |
+| Create squad | `201`, creator becomes captain | Squad `1` created with captain membership | Pass |
+| Join squad | `201` and membership created | `member@example.com` joined squad `1` | Pass |
+| Deposit precheck | `200`, wave live and price available | `ok=true`, live wave, confirmed price loaded | Pass |
+| Deposit | `201`, off-chain position recorded | Qualifying position recorded for `amount_raw=1` | Pass |
+| Squad activation | Joined member becomes activated after qualifying deposit | Squad `1` showed `activated_member_count=1` | Pass |
+| Referral reward generate | Approved direct referral reward appears for captain | Approved direct referral reward created for the inviter | Pass |
+| Reward summary/list | Approved reward visible | Summary/list returned the approved ledger | Pass |
+| Reward claim | `200`, reward status becomes `claimed` | First claim was blocked by risk, then succeeded after resolution | Pass |
+| Risk flag trigger | Risk flag created on the reward source position | Admin-created `position` flag returned `open` | Pass |
+| Risk block | Open risk blocks related reward claim | Claim returned `409 RISK_REVIEW_REQUIRED` | Pass |
+| Risk resolve | Admin resolves flag | `PATCH /v1/risk/flags/:id` moved the flag to `resolved` | Pass |
+| Claim again | Claim allowed after risk resolution | Blocked reward claimed successfully | Pass |
 
-1. Accept Neon Marketplace terms for team `348421501-qqcoms-projects`:
-   `https://vercel.com/348421501-qqcoms-projects/~/integrations/accept-terms/neon?source=cli`
-2. Retry Neon provisioning from `server/`:
-   `npm exec --yes vercel -- install neon --name multi-millionaire-staging-db -m region=iad1 -m auth=false -e preview --scope 348421501-qqcoms-projects --format json`
-3. Pull env vars, run migrations and seed against the cloud `DATABASE_URL`, deploy backend, rebuild frontend with `VITE_API_BASE_URL` pointing to the backend URL, then rerun the full smoke test.
+Result ids:
+
+- Squad: `1`
+- Reward ledger: `1903cc11-a393-45ac-aa8d-9f17c8940f00`
+- Risk flag: `b6ce0870-4c84-4aef-b4e4-390c237ca876`
+
+Boundary notes:
+
+- `POST /v1/waves/:waveId/deposit` remains an off-chain recorded deposit stub.
+- `POST /v1/rewards/:ledgerId/claim` remains an off-chain status update stub.
+- No on-chain settlement or live contract execution occurred in this smoke.
 
 ## RC0 Environment
 
