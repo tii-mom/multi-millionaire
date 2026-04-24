@@ -16,7 +16,7 @@
   - `TOKEN_ADDRESS`
   - `LOCK_VAULT_ADDRESS`
   - `ORACLE_ADDRESS`
-  - `REWARD_DISTRIBUTOR_ADDRESS`
+  - `REWARD_DISTRIBUTOR_ADDRESS` only when `REWARD_CLAIM_MODEL=distributor`
   - `WALLET_BINDING_ENABLED`
   - `WALLET_BINDING_MESSAGE_DOMAIN`
   - `RECEIPT_VERIFICATION_ENABLED`
@@ -29,6 +29,8 @@
 - Confirm the backend build and test suite pass.
 - Confirm no staging-only secrets are checked into the repo.
 - Confirm the release branch still states that legacy deposit and reward claim endpoints are off-chain stubs unless the chain receipt/reward claim production gates are explicitly enabled.
+- Review `docs/gray-launch-communications.md` before any user-facing
+  announcement, poster, screenshot, or support macro is published.
 
 ## Migration Order
 
@@ -77,7 +79,8 @@ Expected staging outcome:
 - squad activation still follows qualifying deposits.
 - emergency controls can be toggled and restored by an admin operator,
 - control changes create admin audit log entries,
-- chain event and receipt verifier diagnostics are visible to admins.
+- chain event, wallet signature, Merkle claim, contract config, and receipt
+  verifier diagnostics are visible to admins.
 - Merkle draft batch/proof generation is visible to admins, and claim receipt
   submission remains fail-closed until the real chain verifier is configured.
 
@@ -113,7 +116,8 @@ For the next staging release record, capture:
 - control key toggled and restored state
 - audit log id/action for the control update
 - chain-events query result count and `apply_status` filter used
-- `/v1/admin/ops` receipt verifier `mode`, `status`, and `configured`
+- `/v1/admin/ops` receipt verifier, wallet signature verifier, Merkle claim
+  verifier, and contract integration diagnostic status
 - latest Merkle batch id/root/proof count, if reward claim rehearsal is in scope
 - confirmation that production smoke remained GET-only unless a separate
   mutating canary approval was recorded

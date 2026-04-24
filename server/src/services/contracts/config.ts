@@ -50,6 +50,12 @@ export interface ReceiptConfig {
   requiredConfirmations: number;
 }
 
+export type RewardClaimModel = 'legacy_stub' | 'merkle' | 'distributor';
+
+export interface RewardClaimConfig {
+  model: RewardClaimModel;
+}
+
 export interface OperatorConfig {
   address: string | null;
   privateKeyPresent: boolean;
@@ -71,6 +77,7 @@ export interface ContractIntegrationConfig {
   indexer: IndexerConfig;
   walletBinding: WalletBindingConfig;
   receipt: ReceiptConfig;
+  rewardClaim: RewardClaimConfig;
   operator: OperatorConfig;
 }
 
@@ -145,6 +152,14 @@ function readInteger(value: string | null | undefined, defaultValue: number | nu
 
 function readString(value: string | null | undefined): string | null {
   return normalizeString(value);
+}
+
+function readRewardClaimModel(value: string | null | undefined): RewardClaimModel {
+  const normalized = normalizeString(value)?.toLowerCase();
+  if (normalized === 'merkle' || normalized === 'distributor') {
+    return normalized;
+  }
+  return 'legacy_stub';
 }
 
 function buildAbiPath(rootDir: string, fileName: string, explicitValue: string | null | undefined): string {
@@ -233,6 +248,9 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = process.e
       enabled: readBoolean(env.RECEIPT_VERIFICATION_ENABLED, false),
       requiredConfirmations: readInteger(env.RECEIPT_REQUIRED_CONFIRMATIONS, readInteger(env.CHAIN_INDEXER_CONFIRMATIONS, 12) ?? 12) ?? 12,
     },
+    rewardClaim: {
+      model: readRewardClaimModel(env.REWARD_CLAIM_MODEL),
+    },
     operator: {
       address: readString(env.CHAIN_OPERATOR_ADDRESS),
       privateKeyPresent: normalizeString(env.CHAIN_OPERATOR_PRIVATE_KEY) !== null,
@@ -261,11 +279,21 @@ export function validateContractIntegrationConfig(
     requireField('TOKEN_ADDRESS', config.token.address, 'TOKEN_ADDRESS is required when chain integration is enabled');
     requireField('LOCK_VAULT_ADDRESS', config.lockVault.address, 'LOCK_VAULT_ADDRESS is required when chain integration is enabled');
     requireField('ORACLE_ADDRESS', config.oracle.address, 'ORACLE_ADDRESS is required when chain integration is enabled');
-    requireField(
-      'REWARD_DISTRIBUTOR_ADDRESS',
-      config.rewardDistributor.address,
-      'REWARD_DISTRIBUTOR_ADDRESS is required when chain integration is enabled'
-    );
+    if (config.rewardClaim.model === 'distributor') {
+      requireField(
+        'REWARD_DISTRIBUTOR_ADDRESS',
+        config.rewardDistributor.address,
+        'REWARD_DISTRIBUTOR_ADDRESS is required when REWARD_CLAIM_MODEL=distributor'
+      );
+    }
+  }
+
+  if (config.mainlineWritesEnabled && config.rewardClaim.model === 'legacy_stub') {
+    issues.push({
+      severity: 'error',
+      key: 'REWARD_CLAIM_MODEL',
+      message: 'Production chain writes require REWARD_CLAIM_MODEL=merkle or distributor',
+    });
   }
 
   if (config.walletBinding.enabled && !config.walletBinding.messageDomain) {

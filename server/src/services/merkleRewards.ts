@@ -34,6 +34,12 @@ export class MerkleClaimVerificationError extends Error {
   }
 }
 
+export interface MerkleClaimVerifierDiagnostics {
+  configured: boolean;
+  status: 'not_configured';
+  model: string;
+}
+
 function sha256(value: string): string {
   return `0x${crypto.createHash('sha256').update(value).digest('hex')}`;
 }
@@ -138,4 +144,12 @@ export async function verifyMerkleClaimReceipt(): Promise<never> {
     'MERKLE_CLAIM_VERIFIER_NOT_CONFIGURED',
     'Merkle claim receipt verification requires production chain RPC, ABI, and claim event schema'
   );
+}
+
+export function getMerkleClaimVerifierDiagnostics(): MerkleClaimVerifierDiagnostics {
+  return {
+    configured: false,
+    status: 'not_configured',
+    model: process.env.REWARD_CLAIM_MODEL || 'legacy_stub',
+  };
 }

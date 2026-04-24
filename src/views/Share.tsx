@@ -4,7 +4,7 @@ import { ShareIcon, Download, Zap, Loader2, Copy } from "lucide-react";
 import html2canvas from "html2canvas";
 
 export default function Share({ myDeposit }: any) {
-  const estimatedReferralValue = myDeposit > 0 ? (myDeposit * 0.05).toFixed(2) : "0.00";
+  const estimatedReferralValue = myDeposit > 0 ? (myDeposit * 0.01).toFixed(2) : "0.00";
   
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -53,7 +53,7 @@ export default function Share({ myDeposit }: any) {
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             title: 'My 72H Millionaire Path',
-            text: 'I just locked 72H to secure my millionaire path! Join my Squad.',
+            text: 'I joined the 72H gray-test path. Chain verification is required before any real lock or reward claim.',
             files: [file]
           });
           toast.success("Shared successfully!");
@@ -77,7 +77,7 @@ export default function Share({ myDeposit }: any) {
   };
 
   const handleCopy = async () => {
-    const textToCopy = `I just locked ${myDeposit.toLocaleString()} 72H tokens on the Millionaire Path! Join my squad and start earning: https://72h.lol`;
+    const textToCopy = `I joined the 72H gray-test path with ${myDeposit.toLocaleString()} 72H shown as app-recorded progress. Real locks and rewards require chain verification: https://72h.lol`;
     try {
       await navigator.clipboard.writeText(textToCopy);
       toast.success("App link & deposit copied to clipboard!");
@@ -131,14 +131,14 @@ export default function Share({ myDeposit }: any) {
             <span className="text-[#DBFF00] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">~</span>{estimatedReferralValue} <span className="text-sm font-bold tracking-widest pl-1 opacity-80">72H</span>
           </div>
           <div className="mt-1 text-[9px] uppercase tracking-widest font-mono font-bold opacity-50">
-            Estimated referral value
+            Estimated referral preview
           </div>
         </div>
         <Zap className="w-10 h-10 opacity-90 drop-shadow-md z-10" />
       </div>
 
       <p className="text-[11px] text-white/50 font-mono text-center mb-0 mt-1 uppercase tracking-widest">
-        Share poster or copy your invite
+        Share gray-test poster or copy your invite
       </p>
 
       {/* Poster Generator Mock */}
@@ -178,7 +178,7 @@ export default function Share({ myDeposit }: any) {
               <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#DBFF00] to-transparent" />
               <div className="pl-5 py-1">
                 <div className="text-[9px] uppercase tracking-widest text-[#DBFF00]/80 font-mono mb-1.5">
-                  My Locked Holdings
+                  App-Recorded Progress
                 </div>
                 <div className="font-mono text-2xl text-white tabular-nums tracking-tighter">
                   {myDeposit.toLocaleString()} <span className="text-sm tracking-widest opacity-50 font-normal text-white">72H</span>
@@ -190,7 +190,7 @@ export default function Share({ myDeposit }: any) {
           {/* Footer of Poster */}
           <div className="w-full flex justify-between items-end pt-6">
             <div className="flex flex-col gap-1.5">
-              <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-mono">Scan to Join Squad</span>
+              <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-mono">Scan to Join Gray Test</span>
               <span className="text-[10px] font-mono tracking-widest text-white/70">72H.LOL</span>
             </div>
             {/* Mock QR Code */}

@@ -5,7 +5,7 @@ import { getAdminDashboard, listAdminRewards } from '../src/models/adminReadMode
 import { createAdminAuditLog, listAdminAuditLogs, listAppControls, setAppControl } from '../src/models/opsModel';
 import { listChainEvents } from '../src/models/chainEventModel';
 import { listMerkleRewardBatches, listMerkleRewardProofs } from '../src/models/merkleRewardModel';
-import { createDraftMerkleRewardBatch } from '../src/services/merkleRewards';
+import { createDraftMerkleRewardBatch, getMerkleClaimVerifierDiagnostics } from '../src/services/merkleRewards';
 
 jest.mock('../src/models/adminReadModel', () => ({
   getAdminDashboard: jest.fn(),
@@ -33,6 +33,7 @@ jest.mock('../src/models/merkleRewardModel', () => ({
 
 jest.mock('../src/services/merkleRewards', () => ({
   createDraftMerkleRewardBatch: jest.fn(),
+  getMerkleClaimVerifierDiagnostics: jest.fn(),
 }));
 
 const getAdminDashboardMock = getAdminDashboard as jest.Mock;
@@ -45,6 +46,7 @@ const listChainEventsMock = listChainEvents as jest.Mock;
 const listMerkleRewardBatchesMock = listMerkleRewardBatches as jest.Mock;
 const listMerkleRewardProofsMock = listMerkleRewardProofs as jest.Mock;
 const createDraftMerkleRewardBatchMock = createDraftMerkleRewardBatch as jest.Mock;
+const getMerkleClaimVerifierDiagnosticsMock = getMerkleClaimVerifierDiagnostics as jest.Mock;
 
 const adminToken = jwt.sign({ userId: 'admin-user', email: 'admin@example.com' }, 'secret');
 const userToken = jwt.sign({ userId: 'normal-user', email: 'user@example.com' }, 'secret');
@@ -64,6 +66,12 @@ describe('Admin read API', () => {
     listMerkleRewardBatchesMock.mockReset();
     listMerkleRewardProofsMock.mockReset();
     createDraftMerkleRewardBatchMock.mockReset();
+    getMerkleClaimVerifierDiagnosticsMock.mockReset();
+    getMerkleClaimVerifierDiagnosticsMock.mockReturnValue({
+      configured: false,
+      status: 'not_configured',
+      model: 'legacy_stub',
+    });
   });
 
   it('requires admin access for dashboard reads', async () => {
@@ -136,6 +144,15 @@ describe('Admin read API', () => {
       status: 'disabled',
       mode: 'disabled',
     });
+    expect(res.body.data.wallet_signature_verifier).toMatchObject({
+      configured: false,
+      status: 'disabled',
+    });
+    expect(res.body.data.merkle_claim_verifier).toMatchObject({
+      configured: false,
+      status: 'not_configured',
+    });
+    expect(res.body.data.contract_integration).toHaveProperty('readyForReads');
   });
 
   it('requires admin access for operations controls', async () => {

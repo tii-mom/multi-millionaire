@@ -10,7 +10,13 @@ import { createAdminAuditLog, listAdminAuditLogs, listAppControls, setAppControl
 import { listChainEvents } from '../models/chainEventModel';
 import { listMerkleRewardBatches, listMerkleRewardProofs } from '../models/merkleRewardModel';
 import { getReceiptVerifierDiagnostics } from '../services/receiptVerifier';
-import { createDraftMerkleRewardBatch } from '../services/merkleRewards';
+import { createDraftMerkleRewardBatch, getMerkleClaimVerifierDiagnostics } from '../services/merkleRewards';
+import { getWalletSignatureVerifierDiagnostics } from '../services/walletSignatureVerifier';
+import {
+  getContractArtifactStatuses,
+  getContractIntegrationDiagnostics,
+  loadContractIntegrationConfig,
+} from '../services/contracts/config';
 
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
@@ -119,10 +125,15 @@ export async function getChainEvents(req: Request, res: Response, next: NextFunc
 
 export async function getOpsDiagnostics(req: Request, res: Response, next: NextFunction) {
   try {
+    const contractConfig = loadContractIntegrationConfig();
     return res.json({
       request_id: req.id || '',
       data: {
         receipt_verifier: getReceiptVerifierDiagnostics(),
+        wallet_signature_verifier: getWalletSignatureVerifierDiagnostics(),
+        merkle_claim_verifier: getMerkleClaimVerifierDiagnostics(),
+        contract_integration: getContractIntegrationDiagnostics(contractConfig),
+        contract_artifacts: getContractArtifactStatuses(contractConfig),
       },
     });
   } catch (err) {

@@ -4,26 +4,19 @@ import {
   createWalletBindIntent,
   getWalletBindIntentForUser,
   listWalletBindingsForUser,
+  markWalletBindIntentExpired,
   markWalletBindIntentVerified,
   normalizeWalletAddress,
   upsertVerifiedWalletBinding,
 } from '../models/walletBindingModel';
+import {
+  isPlausibleWalletAddress,
+  verifyWalletSignature,
+  WalletSignatureVerificationError,
+} from '../services/walletSignatureVerifier';
 
 function walletBindingEnabled(): boolean {
   return process.env.WALLET_BINDING_ENABLED === 'true';
-}
-
-function verifyWalletSignature(input: {
-  nonce: string;
-  walletAddress: string;
-  signature: string;
-  signableMessage: string;
-}): boolean {
-  const mode = process.env.WALLET_SIGNATURE_MODE || 'disabled';
-  if (mode === 'test') {
-    return input.signature === `test:${input.nonce}:${normalizeWalletAddress(input.walletAddress)}`;
-  }
-  return false;
 }
 
 export async function createBindIntent(req: Request, res: Response, next: NextFunction) {
@@ -39,6 +32,9 @@ export async function createBindIntent(req: Request, res: Response, next: NextFu
     const walletAddress = typeof req.body.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
     if (!walletAddress) {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'walletAddress is required' } });
+    }
+    if (!isPlausibleWalletAddress(walletAddress)) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WALLET_ADDRESS', message: 'walletAddress is not valid for the configured chain' } });
     }
 
     const config = loadContractIntegrationConfig();
@@ -79,22 +75,23 @@ export async function bindWallet(req: Request, res: Response, next: NextFunction
     if (!nonce || !walletAddress || !signature) {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'nonce, walletAddress, and signature are required' } });
     }
+    if (!isPlausibleWalletAddress(walletAddress)) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WALLET_ADDRESS', message: 'walletAddress is not valid for the configured chain' } });
+    }
 
     const intent = await getWalletBindIntentForUser(user.id, nonce);
     if (!intent || intent.status !== 'pending') {
       return res.status(404).json({ request_id: req.id || '', error: { code: 'BIND_INTENT_NOT_FOUND', message: 'Wallet bind intent not found' } });
     }
     if (intent.expires_at.getTime() <= Date.now()) {
+      await markWalletBindIntentExpired(intent.id);
       return res.status(409).json({ request_id: req.id || '', error: { code: 'BIND_INTENT_EXPIRED', message: 'Wallet bind intent expired' } });
     }
     if (normalizeWalletAddress(intent.wallet_address) !== normalizeWalletAddress(walletAddress)) {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'WALLET_MISMATCH', message: 'Wallet address does not match bind intent' } });
     }
 
-    const verified = verifyWalletSignature({ nonce, walletAddress, signature, signableMessage: intent.signable_message });
-    if (!verified) {
-      return res.status(503).json({ request_id: req.id || '', error: { code: 'SIGNATURE_VERIFIER_NOT_CONFIGURED', message: 'Production wallet signature verifier is not configured' } });
-    }
+    verifyWalletSignature({ nonce, walletAddress, signature, signableMessage: intent.signable_message });
 
     const binding = await upsertVerifiedWalletBinding({
       userId: user.id,
@@ -110,6 +107,9 @@ export async function bindWallet(req: Request, res: Response, next: NextFunction
 
     return res.status(201).json({ request_id: req.id || '', data: binding });
   } catch (err) {
+    if (err instanceof WalletSignatureVerificationError) {
+      return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
+    }
     return next(err);
   }
 }

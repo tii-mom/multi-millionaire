@@ -66,7 +66,7 @@ export default function Rewards() {
     setClaimingId(ledgerId);
     try {
       await api.claimReward(ledgerId, token);
-      toast.success("Reward marked as claimed.");
+      toast.success("Staging reward marked as claimed.");
       await loadRewards();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to claim reward.";
@@ -104,7 +104,7 @@ export default function Rewards() {
             <span className="text-[11px] uppercase tracking-widest font-mono">Reward Ledger</span>
           </div>
           <div className="text-[9px] uppercase tracking-widest font-mono text-[#DBFF00]/70 border border-[#DBFF00]/20 bg-[#DBFF00]/10 rounded-full px-3 py-1.5">
-            Merkle-ready
+            Chain-gated
           </div>
         </div>
 
@@ -201,7 +201,7 @@ export default function Rewards() {
                       disabled={reward.status !== "approved" || claimingId === reward.id}
                       className="min-w-[64px] bg-white/10 text-white border border-white/10 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-white/15 transition-colors disabled:opacity-40"
                     >
-                      {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Stub"}
+                      {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Stage"}
                     </button>
                   </div>
                 </div>

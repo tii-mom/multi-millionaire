@@ -13,6 +13,7 @@ jest.mock('../src/models/walletBindingModel', () => ({
   getWalletBindIntentForUser: jest.fn(),
   listWalletBindingsForUser: jest.fn(),
   findVerifiedWalletBinding: jest.fn(),
+  markWalletBindIntentExpired: jest.fn(),
   markWalletBindIntentVerified: jest.fn(),
   normalizeWalletAddress: jest.fn((value: string) => value.trim().toLowerCase()),
   upsertVerifiedWalletBinding: jest.fn(),

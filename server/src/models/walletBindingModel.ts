@@ -121,6 +121,15 @@ export async function markWalletBindIntentVerified(intentId: string): Promise<vo
   );
 }
 
+export async function markWalletBindIntentExpired(intentId: string): Promise<void> {
+  await query(
+    `UPDATE wallet_bind_intents
+     SET status = 'expired', updated_at = NOW()
+     WHERE id = $1 AND status = 'pending'`,
+    [intentId]
+  );
+}
+
 export async function upsertVerifiedWalletBinding(input: {
   userId: string;
   chainId: string;

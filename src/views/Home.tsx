@@ -30,7 +30,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const [walletLoading, setWalletLoading] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [receiptLoading, setReceiptLoading] = useState(false);
-  const availableBalance = 2450000 - myDeposit; // Make balance strictly dynamic according to local storage changes
+  const availableBalance = 2450000 - myDeposit; // Display-only balance for staging/off-chain flows.
 
   useEffect(() => {
     let cancelled = false;
@@ -510,7 +510,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             />
             
             <div className="absolute -top-3 right-2 bg-black px-2 text-[9px] text-white/30 font-mono tracking-widest uppercase flex items-center gap-1 z-30">
-              Wallet:
+              Display:
               <div className="relative inline-flex min-w-[50px] justify-end">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
@@ -622,7 +622,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             {isConfirming ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Submitting Lock...</span>
+                <span>Recording Deposit...</span>
               </>
             ) : (
               <>
@@ -642,7 +642,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               <div className="h-2 w-0.5 bg-white/40 rounded-full animate-[pulse_1s_ease-in-out_infinite]" />
               <div className="h-3 w-0.5 bg-white/40 rounded-full animate-[pulse_1.5s_ease-in-out_infinite_0.2s]" />
               <div className="h-1.5 w-0.5 bg-white/40 rounded-full animate-[pulse_0.8s_ease-in-out_infinite_0.4s]" />
-              <span className="text-[8px] font-mono tracking-widest uppercase ml-1">Network Active</span>
+              <span className="text-[8px] font-mono tracking-widest uppercase ml-1">{chainMainlineEnabled ? "Receipt Mode" : "Staging Mode"}</span>
             </div>
           </div>
         </div>

@@ -14,15 +14,42 @@ describe('contract config loader', () => {
       TOKEN_ADDRESS: 'TOKEN',
       LOCK_VAULT_ADDRESS: 'LOCK',
       ORACLE_ADDRESS: 'ORACLE',
-      REWARD_DISTRIBUTOR_ADDRESS: 'REWARD',
+      REWARD_CLAIM_MODEL: 'merkle',
     });
 
     const diagnostics = getContractIntegrationDiagnostics(config);
 
     expect(config.readOnlyEnabled).toBe(true);
+    expect(config.rewardClaim.model).toBe('merkle');
     expect(diagnostics.readyForReads).toBe(true);
     expect(diagnostics.readyForIndexer).toBe(false);
     expect(diagnostics.abiArtifacts).toHaveLength(3);
+  });
+
+  it('requires a distributor address only for the distributor claim model', () => {
+    const merkleConfig = loadContractIntegrationConfig({
+      CHAIN_READ_ONLY_ENABLED: 'true',
+      CHAIN_RPC_URL: 'https://rpc.example.invalid',
+      CHAIN_ID: 'ton-mainnet',
+      TOKEN_ADDRESS: 'TOKEN',
+      LOCK_VAULT_ADDRESS: 'LOCK',
+      ORACLE_ADDRESS: 'ORACLE',
+      REWARD_CLAIM_MODEL: 'merkle',
+    });
+    expect(getContractIntegrationDiagnostics(merkleConfig).issues).toEqual([]);
+
+    const distributorConfig = loadContractIntegrationConfig({
+      CHAIN_READ_ONLY_ENABLED: 'true',
+      CHAIN_RPC_URL: 'https://rpc.example.invalid',
+      CHAIN_ID: 'ton-mainnet',
+      TOKEN_ADDRESS: 'TOKEN',
+      LOCK_VAULT_ADDRESS: 'LOCK',
+      ORACLE_ADDRESS: 'ORACLE',
+      REWARD_CLAIM_MODEL: 'distributor',
+    });
+    expect(getContractIntegrationDiagnostics(distributorConfig).issues).toEqual([
+      expect.objectContaining({ key: 'REWARD_DISTRIBUTOR_ADDRESS' }),
+    ]);
   });
 
   it('fails closed when chain integration is enabled without addresses', () => {
@@ -35,4 +62,3 @@ describe('contract config loader', () => {
     ).toThrow(ContractConfigError);
   });
 });
-
