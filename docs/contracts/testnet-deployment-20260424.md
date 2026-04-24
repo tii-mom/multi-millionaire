@@ -54,9 +54,20 @@ be treated as valid.
 ## Fresh Testnet Canary Flow
 
 The canary must use a real testnet Jetton master. Do not use the admin wallet as
-a placeholder token address.
+a placeholder token address. If no external testnet 72H Jetton exists, deploy
+the repository's `TestJettonMaster`; it is for testnet canary only and must not
+be used as the mainnet 72H token.
 
-1. Provide or deploy `TOKEN_ADDRESS_TESTNET`.
+1. Provide `TOKEN_ADDRESS_TESTNET` or deploy a testnet-only Jetton:
+
+```bash
+UPDATE_ENV=true npm run contract:deploy:testnet-jetton
+```
+
+The deploy script also mints a small test balance to the deployer by default.
+Override the recipient or amount with `TESTNET_JETTON_MINT_RECIPIENT` and
+`TESTNET_JETTON_MINT_AMOUNT_RAW`.
+
 2. Build contracts:
 
 ```bash

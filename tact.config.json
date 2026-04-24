@@ -20,6 +20,16 @@
         "external": false
       },
       "mode": "full"
+    },
+    {
+      "name": "TestJetton",
+      "path": "contracts/test_jetton.tact",
+      "output": "build/TestJetton",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
     }
   ]
 }

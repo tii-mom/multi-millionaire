@@ -80,6 +80,8 @@ If the target chain uses generated wrappers instead of ABI JSON, these variables
 | Variable | Required when | Notes |
 | --- | --- | --- |
 | `TOKEN_ADDRESS_TESTNET` | Deploying or canarying testnet contracts. | Real testnet Jetton master address. Do not use an admin wallet placeholder. |
+| `TESTNET_JETTON_MINT_RECIPIENT` | Deploying repository `TestJettonMaster`. | Optional; defaults to the deployer wallet. |
+| `TESTNET_JETTON_MINT_AMOUNT_RAW` | Deploying repository `TestJettonMaster`. | Optional; defaults to a small internal canary balance. |
 | `LOCK_VAULT_ADDRESS_TESTNET` | Deriving wallets or sending canary deposit. | Written by `UPDATE_ENV=true npm run contract:deploy:testnet`. |
 | `MERKLE_CLAIM_ADDRESS_TESTNET` | Deriving reward wallet or claim canary. | Written by `UPDATE_ENV=true npm run contract:deploy:testnet`. |
 | `LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET` | Configuring LockVault. | Derived by `npm run contract:jetton-wallets:testnet`. |
