@@ -71,6 +71,8 @@ If the target chain uses generated wrappers instead of ABI JSON, these variables
 | `WALLET_BINDING_ENABLED` | Wallet binding endpoints are exposed. | Can be enabled before deposit migration if not required by current deposit endpoint. |
 | `WALLET_BINDING_NONCE_TTL_SECONDS` | Signature challenge flow is enabled. | Suggested default: 300. |
 | `WALLET_BINDING_MESSAGE_DOMAIN` | Signature challenge flow is enabled. | Should include app name and environment. |
+| `WALLET_SIGNATURE_MODE` | Signature challenge flow is enabled. | Use `ton_proof` in production; never use `test` in production. |
+| `WALLET_TON_PROOF_MAX_AGE_SECONDS` | `WALLET_SIGNATURE_MODE=ton_proof`. | Optional; defaults to `300`. |
 | `RECEIPT_VERIFICATION_ENABLED` | Receipt endpoint is exposed. | Keep false until RPC, ABI, wallet binding, and event apply are ready. |
 | `RECEIPT_REQUIRED_CONFIRMATIONS` | Receipt endpoint accepts finalized tx only. | May reuse `CHAIN_INDEXER_CONFIRMATIONS` if the same finality rule is acceptable. |
 | `MERKLE_CLAIM_VERIFIER` | Merkle claim receipts are accepted. | Use `ton_rpc` for real TON verification; never use `test` in production. |
@@ -174,7 +176,8 @@ Operator signing is not required for the first receipt-to-position path if users
 - [ ] Provide price updater policy and price precision; external Oracle address is optional in the current minimal design.
 - [x] Provide testnet MerkleClaim address, deployment LT, ABI/wrapper, and reward proof format.
 - [x] Exercise local wallet binding with `WALLET_SIGNATURE_MODE=test` for receipt apply canary.
-- [ ] Provide production TON wallet signature standard and sample signed bind message.
+- [x] Add backend TON Connect `ton_proof` verifier for production wallet binding.
+- [ ] Wire frontend TON Connect proof submission to the backend verifier.
 - [ ] Provide deposit, price, reward batch, and reward claim fixtures that line up with the parser tests.
 - [ ] Decide whether backend operator signing is in scope for Sprint 2 or postponed.
 - [ ] Decide when `chain_events` and wallet migrations may be applied to shared staging.
