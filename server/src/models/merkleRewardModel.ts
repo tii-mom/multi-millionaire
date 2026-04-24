@@ -211,8 +211,14 @@ export async function listMerkleRewardProofs(filters: { batchId?: string; userId
   return result.rows;
 }
 
-export async function markMerkleClaimPending(ledgerId: string, userId: string, claimTxHash: string): Promise<MerkleRewardProof | null> {
-  const result = await query<MerkleRewardProof>(
+export async function markMerkleClaimPending(
+  ledgerId: string,
+  userId: string,
+  claimTxHash: string,
+  executor?: QueryExecutor
+): Promise<MerkleRewardProof | null> {
+  const db = executor || { query };
+  const result = await db.query<MerkleRewardProof>(
     `UPDATE merkle_reward_proofs
      SET claim_status = 'claim_pending', claim_tx_hash = $3, updated_at = NOW()
      WHERE reward_ledger_id = $1
@@ -220,6 +226,28 @@ export async function markMerkleClaimPending(ledgerId: string, userId: string, c
        AND claim_status = 'proof_available'
      RETURNING ${proofColumns}`,
     [ledgerId, userId, claimTxHash]
+  );
+  return result.rows[0] || null;
+}
+
+export async function markMerkleClaimVerified(input: {
+  ledgerId: string;
+  userId: string;
+  claimTxHash: string;
+  chainEventId: string;
+}, executor?: QueryExecutor): Promise<MerkleRewardProof | null> {
+  const db = executor || { query };
+  const result = await db.query<MerkleRewardProof>(
+    `UPDATE merkle_reward_proofs
+     SET claim_status = 'claimed',
+         claim_tx_hash = $3,
+         claim_chain_event_id = $4,
+         updated_at = NOW()
+     WHERE reward_ledger_id = $1
+       AND beneficiary_user_id = $2
+       AND claim_status IN ('proof_available','claim_pending')
+     RETURNING ${proofColumns}`,
+    [input.ledgerId, input.userId, input.claimTxHash, input.chainEventId]
   );
   return result.rows[0] || null;
 }

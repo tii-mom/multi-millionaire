@@ -5,7 +5,9 @@ import { query } from '../src/db';
 import { createPosition } from '../src/models/positionModel';
 import { getReferral, lockReferral } from '../src/models/referralModel';
 import { createRewardLedger, getRewardLedgerById, markRewardClaimed } from '../src/models/rewardModel';
-import { getMerkleProofForLedger, markMerkleClaimPending } from '../src/models/merkleRewardModel';
+import { getMerkleProofForLedger, markMerkleClaimVerified } from '../src/models/merkleRewardModel';
+import { insertChainEvent } from '../src/models/chainEventModel';
+import { verifyMerkleClaimReceipt } from '../src/services/merkleRewards';
 
 jest.mock('../src/db', () => {
   const query = jest.fn();
@@ -82,8 +84,20 @@ jest.mock('../src/models/riskModel', () => ({
 
 jest.mock('../src/models/merkleRewardModel', () => ({
   getMerkleProofForLedger: jest.fn(),
-  markMerkleClaimPending: jest.fn(),
+  markMerkleClaimVerified: jest.fn(),
 }));
+
+jest.mock('../src/models/chainEventModel', () => ({
+  insertChainEvent: jest.fn(),
+}));
+
+jest.mock('../src/services/merkleRewards', () => {
+  const actual = jest.requireActual('../src/services/merkleRewards');
+  return {
+    ...actual,
+    verifyMerkleClaimReceipt: jest.fn(actual.verifyMerkleClaimReceipt),
+  };
+});
 
 const queryMock = query as jest.Mock;
 const createPositionMock = createPosition as jest.Mock;
@@ -93,7 +107,9 @@ const createRewardLedgerMock = createRewardLedger as jest.Mock;
 const getRewardLedgerByIdMock = getRewardLedgerById as jest.Mock;
 const markRewardClaimedMock = markRewardClaimed as jest.Mock;
 const getMerkleProofForLedgerMock = getMerkleProofForLedger as jest.Mock;
-const markMerkleClaimPendingMock = markMerkleClaimPending as jest.Mock;
+const markMerkleClaimVerifiedMock = markMerkleClaimVerified as jest.Mock;
+const insertChainEventMock = insertChainEvent as jest.Mock;
+const verifyMerkleClaimReceiptMock = verifyMerkleClaimReceipt as jest.Mock;
 
 const inviteeUserId = '00000000-0000-0000-0000-000000000101';
 const inviterUserId = '00000000-0000-0000-0000-000000000202';
@@ -127,7 +143,10 @@ describe('Reward API and generation', () => {
     getRewardLedgerByIdMock.mockReset();
     markRewardClaimedMock.mockReset();
     getMerkleProofForLedgerMock.mockReset();
-    markMerkleClaimPendingMock.mockReset();
+    markMerkleClaimVerifiedMock.mockReset();
+    insertChainEventMock.mockReset();
+    verifyMerkleClaimReceiptMock.mockReset();
+    verifyMerkleClaimReceiptMock.mockImplementation(jest.requireActual('../src/services/merkleRewards').verifyMerkleClaimReceipt);
   });
 
   it('creates a reward for the first qualifying referred deposit', async () => {
@@ -298,6 +317,73 @@ describe('Reward API and generation', () => {
 
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe('MERKLE_CLAIM_VERIFIER_NOT_CONFIGURED');
-    expect(markMerkleClaimPendingMock).not.toHaveBeenCalled();
+    expect(markMerkleClaimVerifiedMock).not.toHaveBeenCalled();
+  });
+
+  it('marks Merkle claim receipts claimed only after chain verification', async () => {
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      batch_metadata: { contract_batch_id: '2' },
+      chain_id: 'ton-testnet',
+      beneficiary_wallet: '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41',
+      amount_raw: '100',
+      leaf_hash: '0x01',
+    });
+    verifyMerkleClaimReceiptMock.mockResolvedValue({
+      txHash: 'claim-hash',
+      logIndex: 0,
+      contractAddress: 'merkle-claim',
+      beneficiaryWallet: '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41',
+      recipient: '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41',
+      amountRaw: '100',
+      ledgerIdHash: '1',
+      batchId: '2',
+      blockNumber: 123,
+      blockTime: '2026-04-24T00:00:00.000Z',
+      finalized: true,
+    });
+    insertChainEventMock.mockResolvedValue({
+      inserted: true,
+      event: { id: 'chain-event-1', apply_status: 'applied' },
+    });
+    markMerkleClaimVerifiedMock.mockResolvedValue({
+      id: 'proof-1',
+      claim_status: 'claimed',
+      claim_chain_event_id: 'chain-event-1',
+    });
+    markRewardClaimedMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'claimed',
+    });
+
+    const res = await request(app)
+      .post('/v1/rewards/ledger-1/claim-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: 'claim-hash' });
+
+    expect(res.status).toBe(200);
+    expect(insertChainEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      chainId: 'ton-testnet',
+      contractRole: 'merkle_claim',
+      eventName: 'ClaimReward',
+      txHash: 'claim-hash',
+      applyStatus: 'applied',
+    }));
+    expect(markMerkleClaimVerifiedMock).toHaveBeenCalledWith(expect.objectContaining({
+      ledgerId: 'ledger-1',
+      userId: inviteeUserId,
+      claimTxHash: 'claim-hash',
+      chainEventId: 'chain-event-1',
+    }), expect.objectContaining({ query: expect.any(Function) }));
+    expect(markRewardClaimedMock).toHaveBeenCalledWith('ledger-1', inviteeUserId, expect.objectContaining({ query: expect.any(Function) }));
+    expect(res.body.data.reward.status).toBe('claimed');
   });
 });

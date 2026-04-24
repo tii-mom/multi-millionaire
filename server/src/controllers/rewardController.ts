@@ -8,8 +8,10 @@ import {
 } from '../models/rewardModel';
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
 import { isControlEnabled, productionChainRequired, riskReviewEnabled } from '../services/productionGuards';
-import { getMerkleProofForLedger, markMerkleClaimPending } from '../models/merkleRewardModel';
+import { getMerkleProofForLedger, markMerkleClaimVerified } from '../models/merkleRewardModel';
 import { encodeMerkleProofCell, hashLedgerId, MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
+import { withTransaction } from '../db';
+import { insertChainEvent } from '../models/chainEventModel';
 
 const allowedStatuses = new Set<RewardStatus>(['pending', 'approved', 'claimed', 'rejected']);
 
@@ -156,15 +158,54 @@ export async function submitMerkleClaimReceipt(req: Request, res: Response, next
       return res.status(404).json({ request_id: req.id || '', error: { code: 'MERKLE_PROOF_NOT_AVAILABLE', message: 'Merkle proof is not available for this reward' } });
     }
 
-    await verifyMerkleClaimReceipt({
+    const receipt = await verifyMerkleClaimReceipt({
       txHash,
       beneficiaryWallet: proof.beneficiary_wallet,
       amountRaw: proof.amount_raw,
       ledgerIdHash: hashLedgerId(ledgerId),
       batchId: typeof proof.batch_metadata?.contract_batch_id === 'string' ? proof.batch_metadata.contract_batch_id : undefined,
     });
-    const pending = await markMerkleClaimPending(ledgerId, user.id, txHash);
-    return res.json({ request_id: req.id || '', data: pending });
+    const result = await withTransaction(async (tx) => {
+      const eventResult = await insertChainEvent({
+        chainId: proof.chain_id,
+        contractAddress: receipt.contractAddress,
+        contractRole: 'merkle_claim',
+        eventName: 'ClaimReward',
+        txHash: receipt.txHash,
+        logIndex: receipt.logIndex,
+        blockNumber: receipt.blockNumber,
+        blockTime: receipt.blockTime,
+        finalized: receipt.finalized,
+        payload: {
+          txHash: receipt.txHash,
+          beneficiaryWallet: receipt.beneficiaryWallet,
+          recipient: receipt.recipient,
+          amountRaw: receipt.amountRaw,
+          ledgerIdHash: receipt.ledgerIdHash,
+          batchId: receipt.batchId,
+        },
+        applyStatus: 'applied',
+        executor: tx,
+      });
+      if (!eventResult.inserted) {
+        return { eventResult, proof: null, ledger: null };
+      }
+
+      const claimedProof = await markMerkleClaimVerified({
+        ledgerId,
+        userId: user.id,
+        claimTxHash: receipt.txHash,
+        chainEventId: eventResult.event.id,
+      }, tx);
+      const claimedLedger = await markRewardClaimed(ledgerId, user.id, tx);
+      return { eventResult, proof: claimedProof, ledger: claimedLedger };
+    });
+
+    if (!result.eventResult.inserted || !result.proof || !result.ledger) {
+      return res.status(409).json({ request_id: req.id || '', error: { code: 'DUPLICATE_CLAIM_RECEIPT', message: 'Claim receipt was already submitted or reward is no longer claimable' } });
+    }
+
+    return res.json({ request_id: req.id || '', data: { proof: result.proof, reward: result.ledger, chain_event: result.eventResult.event } });
   } catch (err) {
     if (err instanceof MerkleClaimVerificationError) {
       return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });

@@ -11,6 +11,7 @@ import type {
   BootstrapData,
   DepositReceiptResult,
   MerkleRewardBatch,
+  MerkleClaimReceiptResult,
   MerkleRewardProof,
   MerkleRewardProofWithBatch,
   Position,
@@ -160,7 +161,7 @@ export const api = {
   },
 
   submitMerkleClaimReceipt(ledgerId: string, txHash: string, token: string) {
-    return requestJson<MerkleRewardProof>(`/v1/rewards/${ledgerId}/claim-receipt`, {
+    return requestJson<MerkleClaimReceiptResult>(`/v1/rewards/${ledgerId}/claim-receipt`, {
       method: "POST",
       token,
       body: { txHash },

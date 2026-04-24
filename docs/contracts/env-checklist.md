@@ -91,6 +91,10 @@ If the target chain uses generated wrappers instead of ABI JSON, these variables
 | `TESTNET_CANARY_WAVE_ID` | Sending a canary deposit. | Defaults to `1` if omitted. |
 | `TESTNET_CANARY_POSITION_ID` | Sending a canary deposit. | Optional; defaults to a timestamp-generated unique id. |
 | `TESTNET_CANARY_AMOUNT_RAW` | Sending a canary deposit. | Small raw Jetton amount funded to the depositor wallet. |
+| `TESTNET_CLAIM_AMOUNT_RAW` | Sending a Merkle claim canary. | Optional; defaults to a small raw amount. |
+| `TESTNET_CLAIM_BATCH_ID` | Sending a Merkle claim canary. | Optional; defaults to a timestamp-generated uint64 batch id. |
+| `TESTNET_CLAIM_LEDGER_ID` | Sending a Merkle claim canary. | Use the backend `reward_ledgers.id` UUID when validating backend claim receipt apply. |
+| `TESTNET_CLAIMANT_MNEMONIC` | Sending a Merkle claim canary from a separate claimant. | Optional; falls back to deployer mnemonic for controlled internal canary only. |
 
 Frontend wallet variables depend on the wallet provider. If TON Connect is used, provide the manifest URL and any network/provider IDs separately from backend secrets.
 
@@ -110,6 +114,17 @@ Local secrets such as deployer mnemonics and RPC API keys must stay out of git.
 | `MERKLE_CLAIM_ADDRESS_TESTNET` | `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH` |
 | `MERKLE_CLAIM_DEPLOYMENT_LT_TESTNET` | `65157256000003` |
 | `REWARD_JETTON_WALLET_ADDRESS_TESTNET` | `kQA1fYQl80IBTd_Geavn1VpuNY6_Sf8-iBEn8hudzq5hE3ut` |
+
+Latest testnet claim canary:
+
+| Evidence | Value |
+| --- | --- |
+| Claim tx hash | `Kidy8e/ZZR9PQHput2wQwkJxUIuhHYrtHY06sAGmK9E=` |
+| Claim LT | `65164428000003` |
+| Contract batch id | `1777041213767` |
+| Backend reward ledger id | `8b05e995-2bb1-4459-9f12-1ebd03b4621c` |
+| Amount raw | `1000` |
+| Backend local apply | `reward=claimed`, `proof=claimed`, `chain_event=applied` |
 
 For backend testnet receipt apply, map the `_TESTNET` values into the runtime
 variables consumed by the API:

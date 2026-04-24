@@ -91,7 +91,13 @@ describe('Merkle reward helpers', () => {
       beneficiaryWallet,
       amountRaw: '500',
       ledgerIdHash: '0x03',
-    })).resolves.toBeUndefined();
+    })).resolves.toMatchObject({
+      txHash: 'claim-hash',
+      amountRaw: '500',
+      batchId: '2',
+      ledgerIdHash: '3',
+      finalized: true,
+    });
 
     fetchMock.mockRestore();
     process.env = originalEnv;

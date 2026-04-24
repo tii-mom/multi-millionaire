@@ -125,9 +125,15 @@ Latest testnet evidence is recorded in
 - Verified deposit receipt tx:
   `9BJVuUvqZ3KpdtSMwa20JRGm3jyZUZoZ3Z1rU4e9Vcg=`
 - Backend local receipt apply: `applied`
+- Verified Merkle claim receipt tx:
+  `Kidy8e/ZZR9PQHput2wQwkJxUIuhHYrtHY06sAGmK9E=`
+- Backend local claim receipt apply: `reward=claimed`,
+  `proof=claimed`, `chain_event=applied`
 
 This proves the testnet deposit receipt path can create a backend chain event
-and position. It does not authorize production chain writes or mainnet launch.
+and position, and the testnet Merkle claim receipt path can mark the reward and
+proof claimed only after chain verification. It does not authorize production
+chain writes or mainnet launch.
 
 ## Canary SOP
 
@@ -219,7 +225,8 @@ Real chain-backed production still requires verified production values for:
 - production TON wallet signature verification, replacing local
   `WALLET_SIGNATURE_MODE=test`
 - finality/confirmation depth and replay protection rules
-- Merkle claim canary with a funded reward wallet and verified claim receipt
+- frontend TonConnect transaction builders for LockVault Jetton transfer and
+  MerkleClaim `ClaimReward`
 - reconciliation process between API records, chain events, and reward ledgers
 
 Until those are complete and validated on staging, real funds must remain behind

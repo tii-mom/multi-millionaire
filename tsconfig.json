@@ -27,6 +27,8 @@
     "server",
     "node_modules",
     "build",
-    "dist"
+    "dist",
+    "**/* 2.ts",
+    "**/* 2.tsx"
   ]
 }

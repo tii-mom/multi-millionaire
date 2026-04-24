@@ -119,6 +119,20 @@ The script submits a standard Jetton transfer to the user's Jetton wallet with
 `destination=LockVault`, then polls LockVault transactions and prints the
 receipt hash for backend `/v1/waves/:waveId/deposit-receipt`.
 
+8. Send one small Merkle claim canary:
+
+```bash
+CHAIN_RPC_URL=https://ton-testnet.api.onfinality.io/public/jsonRPC \
+TESTNET_CLAIM_AMOUNT_RAW=<small_raw_amount> \
+TESTNET_CLAIM_LEDGER_ID=<backend_reward_ledger_uuid> \
+npx tsx scripts/sendTestnetClaim.ts
+```
+
+The claim script sets a single-leaf Merkle root, funds the MerkleClaim reward
+Jetton wallet if the repository `TestJettonMaster` is used, sends `ClaimReward`,
+and prints the claim receipt hash for backend
+`/v1/rewards/:ledgerId/claim-receipt`.
+
 ## Latest Testnet Canary Evidence
 
 - Date: 2026-04-24
@@ -143,6 +157,17 @@ receipt hash for backend `/v1/waves/:waveId/deposit-receipt`.
   - wallet binding: `verified` using local `WALLET_SIGNATURE_MODE=test`
   - chain event apply status: `applied`
   - position on-chain id: `1777039939895`
+- Script-verified Merkle claim canary:
+  - amount raw: `1000`
+  - backend reward ledger id: `8b05e995-2bb1-4459-9f12-1ebd03b4621c`
+  - contract batch id: `1777041213767`
+  - claim tx hash: `Kidy8e/ZZR9PQHput2wQwkJxUIuhHYrtHY06sAGmK9E=`
+  - LT: `65164428000003`
+- Backend local claim receipt apply:
+  - database: temporary local Postgres only
+  - Merkle proof status: `claimed`
+  - reward ledger status: `claimed`
+  - chain event apply status: `applied`
 
 The backend verifier now accepts TON RPC responses that place message bodies in
 `in_msg.msg_data.body`, which is the shape returned by the testnet JSON-RPC
@@ -150,8 +175,8 @@ used for this canary.
 
 ## Mainnet Blockers
 
-- Merkle claim canary with funded reward Jetton wallet, active backend batch,
-  and verified on-chain claim receipt.
-- Frontend TonConnect transaction builders for deposit and claim, or a limited
-  operator canary flow documented separately.
+- Production TON wallet signature verification; local `WALLET_SIGNATURE_MODE=test`
+  is not allowed for production.
+- Frontend TonConnect transaction builders for LockVault Jetton transfer and
+  MerkleClaim `ClaimReward`.
 - Mainnet deployment via the admin Tonkeeper wallet only after the above passes.

@@ -57,6 +57,20 @@ export interface MerkleClaimReceiptInput {
   batchId?: string;
 }
 
+export interface VerifiedMerkleClaimReceipt {
+  txHash: string;
+  logIndex: number;
+  contractAddress: string;
+  beneficiaryWallet: string;
+  recipient: string;
+  amountRaw: string;
+  ledgerIdHash: string;
+  batchId: string;
+  blockNumber: number | null;
+  blockTime: string | null;
+  finalized: boolean;
+}
+
 function sha256(value: string): string {
   return `0x${crypto.createHash('sha256').update(value).digest('hex')}`;
 }
@@ -197,7 +211,7 @@ export async function createDraftMerkleRewardBatch(input: {
   });
 }
 
-export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): Promise<void> {
+export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): Promise<VerifiedMerkleClaimReceipt> {
   const mode = (process.env.MERKLE_CLAIM_VERIFIER || process.env.CHAIN_RECEIPT_VERIFIER || '').trim().toLowerCase();
   if (mode !== 'ton_rpc') {
     throw new MerkleClaimVerificationError(
@@ -248,6 +262,20 @@ export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): 
   if (match.claim.amountRaw !== input.amountRaw) {
     throw new MerkleClaimVerificationError(409, 'AMOUNT_MISMATCH', 'Claim receipt amount does not match the Merkle proof');
   }
+
+  return {
+    txHash: input.txHash,
+    logIndex: 0,
+    contractAddress: match.message.destination,
+    beneficiaryWallet: normalizeTonAddress(match.message.source),
+    recipient: match.claim.recipient,
+    amountRaw: match.claim.amountRaw,
+    ledgerIdHash: match.claim.ledgerIdHash,
+    batchId: match.claim.batchId,
+    blockNumber: match.transaction.transaction_id?.lt ? Number(match.transaction.transaction_id.lt) : null,
+    blockTime: match.transaction.utime ? new Date(match.transaction.utime * 1000).toISOString() : null,
+    finalized: true,
+  };
 }
 
 export function getMerkleClaimVerifierDiagnostics(): MerkleClaimVerifierDiagnostics {

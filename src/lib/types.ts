@@ -201,6 +201,12 @@ export interface MerkleRewardProofWithBatch extends MerkleRewardProof {
   published_tx_hash: string | null;
 }
 
+export interface MerkleClaimReceiptResult {
+  proof: MerkleRewardProof;
+  reward: RewardLedger;
+  chain_event: ChainEvent;
+}
+
 export interface AdminWave extends Wave {
   unlock_multiplier_bps: number;
   price_freshness_ttl_seconds: number;

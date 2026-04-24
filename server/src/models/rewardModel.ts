@@ -103,8 +103,9 @@ export async function getRewardLedgerById(ledgerId: string): Promise<RewardLedge
   return result.rows[0] || null;
 }
 
-export async function markRewardClaimed(ledgerId: string, userId: string): Promise<RewardLedger | null> {
-  const result = await query<RewardLedger>(
+export async function markRewardClaimed(ledgerId: string, userId: string, executor?: QueryExecutor): Promise<RewardLedger | null> {
+  const db = executor || { query };
+  const result = await db.query<RewardLedger>(
     `UPDATE reward_ledgers
      SET status = 'claimed', updated_at = NOW()
      WHERE id = $1 AND beneficiary_user_id = $2 AND status = 'approved'
