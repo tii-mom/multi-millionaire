@@ -94,6 +94,37 @@ If the target chain uses generated wrappers instead of ABI JSON, these variables
 
 Frontend wallet variables depend on the wallet provider. If TON Connect is used, provide the manifest URL and any network/provider IDs separately from backend secrets.
 
+## Current Testnet Canary Values
+
+These values are testnet-only and are safe to document as public addresses.
+Local secrets such as deployer mnemonics and RPC API keys must stay out of git.
+
+| Variable | Current testnet value |
+| --- | --- |
+| `CHAIN_ID` | `ton-testnet` |
+| `CHAIN_RPC_URL` | `https://ton-testnet.api.onfinality.io/public/jsonRPC` |
+| `TOKEN_ADDRESS_TESTNET` | `kQAaCCxV8V_naWdAtURJnZ683QFXlGTiTCEHukthk8r_PBec` |
+| `LOCK_VAULT_ADDRESS_TESTNET` | `kQDa42BOYHpCwoHQAWkjsmnLMXP9WxFkKjcnt1jCaz-CBae3` |
+| `LOCK_VAULT_DEPLOYMENT_LT_TESTNET` | `65157232000003` |
+| `LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET` | `kQDOjELOK55pBR83xAbfkFuinoQEEdUNaJPFisFYPTR_nMwR` |
+| `MERKLE_CLAIM_ADDRESS_TESTNET` | `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH` |
+| `MERKLE_CLAIM_DEPLOYMENT_LT_TESTNET` | `65157256000003` |
+| `REWARD_JETTON_WALLET_ADDRESS_TESTNET` | `kQA1fYQl80IBTd_Geavn1VpuNY6_Sf8-iBEn8hudzq5hE3ut` |
+
+For backend testnet receipt apply, map the `_TESTNET` values into the runtime
+variables consumed by the API:
+
+```bash
+CHAIN_ID=ton-testnet
+TOKEN_ADDRESS="$TOKEN_ADDRESS_TESTNET"
+LOCK_VAULT_ADDRESS="$LOCK_VAULT_ADDRESS_TESTNET"
+MERKLE_CLAIM_ADDRESS="$MERKLE_CLAIM_ADDRESS_TESTNET"
+RECEIPT_VERIFICATION_ENABLED=true
+CHAIN_RECEIPT_VERIFIER=ton_rpc
+TON_RECEIPT_LOOKBACK_LIMIT=50
+WALLET_BINDING_ENABLED=true
+```
+
 ## Operator Env
 
 | Variable | Required when | Notes |
@@ -121,13 +152,14 @@ Operator signing is not required for the first receipt-to-position path if users
 
 ## Readiness Checklist
 
-- [ ] Confirm target chain id and environment naming.
-- [ ] Provide RPC URL and finality/reorg settings.
-- [ ] Provide 72H token address and decimals.
-- [ ] Provide LockVault address, deployment block, ABI/wrapper, and sample deposit receipt.
+- [x] Confirm testnet chain id and environment naming.
+- [x] Provide testnet RPC URL for canary verification.
+- [x] Provide testnet token address and decimals for canary verification.
+- [x] Provide testnet LockVault address, deployment LT, ABI/wrapper, and sample deposit receipt.
 - [ ] Provide price updater policy and price precision; external Oracle address is optional in the current minimal design.
-- [ ] Provide MerkleClaim address, deployment block, ABI/wrapper, and reward proof format.
-- [ ] Provide wallet signature standard and sample signed bind message.
+- [x] Provide testnet MerkleClaim address, deployment LT, ABI/wrapper, and reward proof format.
+- [x] Exercise local wallet binding with `WALLET_SIGNATURE_MODE=test` for receipt apply canary.
+- [ ] Provide production TON wallet signature standard and sample signed bind message.
 - [ ] Provide deposit, price, reward batch, and reward claim fixtures that line up with the parser tests.
 - [ ] Decide whether backend operator signing is in scope for Sprint 2 or postponed.
 - [ ] Decide when `chain_events` and wallet migrations may be applied to shared staging.

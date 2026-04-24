@@ -12,15 +12,21 @@ not mainnet production addresses.
 
 ## Current Testnet Addresses
 
-- LockVault: `kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt`
-- LockVault deployment LT: `65129793000003`
-- MerkleClaim: `kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg`
-- MerkleClaim deployment LT: `65129811000003`
+- TestJetton master: `kQAaCCxV8V_naWdAtURJnZ683QFXlGTiTCEHukthk8r_PBec`
+- TestJetton deploy LT: `65157150000003`
+- Admin/deployer test Jetton wallet:
+  `kQBvlJbxzzjc6cEDd1CsJ-53Ga7R3aPZZIyK9AMCafzgK_If`
+- LockVault: `kQDa42BOYHpCwoHQAWkjsmnLMXP9WxFkKjcnt1jCaz-CBae3`
+- LockVault deployment LT: `65157232000003`
+- LockVault Jetton wallet:
+  `kQDOjELOK55pBR83xAbfkFuinoQEEdUNaJPFisFYPTR_nMwR`
+- MerkleClaim: `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH`
+- MerkleClaim deployment LT: `65157256000003`
+- MerkleClaim reward Jetton wallet:
+  `kQA1fYQl80IBTd_Geavn1VpuNY6_Sf8-iBEn8hudzq5hE3ut`
 
-These addresses were produced by an earlier testnet deployment. Because the
-contract code has since changed to real Jetton custody and Merkle proof
-verification, a fresh testnet deployment is required before canary evidence can
-be treated as valid.
+These are testnet-only canary addresses. The TestJetton is not the mainnet 72H
+token and must not be treated as production collateral.
 
 ## Current Contract Semantics
 
@@ -113,14 +119,39 @@ The script submits a standard Jetton transfer to the user's Jetton wallet with
 `destination=LockVault`, then polls LockVault transactions and prints the
 receipt hash for backend `/v1/waves/:waveId/deposit-receipt`.
 
+## Latest Testnet Canary Evidence
+
+- Date: 2026-04-24
+- RPC: `https://ton-testnet.api.onfinality.io/public/jsonRPC`
+- Deployer/depositor wallet:
+  `kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl`
+- Contract state after first canary:
+  - `depositCount=1`
+  - `totalDepositedRaw=1000000000`
+  - `totalActiveRaw=1000000000`
+  - `lastPositionId=1777039479260`
+- Script-verified deposit canary:
+  - amount raw: `1000`
+  - wave: `1`
+  - position id: `1777039939895`
+  - LockVault tx hash: `9BJVuUvqZ3KpdtSMwa20JRGm3jyZUZoZ3Z1rU4e9Vcg=`
+  - LT: `65161189000007`
+- Backend local receipt apply:
+  - database: temporary local Postgres only
+  - `/health=ok`
+  - `/ready=ready`
+  - wallet binding: `verified` using local `WALLET_SIGNATURE_MODE=test`
+  - chain event apply status: `applied`
+  - position on-chain id: `1777039939895`
+
+The backend verifier now accepts TON RPC responses that place message bodies in
+`in_msg.msg_data.body`, which is the shape returned by the testnet JSON-RPC
+used for this canary.
+
 ## Mainnet Blockers
 
-- Fresh testnet deployment with current code.
-- Testnet 72H Jetton master address, or an intentionally deployed testnet-only
-  Jetton master.
-- Testnet canary deposit receipt verified by backend `CHAIN_RECEIPT_VERIFIER=ton_rpc`.
-- Merkle claim canary with an active backend batch and verified on-chain claim
-  receipt.
+- Merkle claim canary with funded reward Jetton wallet, active backend batch,
+  and verified on-chain claim receipt.
 - Frontend TonConnect transaction builders for deposit and claim, or a limited
   operator canary flow documented separately.
 - Mainnet deployment via the admin Tonkeeper wallet only after the above passes.

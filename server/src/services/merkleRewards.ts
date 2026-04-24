@@ -267,7 +267,7 @@ function normalizeUint256(value: string): string {
   return BigInt(trimmed).toString();
 }
 
-async function fetchTonTransactions(rpcUrl: string, address: string, txHash: string): Promise<TonTransactionLike[]> {
+async function fetchTonTransactions(rpcUrl: string, address: string, _txHash: string): Promise<TonTransactionLike[]> {
   const response = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -278,7 +278,6 @@ async function fetchTonTransactions(rpcUrl: string, address: string, txHash: str
       params: {
         address,
         limit: Number(process.env.TON_RECEIPT_LOOKBACK_LIMIT || 20),
-        hash: txHash,
       },
     }),
   });

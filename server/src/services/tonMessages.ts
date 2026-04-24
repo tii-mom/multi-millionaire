@@ -25,7 +25,10 @@ export interface ParsedMerkleClaim {
 export interface TonTransactionMessage {
   source: string;
   destination: string;
-  body: string;
+  body?: string;
+  msg_data?: {
+    body?: string;
+  };
 }
 
 export interface TonTransactionLike {
@@ -72,6 +75,10 @@ export function normalizeTonAddress(value: string): string {
 
 function addressToComparableString(address: Address): string {
   return address.toRawString().toLowerCase();
+}
+
+export function getTonMessageBody(message: TonTransactionMessage): string | null {
+  return message.body || message.msg_data?.body || null;
 }
 
 function loadDepositForwardPayload(slice: Slice): Slice {
@@ -166,7 +173,11 @@ export function findDepositTransaction(input: {
   for (const transaction of input.transactions) {
     const hash = transaction.transaction_id?.hash;
     const message = transaction.in_msg;
-    if (!hash || hash !== input.txHash || !message?.body || !message.destination) {
+    if (!hash || hash !== input.txHash || !message || !message.destination) {
+      continue;
+    }
+    const body = getTonMessageBody(message);
+    if (!body) {
       continue;
     }
     if (normalizeTonAddress(message.destination) !== expectedDestination) {
@@ -175,7 +186,7 @@ export function findDepositTransaction(input: {
     if (!transactionSucceeded(transaction)) {
       continue;
     }
-    const deposit = parseLockVaultDepositBody(message.body);
+    const deposit = parseLockVaultDepositBody(body);
     return { transaction, message, deposit };
   }
   return null;
@@ -190,7 +201,11 @@ export function findMerkleClaimTransaction(input: {
   for (const transaction of input.transactions) {
     const hash = transaction.transaction_id?.hash;
     const message = transaction.in_msg;
-    if (!hash || hash !== input.txHash || !message?.body || !message.destination) {
+    if (!hash || hash !== input.txHash || !message || !message.destination) {
+      continue;
+    }
+    const body = getTonMessageBody(message);
+    if (!body) {
       continue;
     }
     if (normalizeTonAddress(message.destination) !== expectedDestination) {
@@ -199,7 +214,7 @@ export function findMerkleClaimTransaction(input: {
     if (!transactionSucceeded(transaction)) {
       continue;
     }
-    const claim = parseMerkleClaimBody(message.body);
+    const claim = parseMerkleClaimBody(body);
     return { transaction, message, claim };
   }
   return null;

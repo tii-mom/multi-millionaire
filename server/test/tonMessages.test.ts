@@ -92,6 +92,40 @@ describe('TON Tact message parsers', () => {
     })).toBeNull();
   });
 
+  it('finds deposit receipts when RPC nests the body under msg_data', () => {
+    const body = beginCell()
+      .storeUint(JETTON_TRANSFER_NOTIFICATION_OPCODE, 32)
+      .storeUint(BigInt('11'), 64)
+      .storeCoins(BigInt('1000'))
+      .storeAddress(wallet)
+      .storeBit(false)
+      .storeUint(7, 32)
+      .storeUint(BigInt('42'), 64)
+      .endCell()
+      .toBoc()
+      .toString('base64');
+
+    const match = findDepositTransaction({
+      txHash: 'tx-hash',
+      lockVaultAddress: walletAddress,
+      transactions: [{
+        transaction_id: { hash: 'tx-hash' },
+        in_msg: {
+          source: walletAddress,
+          destination: walletAddress,
+          msg_data: { body },
+        },
+      }],
+    });
+
+    expect(match?.deposit).toMatchObject({
+      waveId: 7,
+      amountRaw: '1000',
+      positionId: '42',
+      senderAddress: wallet.toRawString().toLowerCase(),
+    });
+  });
+
   it('parses Merkle ClaimReward message bodies', () => {
     const body = beginCell()
       .storeUint(MERKLE_CLAIM_OPCODE, 32)

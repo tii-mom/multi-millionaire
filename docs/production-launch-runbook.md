@@ -65,8 +65,9 @@ test risk thresholds in production.
   verification, chain event ingest, reward claim verification, and emergency
   controls are all validated on staging.
 - `CHAIN_RECEIPT_VERIFIER` must remain `disabled` or unset for production until
-  a real production verifier is implemented. The `test` verifier is for
-  staging-only controlled rehearsals.
+  mainnet LockVault/MerkleClaim addresses, RPC, wallet binding, and receipt
+  parsing are validated against a small approved mainnet canary. The `test`
+  verifier is for local/staging-only controlled rehearsals.
 - Production deposits must use `POST /v1/waves/:waveId/deposit-receipt`; the
   legacy `POST /v1/waves/:waveId/deposit` endpoint is an off-chain staging
   stub and fails closed when mainline chain writes are required.
@@ -109,6 +110,24 @@ Latest evidence:
   `/v1/waves/current`
 - Readiness result: `200`, `database=ok`
 - Current wave result: `200`, wave `1`, status `live`
+
+## Testnet Chain Canary Evidence
+
+Latest testnet evidence is recorded in
+`docs/contracts/testnet-deployment-20260424.md`.
+
+- Date: 2026-04-24
+- Network: `ton-testnet`
+- Testnet LockVault:
+  `kQDa42BOYHpCwoHQAWkjsmnLMXP9WxFkKjcnt1jCaz-CBae3`
+- Testnet MerkleClaim:
+  `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH`
+- Verified deposit receipt tx:
+  `9BJVuUvqZ3KpdtSMwa20JRGm3jyZUZoZ3Z1rU4e9Vcg=`
+- Backend local receipt apply: `applied`
+
+This proves the testnet deposit receipt path can create a backend chain event
+and position. It does not authorize production chain writes or mainnet launch.
 
 ## Canary SOP
 
@@ -195,12 +214,12 @@ After deployment:
 
 Real chain-backed production still requires verified production values for:
 
-- contract verifier logic for deposit receipts, wallet binding, chain event
-  ingest, and reward claim verification
-- deployed contract addresses and ABIs that match the production network
+- mainnet contract addresses and ABIs that match the production network
 - production RPC provider URLs and failover policy
+- production TON wallet signature verification, replacing local
+  `WALLET_SIGNATURE_MODE=test`
 - finality/confirmation depth and replay protection rules
-- signer or relayer custody model, limits, and emergency rotation procedure
+- Merkle claim canary with a funded reward wallet and verified claim receipt
 - reconciliation process between API records, chain events, and reward ledgers
 
 Until those are complete and validated on staging, real funds must remain behind

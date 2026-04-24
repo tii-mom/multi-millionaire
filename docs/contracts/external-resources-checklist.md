@@ -28,21 +28,25 @@ This checklist is the final resource intake list for Sprint 2. It does not autho
 - Read methods required for position lookup
 - Owner/admin policy, if any
 
-### 4. Oracle Address
+### 4. Price Updater / Oracle
 
-- Deployed Oracle contract address
-- Deployment block
-- Event or read schema for `PriceConfirmed`
+- External Oracle address is optional for the current minimal LockVault design.
+- If no Oracle is used, document the owner-signed `SetPrice` policy instead.
+- Deployment block, if a separate Oracle is introduced later
+- Event or read schema for `PriceConfirmed`, if a separate Oracle is introduced
 - Price precision and rounding rules
 - Update cadence and finality expectation
 
-### 5. RewardDistributor Address
+### 5. MerkleClaim Address
 
-- Deployed RewardDistributor contract address
+- Deployed MerkleClaim contract address
 - Deployment block
-- Event schema for `RewardBatchPublished` and `RewardClaimed`
-- Claim format and proof verification assumptions
+- Claim message schema and receipt parsing rules
+- Merkle batch and proof format
 - Batch publication policy
+
+`RewardDistributor` is required only if the reward model changes away from the
+current Merkle Claim design.
 
 ### 6. ABI / Wrapper Artifacts
 
@@ -55,8 +59,8 @@ This checklist is the final resource intake list for Sprint 2. It does not autho
 ### 7. Start Blocks
 
 - LockVault start block
-- Oracle start block
-- RewardDistributor start block
+- Oracle start block, if a separate Oracle is introduced
+- MerkleClaim start block
 - Token contract start block, if it is indexed or used for validation
 
 ### 8. Wallet Signature Standard
@@ -75,8 +79,8 @@ Sprint 2 should not move into live integration work until all of the following a
 - RPC URL
 - token address
 - LockVault address
-- Oracle address
-- RewardDistributor address
+- price updater policy, or Oracle address if the design changes to a separate Oracle
+- MerkleClaim address
 - ABI or wrapper artifacts
 - start blocks
 - wallet signature standard
@@ -93,4 +97,3 @@ Once the resources are available, the first implementation pass should follow th
 4. Wallet binding validation
 5. Receipt to position mapping
 6. `chain_events` ingest/apply planning
-

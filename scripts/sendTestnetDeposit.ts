@@ -2,9 +2,16 @@ import 'dotenv/config';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import { Address, beginCell, internal, SendMode, toNano } from '@ton/core';
 import { JettonMaster, JettonWallet, TonClient, WalletContractV4 } from '@ton/ton';
-import { parseLockVaultDepositBody, TonTransactionLike } from '../server/src/services/tonMessages';
+import * as tonMessages from '../server/src/services/tonMessages';
+import type { TonTransactionLike } from '../server/src/services/tonMessages';
 
 const JETTON_TRANSFER_OPCODE = 0x0f8a7ea5;
+const tonMessageExports = ('default' in tonMessages ? tonMessages.default : tonMessages) as typeof tonMessages;
+const { parseLockVaultDepositBody } = tonMessageExports;
+
+function getMessageBody(message: TonTransactionLike['in_msg']): string | null {
+  return message?.body || message?.msg_data?.body || null;
+}
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -20,6 +27,33 @@ function optionalMnemonic(): string {
     throw new Error('TESTNET_DEPOSITOR_MNEMONIC or TESTNET_DEPLOYER_MNEMONIC is required');
   }
   return value;
+}
+
+function optionalTestnetApiKey(): string | undefined {
+  return process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
+}
+
+function redactSecrets(message: string): string {
+  let redacted = message;
+  for (const [name, value] of Object.entries(process.env)) {
+    const secret = value?.trim();
+    if (!secret || secret.length < 4 || !/(API_KEY|MNEMONIC|SECRET|PRIVATE|PASSWORD)/i.test(name)) {
+      continue;
+    }
+    redacted = redacted.split(secret).join('[redacted]');
+  }
+  return redacted
+    .replace(/([?&](?:api[_-]?key|token|key)=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[redacted]')
+    .replace(/((?:authorization|x-api-key|api-key|apikey)["']?\s*[:=]\s*["']?)[^"',\s}]+/gi, '$1[redacted]');
+}
+
+function formatError(error: unknown): string {
+  const maybeError = error as { message?: unknown; response?: { status?: unknown } };
+  const status = typeof maybeError?.response?.status === 'number' ? `HTTP ${maybeError.response.status}: ` : '';
+  const rawMessage = typeof maybeError?.message === 'string' ? maybeError.message : String(error);
+  const compactMessage = redactSecrets(rawMessage).replace(/\s+/g, ' ').trim() || 'Script failed';
+  return `${status}${compactMessage.length > 500 ? `${compactMessage.slice(0, 497)}...` : compactMessage}`;
 }
 
 function readPositiveBigInt(name: string): bigint {
@@ -98,11 +132,12 @@ async function findDepositTx(input: {
     const transactions = await fetchLockVaultTransactions(input.rpcUrl, input.lockVaultAddress);
     for (const tx of transactions) {
       const message = tx.in_msg;
-      if (!message?.body || !message.destination || !tx.transaction_id?.hash) {
+      const body = getMessageBody(message);
+      if (!message || !body || !message.destination || !tx.transaction_id?.hash) {
         continue;
       }
       try {
-        const deposit = parseLockVaultDepositBody(message.body);
+        const deposit = parseLockVaultDepositBody(body);
         if (
           deposit.positionId === input.positionId &&
           deposit.waveId === input.waveId &&
@@ -144,7 +179,7 @@ async function main() {
   const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
   const client = new TonClient({
     endpoint,
-    apiKey: process.env.TONCENTER_TESTNET_API_KEY?.trim() || process.env.TONCENTER_API_KEY?.trim() || undefined,
+    apiKey: optionalTestnetApiKey(),
   });
   const openedWallet = client.open(wallet);
   const senderAddress = wallet.address;
@@ -218,6 +253,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(formatError(error));
   process.exit(1);
 });

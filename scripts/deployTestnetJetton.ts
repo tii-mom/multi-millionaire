@@ -27,6 +27,33 @@ function updateEnv(updates: Record<string, string>) {
   fs.writeFileSync(path, text);
 }
 
+function optionalTestnetApiKey(): string | undefined {
+  return process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
+}
+
+function redactSecrets(message: string): string {
+  let redacted = message;
+  for (const [name, value] of Object.entries(process.env)) {
+    const secret = value?.trim();
+    if (!secret || secret.length < 4 || !/(API_KEY|MNEMONIC|SECRET|PRIVATE|PASSWORD)/i.test(name)) {
+      continue;
+    }
+    redacted = redacted.split(secret).join('[redacted]');
+  }
+  return redacted
+    .replace(/([?&](?:api[_-]?key|token|key)=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[redacted]')
+    .replace(/((?:authorization|x-api-key|api-key|apikey)["']?\s*[:=]\s*["']?)[^"',\s}]+/gi, '$1[redacted]');
+}
+
+function formatError(error: unknown): string {
+  const maybeError = error as { message?: unknown; response?: { status?: unknown } };
+  const status = typeof maybeError?.response?.status === 'number' ? `HTTP ${maybeError.response.status}: ` : '';
+  const rawMessage = typeof maybeError?.message === 'string' ? maybeError.message : String(error);
+  const compactMessage = redactSecrets(rawMessage).replace(/\s+/g, ' ').trim() || 'Script failed';
+  return `${status}${compactMessage.length > 500 ? `${compactMessage.slice(0, 497)}...` : compactMessage}`;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -77,7 +104,7 @@ async function main() {
 
   const client = new TonClient({
     endpoint,
-    apiKey: process.env.TONCENTER_TESTNET_API_KEY?.trim() || process.env.TONCENTER_API_KEY?.trim() || undefined,
+    apiKey: optionalTestnetApiKey(),
   });
   const openedWallet = client.open(wallet);
   const sender = openedWallet.sender(keyPair.secretKey);
@@ -135,6 +162,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(formatError(error));
   process.exit(1);
 });
