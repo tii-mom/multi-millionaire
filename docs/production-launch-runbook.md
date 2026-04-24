@@ -20,11 +20,22 @@ test risk thresholds in production.
 ## Production Resource Checklist
 
 - Cloudflare Worker/API service for production, with production routes only.
+  Current status: `server/wrangler.jsonc` defines
+  `multi-millionaire-api-production`, and `wrangler deploy --env production
+  --dry-run` packages successfully, but production deploy is blocked by
+  placeholder vars and missing production Hyperdrive.
 - Cloudflare Pages project or production frontend deployment, with production
-  API origin configured.
+  API origin configured. Current status: Pages project
+  `multi-millionaire-production` exists; custom domain `mm.72h.lol` has been
+  added and is pending Cloudflare verification. No production frontend deploy
+  should be promoted until `VITE_API_BASE_URL` points to the production API.
 - Hyperdrive config or direct database connection for the production API.
+  Current status: no production Hyperdrive exists. The only listed Hyperdrive
+  config is staging `rc1-staging-postgres`, and it must not be reused for
+  production.
 - Neon production project/branch/database, with backups and point-in-time
-  restore enabled before traffic.
+  restore enabled before traffic. Current status: no production Neon connection
+  string or Neon API token is available in this workspace.
 - Production database migrations applied through the current migration set.
 - Production secrets in the deployment platform: database URL, JWT secret,
   admin email allowlist, CORS origins, chain feature flags, and provider
@@ -32,7 +43,9 @@ test risk thresholds in production.
 - Production admin accounts provisioned deliberately; do not run dev seed in
   production.
 - DNS records, TLS certificates, cache rules, rate limits, and WAF/firewall
-  rules for the public domains.
+  rules for the public domains. Current status: Cloudflare Pages domain
+  `mm.72h.lol` is pending; the current API token can manage Pages domains but
+  returned an authentication error for direct DNS record reads.
 - Log drain or observability sink for API logs, deploy events, and audit events.
 - Incident contacts and escalation channel for release lead, backend, frontend,
   database, chain/contracts, and customer support.

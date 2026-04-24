@@ -11,26 +11,43 @@ Date: 2026-04-24
 - Hyperdrive binding:
   - binding: `HYPERDRIVE`
   - id: `88b8cd7fd84e4064ad29b43a16c579f2`
-  - name: `mm-staging-vpc-127`
+  - name: `rc1-staging-postgres`
   - caching: `disabled`
-- Current Hyperdrive origin still references VPC Service
-  `019dbb34-5edb-7101-804f-1a62f6a9c105`.
+- Current Hyperdrive origin references Neon Postgres:
+  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`, database `neondb`,
+  user `neondb_owner`, TLS `sslmode=require`.
 - Historical Cloudflare smoke `cf-20260424-rc1-final`: `pass`.
-- Latest live health check in this thread:
-  - `/health`: `200`
-  - `/ready`: `503`, `database=error`
+- Earlier tunnel-backed live health check in this thread had `/ready=503`;
+  after the Neon cutover, the RC1 smoke readiness evidence is `/ready=200`.
 
 Current RC1 judgment:
 
 - internal RC1 candidate evidence: `yes`, based on the completed Cloudflare
   smoke run
-- sustainable RC1 environment: `no`, because the staging data plane still
-  depends on the local tunnel-backed Postgres route and latest readiness is
-  failing
+- sustainable RC1 environment: `yes for staging`, because the data plane now
+  uses Hyperdrive -> Neon Postgres
+- production environment: `not yet`, because production Neon, production
+  Hyperdrive, production secrets, and production smoke evidence are still
+  separate unfinished tasks
 
-## Temporary Data Plane
+## Current Data Plane
 
 Current route:
+
+`Cloudflare Worker -> Hyperdrive -> Neon Postgres`
+
+Current managed-origin details:
+
+- Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
+- host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- database: `neondb`
+- role: `neondb_owner`
+- caching: `disabled`
+- TLS: `sslmode=require`
+
+## Historical Temporary Data Plane
+
+Previous route:
 
 `Cloudflare Worker -> Hyperdrive -> Workers VPC Service -> Cloudflare Tunnel -> local Postgres`
 
@@ -43,7 +60,7 @@ Known temporary-origin details:
 - local Postgres data directory: `/tmp/mm-pg`
 - local Postgres port: `5432`
 
-This route is not a long-term RC1 environment because it depends on one
+That route is not a long-term RC1 environment because it depends on one
 workstation, an interactive `cloudflared` session, and a Postgres data
 directory under `/tmp`. It has no documented managed-service backup, snapshot,
 HA, or provider SLA boundary.
@@ -54,41 +71,44 @@ Target route:
 
 `Cloudflare Worker -> Hyperdrive -> managed Postgres`
 
-The cutover remains blocked until an operator provides a managed staging
-Postgres connection string and credentials that can be used from `server/` for
-both migrations and seed.
+The staging cutover has been completed. The production cutover remains blocked
+until an operator provides a production Neon Postgres connection string and
+credentials that can be used from `server/` for migrations, production
+Hyperdrive creation, and non-mutating production smoke.
 
 Do not put real secrets in this repository. Export them only in the operator
 shell that runs the cutover commands.
 
 Required operator inputs:
 
-- `DATABASE_URL`: managed staging Postgres direct connection string
+- `DATABASE_URL`: managed production Postgres direct connection string
 - `CLOUDFLARE_API_TOKEN`: token with permission to update Hyperdrive and deploy
-  the staging Worker
+  the production Worker
 
 ## Cutover Checklist
 
-Run from `server/` after exporting the required operator inputs:
+For production, run from `server/` after exporting the required operator inputs:
 
 ```bash
-NODE_ENV=staging DATABASE_URL="$DATABASE_URL" npm run migrate:up
-NODE_ENV=staging DATABASE_URL="$DATABASE_URL" npm run seed:dev
+NODE_ENV=production DATABASE_URL="$DATABASE_URL" npm run migrate:up
 ```
 
-Then repoint the existing Hyperdrive config:
+Then create a production Hyperdrive config. Do not reuse the staging config:
 
 ```bash
-npx wrangler hyperdrive update 88b8cd7fd84e4064ad29b43a16c579f2 \
+npx wrangler hyperdrive create multi-millionaire-production-postgres \
   --connection-string "$DATABASE_URL" \
   --sslmode require \
   --caching-disabled
 ```
 
-Confirm the Hyperdrive origin no longer references the VPC Service:
+Record the returned production Hyperdrive id and add it to
+`server/wrangler.jsonc` under `env.production.hyperdrive`.
+
+Confirm the production Hyperdrive origin references the production Neon host:
 
 ```bash
-npx wrangler hyperdrive get 88b8cd7fd84e4064ad29b43a16c579f2
+npx wrangler hyperdrive get <production-hyperdrive-id>
 ```
 
 Deploy and verify:
@@ -136,4 +156,3 @@ RC1 remains limited to the current off-chain MVP behavior:
 - no real chain lock is executed
 - no oracle settlement is validated
 - no Merkle reward publication or on-chain reward transfer is validated
-

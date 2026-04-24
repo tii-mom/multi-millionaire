@@ -19,23 +19,41 @@ contains the Cloudflare backend staging host, not a Vercel/Neon endpoint.
 - Backend Worker is deployed with a live Hyperdrive binding:
   - binding: `HYPERDRIVE`
   - Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
-  - Hyperdrive name: `mm-staging-vpc-127`
+  - Hyperdrive name: `rc1-staging-postgres`
   - Hyperdrive caching: `disabled`
 - Backend staging health checks:
   - `GET /health`: `200`
-  - latest live `GET /ready` check in this thread: `503`
-  - latest readiness payload: `{"status":"not_ready","database":"error"}`
-  - earlier RC1 smoke readiness result: `200`, `database=ok`
+  - earlier tunnel-backed live `GET /ready` check in this thread: `503`
+  - earlier readiness payload: `{"status":"not_ready","database":"error"}`
+  - RC1 smoke readiness result after the Neon cutover: `200`, `database=ok`
 - Real Cloudflare smoke result:
   - run id: `cf-20260424-rc1-final`
   - status: `pass`
 - Functional assessment:
   - RC1 candidate validation: `pass`
-  - sustainable RC1 environment: `blocked`
+  - sustainable RC1 environment: `yes for staging`, with the off-chain MVP
+    boundaries below
 
-## Temporary Database Route
+## Current Managed Database Route
 
-The current temporary Cloudflare-first route is:
+Verified on 2026-04-24 with `wrangler hyperdrive list`:
+
+`Cloudflare Worker -> Hyperdrive -> Neon Postgres`
+
+- Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
+- Hyperdrive name: `rc1-staging-postgres`
+- host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- database: `neondb`
+- user: `neondb_owner`
+- caching: `disabled`
+- TLS: `sslmode=require`
+
+This replaces the earlier local tunnel-backed route for the current staging
+environment. Keep the old route notes below for rollback/history only.
+
+## Historical Temporary Database Route
+
+The earlier temporary Cloudflare-first route was:
 
 `Cloudflare Worker -> Hyperdrive -> Workers VPC Service -> Cloudflare Tunnel -> existing Postgres`
 
@@ -57,9 +75,9 @@ Details:
   - app protocol: `postgresql`
   - target: `127.0.0.1:5432`
 
-Operational note:
+Historical operational note:
 
-- this staging path remains dependent on the local PostgreSQL process and the
+- this staging path depended on the local PostgreSQL process and the
   local `cloudflared` tunnel session staying up on this machine
 - the latest live check found `/health=200` but `/ready=503`, which is
   consistent with the tunnel-backed data plane being unavailable
@@ -101,23 +119,16 @@ migrated to D1.
 
 - Target route:
   `Cloudflare Worker -> Hyperdrive -> managed Postgres`
-- Single blocker:
-  `No managed Postgres instance and connection string are provisioned for
-  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be
-  rerun on a persistent origin.`
-- Verified temporary-origin facts on 2026-04-24:
-  - `wrangler hyperdrive get 88b8cd7fd84e4064ad29b43a16c579f2` still reports
-    `service_id=019dbb34-5edb-7101-804f-1a62f6a9c105`
-  - `wrangler vpc service get 019dbb34-5edb-7101-804f-1a62f6a9c105` resolves to
-    `127.0.0.1:5432`
-  - local Postgres is running from `/tmp/mm-pg`
-  - the latest process check did not find a running `cloudflared` process
-  - `brew services list` shows `cloudflared` and `postgresql@14` as `none`
+- Current status:
+  `sustainable staging route achieved with Hyperdrive -> Neon Postgres.`
+- Production still needs its own isolated Neon database and production
+  Hyperdrive config. Do not reuse this staging Hyperdrive or Neon database for
+  production.
 - The persistent cutover plan and fallback operating notes are tracked in
   `docs/cloudflare/persistent-db-plan.md`.
-- After Hyperdrive points to managed Postgres, migrations and seed pass on that
-  origin, and a new full Cloudflare smoke passes, the sustainable RC1 blocker
-  can be removed.
+- After any future Hyperdrive origin change, rerun migrations as needed,
+  confirm `/ready=200`, and run a new full Cloudflare smoke before updating the
+  RC1 evidence.
 
 ## Commands Used
 
@@ -174,9 +185,9 @@ npm run smoke
 
 ## RC1 State
 
-- Current blocker count: `1`
+- Current blocker count: `0` for staging sustainability
 - Current status: prior Cloudflare smoke supports internal RC1 candidate
-  evidence, but the latest live readiness check is failing
-- Sustainable RC1 status: not yet achieved
-- RC1 recommendation: acceptable for current RC1 candidate work, not yet a
-  sustainable RC1 environment
+  evidence
+- Sustainable RC1 status: achieved for the staging environment
+- RC1 recommendation: acceptable for closed beta/staging regression, not a real
+  chain-backed production release
