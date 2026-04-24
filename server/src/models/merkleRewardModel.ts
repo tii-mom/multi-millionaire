@@ -60,6 +60,7 @@ const proofColumns = `
 `;
 
 export async function listEligibleRewardsForMerkle(): Promise<EligibleRewardForMerkle[]> {
+  const riskReviewEnabled = !['0', 'false', 'no', 'off'].includes((process.env.RISK_REVIEW_ENABLED || 'true').trim().toLowerCase());
   const result = await query<EligibleRewardForMerkle>(
     `SELECT
        rl.id AS ledger_id,
@@ -76,7 +77,9 @@ export async function listEligibleRewardsForMerkle(): Promise<EligibleRewardForM
          SELECT 1 FROM merkle_reward_proofs mrp
          WHERE mrp.reward_ledger_id = rl.id
        )
-       AND NOT EXISTS (
+       AND (
+         $1::boolean = FALSE
+         OR NOT EXISTS (
          SELECT 1
          FROM risk_flags rf
          WHERE rf.status IN ('open','reviewing')
@@ -85,8 +88,10 @@ export async function listEligibleRewardsForMerkle(): Promise<EligibleRewardForM
              OR (rf.entity_type = 'position' AND rf.entity_id = rl.source_position_id::text)
              OR (rf.entity_type = 'reward_ledger' AND rf.entity_id = rl.id::text)
            )
+         )
        )
-     ORDER BY rl.created_at ASC`
+     ORDER BY rl.created_at ASC`,
+    [riskReviewEnabled]
   );
   return result.rows;
 }

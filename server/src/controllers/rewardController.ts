@@ -7,7 +7,7 @@ import {
   RewardStatus,
 } from '../models/rewardModel';
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
-import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
+import { isControlEnabled, productionChainRequired, riskReviewEnabled } from '../services/productionGuards';
 import { getMerkleProofForLedger, markMerkleClaimPending } from '../models/merkleRewardModel';
 import { MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
 
@@ -80,7 +80,7 @@ export async function claimReward(req: Request, res: Response, next: NextFunctio
     if (ledger.status !== 'approved') {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'REWARD_NOT_APPROVED', message: 'Only approved rewards can be claimed' } });
     }
-    const hasBlockingRisk = await hasBlockingRiskForRewardClaim(ledgerId, user.id);
+    const hasBlockingRisk = riskReviewEnabled() && await hasBlockingRiskForRewardClaim(ledgerId, user.id);
     if (hasBlockingRisk) {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
     }
@@ -103,7 +103,7 @@ export async function getMerkleClaimProof(req: Request, res: Response, next: Nex
     if (!ledger || ledger.beneficiary_user_id !== user.id) {
       return res.status(404).json({ request_id: req.id || '', error: { code: 'REWARD_NOT_FOUND', message: 'Reward ledger not found' } });
     }
-    const hasBlockingRisk = await hasBlockingRiskForRewardClaim(ledgerId, user.id);
+    const hasBlockingRisk = riskReviewEnabled() && await hasBlockingRiskForRewardClaim(ledgerId, user.id);
     if (hasBlockingRisk) {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
     }
@@ -135,7 +135,7 @@ export async function submitMerkleClaimReceipt(req: Request, res: Response, next
     if (!ledger || ledger.beneficiary_user_id !== user.id) {
       return res.status(404).json({ request_id: req.id || '', error: { code: 'REWARD_NOT_FOUND', message: 'Reward ledger not found' } });
     }
-    const hasBlockingRisk = await hasBlockingRiskForRewardClaim(ledgerId, user.id);
+    const hasBlockingRisk = riskReviewEnabled() && await hasBlockingRiskForRewardClaim(ledgerId, user.id);
     if (hasBlockingRisk) {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
     }

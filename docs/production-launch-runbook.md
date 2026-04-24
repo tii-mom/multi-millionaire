@@ -21,21 +21,23 @@ test risk thresholds in production.
 
 - Cloudflare Worker/API service for production, with production routes only.
   Current status: `server/wrangler.jsonc` defines
-  `multi-millionaire-api-production`, and `wrangler deploy --env production
-  --dry-run` packages successfully, but production deploy is blocked by
-  placeholder vars and missing production Hyperdrive.
+  `multi-millionaire-api-production`; production deploy completed on
+  2026-04-24 with version id `749a7f55-10c6-4559-b343-266aa55afb4e`.
+  Production API URL:
+  `https://multi-millionaire-api-production.348421501.workers.dev`.
 - Cloudflare Pages project or production frontend deployment, with production
   API origin configured. Current status: Pages project
   `multi-millionaire-production` exists; custom domain `mm.72h.lol` has been
-  added and is pending Cloudflare verification. No production frontend deploy
-  should be promoted until `VITE_API_BASE_URL` points to the production API.
+  added and is pending Cloudflare verification. Production Pages deployment
+  completed with `VITE_API_BASE_URL` pointing to the production Worker:
+  `https://production.multi-millionaire-production.pages.dev`.
 - Hyperdrive config or direct database connection for the production API.
-  Current status: no production Hyperdrive exists. The only listed Hyperdrive
-  config is staging `rc1-staging-postgres`, and it must not be reused for
-  production.
+  Current status: production Hyperdrive
+  `multi-millionaire-production-postgres` exists with id
+  `92267e746955420d80eb707f4cf23e17`.
 - Neon production project/branch/database, with backups and point-in-time
-  restore enabled before traffic. Current status: no production Neon connection
-  string or Neon API token is available in this workspace.
+  restore enabled before traffic. Current status: production migrations ran
+  successfully against the supplied Neon production connection string.
 - Production database migrations applied through the current migration set.
 - Production secrets in the deployment platform: database URL, JWT secret,
   admin email allowlist, CORS origins, chain feature flags, and provider
@@ -52,6 +54,13 @@ test risk thresholds in production.
 
 ## Required Production Gates
 
+- Current production deployment is an infrastructure canary, not a real
+  chain-backed launch. Chain writes, wallet binding, receipt verification,
+  indexer, and read-only chain integration are all disabled.
+- `ADMIN_OPERATIONS_ENABLED=false` and `RISK_REVIEW_ENABLED=false` are the
+  intended no-manual-review production posture. This removes admin/risk review
+  from the product path; it does not make undeployed contracts or unverified
+  receipts safe to use.
 - `CHAIN_MAINLINE_WRITES_ENABLED=false` until wallet binding, receipt
   verification, chain event ingest, reward claim verification, and emergency
   controls are all validated on staging.
@@ -89,6 +98,17 @@ curl -fsS "$API_BASE_URL/v1/waves/current"
 It does not register users, create passes, join squads, submit deposits, claim
 rewards, or call admin endpoints. Keep the JSON output with the release marker
 and commit SHA.
+
+Latest evidence:
+
+- Date: 2026-04-24
+- API base URL: `https://multi-millionaire-api-production.348421501.workers.dev`
+- Mode: `production-non-mutating`
+- Result: `pass`
+- Checked paths: `/health`, `/ready`, `/v1/app/bootstrap`,
+  `/v1/waves/current`
+- Readiness result: `200`, `database=ok`
+- Current wave result: `200`, wave `1`, status `live`
 
 ## Canary SOP
 

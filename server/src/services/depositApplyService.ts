@@ -6,7 +6,7 @@ import { createRewardLedger } from '../models/rewardModel';
 import { createRiskFlag } from '../models/riskModel';
 import { activateSquadMember } from '../models/squadModel';
 import { Wave } from '../models/waveModel';
-import { isControlEnabled } from './productionGuards';
+import { isControlEnabled, riskReviewEnabled } from './productionGuards';
 
 export type DepositApplySource = 'offchain_stub' | 'chain_receipt';
 
@@ -50,6 +50,7 @@ function highRiskNote(source: DepositApplySource, threshold: bigint) {
 }
 
 export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepositResult> {
+  const shouldRunRiskReview = riskReviewEnabled();
   const amount = BigInt(input.amountRaw);
   const qualifies = amount >= BigInt(input.wave.min_lock_amount);
   const existing = await input.executor.query<{ count: string }>(
@@ -93,7 +94,7 @@ export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepos
     await activateSquadMember(input.wave.wave_id, input.userId, input.executor);
   }
 
-  if (input.trackRapidDepositBurst) {
+  if (shouldRunRiskReview && input.trackRapidDepositBurst) {
     const recentDeposits = await input.executor.query<{ count: string }>(
       `SELECT COUNT(*)
        FROM positions
@@ -111,7 +112,7 @@ export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepos
     }
   }
 
-  const highRiskThreshold = getHighRiskDepositThreshold();
+  const highRiskThreshold = shouldRunRiskReview ? getHighRiskDepositThreshold() : null;
   if (qualifies && isFirstQualifyingForUser && highRiskThreshold !== null && amount > highRiskThreshold) {
     await createRiskFlag({
       entityType: 'position',

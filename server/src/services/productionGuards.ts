@@ -28,3 +28,11 @@ export async function isControlEnabled(key: string): Promise<boolean> {
 export function productionChainRequired(): boolean {
   return isProductionRuntime() || isTruthyEnv(process.env.CHAIN_MAINLINE_WRITES_ENABLED);
 }
+
+export function riskReviewEnabled(): boolean {
+  return !['0', 'false', 'no', 'off'].includes((process.env.RISK_REVIEW_ENABLED || 'true').trim().toLowerCase());
+}
+
+export function adminOperationsEnabled(): boolean {
+  return !['0', 'false', 'no', 'off'].includes((process.env.ADMIN_OPERATIONS_ENABLED || 'true').trim().toLowerCase());
+}

@@ -134,6 +134,9 @@ function validateWalletSignatureMode(value: string, profile: Profile): string | 
 }
 
 function validateProductionAdminEmails(value: string, profile: Profile): string | null {
+  if (profile === 'production' && !isTruthy(process.env.ADMIN_OPERATIONS_ENABLED)) {
+    return null;
+  }
   const placeholder = validateProductionValue(value, profile);
   if (placeholder) return placeholder;
   if (profile === 'production' && value.split(',').some((email) => email.trim().endsWith('@example.com'))) {
@@ -146,7 +149,6 @@ const baseRequired: EnvCheck[] = [
   { name: 'NODE_ENV', hint: 'Set to local/development, staging, or production.', validate: validateNodeEnv },
   { name: 'DATABASE_URL', hint: 'PostgreSQL connection string for the API database.', validate: (value) => validateDatabaseUrl(value) },
   { name: 'JWT_SECRET', hint: 'JWT signing secret shared by API instances.', validate: validateJwtSecret },
-  { name: 'ADMIN_EMAILS', hint: 'Comma-separated admin emails for risk/admin operations.', validate: validateProductionAdminEmails },
 ];
 
 const commonRecommended: EnvCheck[] = [
@@ -211,12 +213,13 @@ const profileChecks: Record<Profile, { required: EnvCheck[]; recommended: EnvChe
     ],
   },
   production: {
-    required: [
-      ...stagingRequired,
-      ...productionMerkleContractEnv,
-    ],
+    required: stagingRequired,
     recommended: [
       { name: 'API_BASE_URL', hint: 'Production API base URL for manual smoke checks only.', validate: (value) => validateUrl(value) },
+      { name: 'ADMIN_OPERATIONS_ENABLED', hint: 'Set false for the decentralized/no-admin production mode.', validate: (value) => validateBoolean(value) },
+      { name: 'ADMIN_EMAILS', hint: 'Comma-separated admin emails. May be empty when ADMIN_OPERATIONS_ENABLED=false.', validate: validateProductionAdminEmails },
+      { name: 'RISK_REVIEW_ENABLED', hint: 'Set false when reward/deposit flow must not depend on manual risk review.', validate: (value) => validateBoolean(value) },
+      ...productionMerkleContractEnv,
       ...productionChainRecommended,
     ],
   },
