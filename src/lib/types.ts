@@ -51,6 +51,20 @@ export interface BootstrapData {
   };
 }
 
+export type AppControlKey =
+  | 'pause_deposits'
+  | 'pause_reward_claims'
+  | 'pause_referral_rewards'
+  | 'maintenance_banner';
+
+export interface AppControl {
+  key: AppControlKey;
+  enabled: boolean;
+  reason: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
 export interface Position {
   id: string;
   user_id: string;

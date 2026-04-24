@@ -5,6 +5,8 @@ import type {
   AdminRiskFlag,
   AdminSquad,
   AdminWave,
+  AppControl,
+  AppControlKey,
   AuthResult,
   BootstrapData,
   DepositReceiptResult,
@@ -168,5 +170,17 @@ export const api = {
 
   adminSquads(token: string) {
     return requestJson<AdminSquad[]>("/v1/admin/squads", { token });
+  },
+
+  adminControls(token: string) {
+    return requestJson<AppControl[]>("/v1/admin/controls", { token });
+  },
+
+  updateAdminControl(key: AppControlKey, input: { enabled: boolean; reason?: string | null }, token: string) {
+    return requestJson<AppControl>(`/v1/admin/controls/${key}`, {
+      method: "PATCH",
+      token,
+      body: input,
+    });
   },
 };

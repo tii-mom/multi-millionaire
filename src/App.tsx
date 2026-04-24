@@ -12,7 +12,6 @@ import Admin from "./views/Admin";
 import BottomNav from "./components/BottomNav";
 import { Toaster } from "@/src/components/ui/sonner";
 import { AnimatePresence, motion } from "motion/react";
-import { toast } from "sonner";
 
 export default function App() {
   const isAdminRoute = window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
@@ -62,17 +61,6 @@ function MainApp() {
     setActiveTab(newTab);
   };
 
-  // Simulate price fluctuation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTokenPrice(prev => {
-        const change = (Math.random() - 0.5) * 0.05;
-        return Number(Math.max(0.1, prev + change).toFixed(3));
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   const variants = {
     initial: (dir: number) => ({
       opacity: 0,
@@ -117,22 +105,9 @@ function MainApp() {
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100%] h-[200px] bg-gradient-to-b from-[#DBFF00]/10 to-transparent blur-[50px] pointer-events-none z-0" />
 
-        {/* Web3 Wallet Simulator (Mock) */}
-        <div
-          onClick={() => toast.success("Wallet fully synchronized. 18ms latency.")}
-          className="absolute top-4 right-6 flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 z-20 backdrop-blur-md cursor-pointer hover:bg-white/10 transition-colors shadow-lg group"
-        >
-          <div className="w-1.5 h-1.5 rounded-full bg-[#DBFF00] shadow-[0_0_8px_#DBFF00] group-hover:animate-ping" />
-          <span className="text-[10px] font-mono text-white/80 tracking-widest pl-0.5">0x3F<span className="opacity-50">...</span>b9A</span>
-
-          <div className="absolute top-full mt-2 right-0 bg-[#111] border border-white/10 rounded-xl p-2.5 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 min-w-[120px] shadow-2xl">
-             <div className="flex justify-between items-center text-[9px] font-mono mb-1 text-white/50">
-               <span>Status</span>
-               <span className="text-[#DBFF00]">Connected</span>
-             </div>
-             <div className="h-0.5 w-full bg-white/5 rounded-full mb-2"><div className="h-full bg-[#DBFF00] w-full rounded-full"></div></div>
-             <div className="text-[8px] uppercase tracking-widest text-[#DBFF00]/50 text-right">Mainnet</div>
-          </div>
+        <div className="absolute top-4 right-6 flex items-center gap-2 bg-amber-300/10 border border-amber-300/20 rounded-full px-3 py-1.5 z-20 backdrop-blur-md shadow-lg">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-200" />
+          <span className="text-[10px] font-mono text-amber-100 tracking-widest pl-0.5">Staging</span>
         </div>
 
         <header className="px-6 pt-16 pb-6 shrink-0 flex items-center justify-between z-10 relative">
@@ -149,8 +124,8 @@ function MainApp() {
           </div>
           <div className="flex flex-col items-end gap-1 top-terminal-panel">
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-white/40 font-mono">Live Price</span>
-              <svg className="w-2.5 h-2.5 text-[#DBFF00] animate-[spin_3s_linear_infinite]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <span className="text-[9px] uppercase tracking-widest text-white/40 font-mono">Display Price</span>
+              <svg className="w-2.5 h-2.5 text-[#DBFF00]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
@@ -163,8 +138,8 @@ function MainApp() {
               >
                 ${tokenPrice.toFixed(3)}
               </motion.span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-[#DBFF00]/10 text-[#DBFF00] font-bold tracking-wider">
-                +2.4%
+              <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-amber-300/10 text-amber-100 font-bold tracking-wider">
+                off-chain
               </span>
             </div>
           </div>

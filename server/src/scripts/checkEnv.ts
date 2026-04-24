@@ -19,6 +19,7 @@ interface CheckResult {
 }
 
 const defaultSecrets = new Set(['secret', 'supersecretjwt']);
+const placeholderPattern = /^(<.*>|.*example.*|.*placeholder.*|.*test.*address.*)$/i;
 
 function normalizeProfile(raw: string | undefined): Profile {
   const value = (raw || '').trim().toLowerCase();
@@ -94,11 +95,50 @@ function validateUrl(value: string): string | null {
   }
 }
 
+function validateBoolean(value: string): string | null {
+  if (!['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(value.trim().toLowerCase())) {
+    return 'Value must be a boolean';
+  }
+  return null;
+}
+
+function isTruthy(value: string | undefined): boolean {
+  return !!value && ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+function validateProductionValue(value: string, profile: Profile): string | null {
+  if (profile === 'production' && placeholderPattern.test(value.trim())) {
+    return 'Production value must not be a placeholder or test value';
+  }
+  return null;
+}
+
+function validateContractValue(value: string, profile: Profile): string | null {
+  return validateProductionValue(value, profile);
+}
+
+function validateReceiptVerifier(value: string, profile: Profile): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (profile === 'production' && ['test', 'disabled', ''].includes(normalized)) {
+    return 'Production receipt verifier must not be test or disabled';
+  }
+  return null;
+}
+
+function validateProductionAdminEmails(value: string, profile: Profile): string | null {
+  const placeholder = validateProductionValue(value, profile);
+  if (placeholder) return placeholder;
+  if (profile === 'production' && value.split(',').some((email) => email.trim().endsWith('@example.com'))) {
+    return 'Production admin emails must not use example.com addresses';
+  }
+  return null;
+}
+
 const baseRequired: EnvCheck[] = [
   { name: 'NODE_ENV', hint: 'Set to local/development, staging, or production.', validate: validateNodeEnv },
   { name: 'DATABASE_URL', hint: 'PostgreSQL connection string for the API database.', validate: (value) => validateDatabaseUrl(value) },
   { name: 'JWT_SECRET', hint: 'JWT signing secret shared by API instances.', validate: validateJwtSecret },
-  { name: 'ADMIN_EMAILS', hint: 'Comma-separated admin emails for risk/admin operations.' },
+  { name: 'ADMIN_EMAILS', hint: 'Comma-separated admin emails for risk/admin operations.', validate: validateProductionAdminEmails },
 ];
 
 const commonRecommended: EnvCheck[] = [
@@ -115,20 +155,23 @@ const stagingRequired: EnvCheck[] = [
 ];
 
 const contractEnv: EnvCheck[] = [
-  { name: 'CHAIN_ID', hint: 'Target chain identifier. Current RC1 smoke records off-chain stubs only.' },
+  { name: 'CHAIN_ID', hint: 'Target chain identifier. Current RC1 smoke records off-chain stubs only.', validate: validateContractValue },
   { name: 'CHAIN_RPC_URL', hint: 'RPC endpoint for chain-backed lock/settlement integration.', validate: (value) => validateUrl(value) },
-  { name: 'TOKEN_ADDRESS', hint: 'Token contract address for future on-chain lock integration.' },
-  { name: 'LOCK_VAULT_ADDRESS', hint: 'Lock vault contract address. Currently documented as a stub boundary.' },
-  { name: 'ORACLE_ADDRESS', hint: 'Oracle contract address. Currently documented as a stub boundary.' },
-  { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Reward distributor address. Current claim API is an off-chain status update stub.' },
+  { name: 'TOKEN_ADDRESS', hint: 'Token contract address for future on-chain lock integration.', validate: validateContractValue },
+  { name: 'LOCK_VAULT_ADDRESS', hint: 'Lock vault contract address. Currently documented as a stub boundary.', validate: validateContractValue },
+  { name: 'ORACLE_ADDRESS', hint: 'Oracle contract address. Currently documented as a stub boundary.', validate: validateContractValue },
+  { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Reward distributor address. Current claim API is an off-chain status update stub.', validate: validateContractValue },
 ];
 
 const productionChainRecommended: EnvCheck[] = [
-  { name: 'CHAIN_INTEGRATION_ENABLED', hint: 'Set true only after production chain resources are ready.' },
-  { name: 'CHAIN_MAINLINE_WRITES_ENABLED', hint: 'Must remain false until production chain writes are approved.' },
-  { name: 'WALLET_BINDING_ENABLED', hint: 'Enable only when wallet signature verification is configured.' },
-  { name: 'WALLET_BINDING_MESSAGE_DOMAIN', hint: 'Domain included in wallet binding signable messages.' },
-  { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Enable only when chain receipt verification is configured.' },
+  { name: 'CHAIN_INTEGRATION_ENABLED', hint: 'Set true only after production chain resources are ready.', validate: (value) => validateBoolean(value) },
+  { name: 'CHAIN_READ_ONLY_ENABLED', hint: 'Set true only after production RPC and read-only checks are configured.', validate: (value) => validateBoolean(value) },
+  { name: 'CHAIN_INDEXER_ENABLED', hint: 'Set true only after event parsing, finality, and backlog monitoring are configured.', validate: (value) => validateBoolean(value) },
+  { name: 'CHAIN_MAINLINE_WRITES_ENABLED', hint: 'Must remain false until production chain writes are approved.', validate: (value) => validateBoolean(value) },
+  { name: 'WALLET_BINDING_ENABLED', hint: 'Enable only when wallet signature verification is configured.', validate: (value) => validateBoolean(value) },
+  { name: 'WALLET_BINDING_MESSAGE_DOMAIN', hint: 'Domain included in wallet binding signable messages.', validate: validateProductionValue },
+  { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Enable only when chain receipt verification is configured.', validate: (value) => validateBoolean(value) },
+  { name: 'CHAIN_RECEIPT_VERIFIER', hint: 'Production receipt verifier implementation. Must not be test or disabled.', validate: validateReceiptVerifier },
   { name: 'RECEIPT_REQUIRED_CONFIRMATIONS', hint: 'Finality confirmations required before applying receipts.', validate: (value) => validateInteger(value) },
 ];
 
@@ -185,6 +228,43 @@ function runCheck(check: EnvCheck, profile: Profile): CheckResult {
   };
 }
 
+function productionConsistencyChecks(profile: Profile): CheckResult[] {
+  if (profile !== 'production') return [];
+
+  const checks: CheckResult[] = [];
+  const chainWrites = isTruthy(process.env.CHAIN_MAINLINE_WRITES_ENABLED);
+  const receiptEnabled = isTruthy(process.env.RECEIPT_VERIFICATION_ENABLED);
+  const walletEnabled = isTruthy(process.env.WALLET_BINDING_ENABLED);
+  const verifier = (process.env.CHAIN_RECEIPT_VERIFIER || '').trim().toLowerCase();
+
+  if (chainWrites && !receiptEnabled) {
+    checks.push({
+      name: 'RECEIPT_VERIFICATION_ENABLED',
+      status: 'invalid',
+      hint: 'Production chain writes require receipt verification.',
+      message: 'CHAIN_MAINLINE_WRITES_ENABLED=true requires RECEIPT_VERIFICATION_ENABLED=true',
+    });
+  }
+  if (chainWrites && !walletEnabled) {
+    checks.push({
+      name: 'WALLET_BINDING_ENABLED',
+      status: 'invalid',
+      hint: 'Production chain writes require wallet ownership verification.',
+      message: 'CHAIN_MAINLINE_WRITES_ENABLED=true requires WALLET_BINDING_ENABLED=true',
+    });
+  }
+  if (chainWrites && ['test', 'disabled', ''].includes(verifier)) {
+    checks.push({
+      name: 'CHAIN_RECEIPT_VERIFIER',
+      status: 'invalid',
+      hint: 'Production chain writes require a real receipt verifier.',
+      message: 'CHAIN_MAINLINE_WRITES_ENABLED=true cannot use test/disabled receipt verifier',
+    });
+  }
+
+  return checks;
+}
+
 function printHuman(profile: Profile, required: CheckResult[], recommended: CheckResult[]) {
   const failures = required.filter((item) => item.status !== 'present');
   const warnings = recommended.filter((item) => item.status !== 'present');
@@ -225,7 +305,10 @@ function main() {
   const profileArg = args.find((arg) => !arg.startsWith('--'));
   const profile = normalizeProfile(profileArg || process.env.NODE_ENV);
   const checks = profileChecks[profile];
-  const required = checks.required.map((check) => runCheck(check, profile));
+  const required = [
+    ...checks.required.map((check) => runCheck(check, profile)),
+    ...productionConsistencyChecks(profile),
+  ];
   const recommended = checks.recommended.map((check) => runCheck(check, profile));
   const missingRequired = required.filter((item) => item.status !== 'present');
   const result = {

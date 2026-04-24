@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Coins, Gift, Loader2, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Coins, Gift, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { motion } from "motion/react";
 import { api } from "@/src/lib/api";
 import type { RewardLedger, RewardSummary } from "@/src/lib/types";
@@ -20,9 +20,11 @@ export default function Rewards() {
   const [rewards, setRewards] = useState<RewardLedger[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadRewards = useCallback(async () => {
     const token = localStorage.getItem("auth_token");
+    setLoadError(null);
     if (!token) {
       setSummary(emptySummary);
       setRewards([]);
@@ -40,6 +42,9 @@ export default function Rewards() {
       setRewards(nextRewards);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load rewards.";
+      setLoadError(message);
+      setSummary(emptySummary);
+      setRewards([]);
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -116,6 +121,23 @@ export default function Rewards() {
             <div className="flex items-center justify-center gap-2 text-white/40 font-mono text-xs py-8">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading rewards
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
+              <div className="font-mono text-xs text-white/55 uppercase tracking-widest">
+                Rewards unavailable
+              </div>
+              <div className="max-w-[280px] text-[11px] leading-5 text-white/35 font-mono">
+                {loadError}
+              </div>
+              <button
+                type="button"
+                onClick={loadRewards}
+                className="mt-1 inline-flex items-center gap-2 rounded-[14px] border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 transition-colors hover:border-[#DBFF00]/40 hover:bg-[#DBFF00]/10 hover:text-[#DBFF00]"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Retry
+              </button>
             </div>
           ) : rewards.length === 0 ? (
             <div className="text-center text-white/40 font-mono text-xs py-8 uppercase tracking-widest">

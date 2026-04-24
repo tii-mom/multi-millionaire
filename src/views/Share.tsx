@@ -3,26 +3,11 @@ import { toast } from "sonner";
 import { ShareIcon, Download, Zap, Loader2, Copy } from "lucide-react";
 import html2canvas from "html2canvas";
 
-export default function Share({ myDeposit, setMyDeposit }: any) {
-  const [isClaiming, setIsClaiming] = useState(false);
-  const [hasClaimed, setHasClaimed] = useState(false);
-  
-  const pendingRewardValue = myDeposit > 0 && !hasClaimed ? myDeposit * 0.05 : 0;
-  const pendingReward = pendingRewardValue.toFixed(2);
+export default function Share({ myDeposit }: any) {
+  const estimatedReferralValue = myDeposit > 0 ? (myDeposit * 0.05).toFixed(2) : "0.00";
   
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleClaim = () => {
-    if (pendingRewardValue <= 0) return;
-    setIsClaiming(true);
-    setTimeout(() => {
-      if (setMyDeposit) setMyDeposit((prev: number) => prev + pendingRewardValue);
-      setHasClaimed(true);
-      setIsClaiming(false);
-      toast.success(`Successfully claimed ${pendingReward} 72H tokens!`);
-    }, 1500);
-  };
 
   const generateImage = async () => {
     if (!posterRef.current) return null;
@@ -140,40 +125,20 @@ export default function Share({ myDeposit, setMyDeposit }: any) {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-[shine_1.5s_ease-in-out]" />
         <div className="relative z-10">
           <div className="text-[10px] uppercase tracking-[0.2em] font-mono font-bold opacity-60 mb-1">
-            Pending Exposure Reward
+            Share Signal
           </div>
           <div className="text-3xl font-mono font-black tracking-tighter tabular-nums flex items-baseline gap-1">
-            <span className="text-[#DBFF00] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">+</span>{pendingReward} <span className="text-sm font-bold tracking-widest pl-1 opacity-80">72H</span>
+            <span className="text-[#DBFF00] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">~</span>{estimatedReferralValue} <span className="text-sm font-bold tracking-widest pl-1 opacity-80">72H</span>
+          </div>
+          <div className="mt-1 text-[9px] uppercase tracking-widest font-mono font-bold opacity-50">
+            Estimated referral value
           </div>
         </div>
         <Zap className="w-10 h-10 opacity-90 drop-shadow-md z-10" />
       </div>
 
-      {/* Claim Reward Button */}
-      <button
-        onClick={handleClaim}
-        disabled={isClaiming || pendingRewardValue <= 0 || hasClaimed}
-        className={`w-full font-bold rounded-[16px] py-3.5 flex items-center justify-center gap-2.5 transition-all -mt-2 ${
-          hasClaimed 
-            ? "bg-white/5 border border-green-500/20 text-green-500/60 cursor-not-allowed shadow-inner" 
-            : pendingRewardValue <= 0
-            ? "bg-white/[0.02] border border-white/5 text-white/30 cursor-not-allowed"
-            : "bg-[#DBFF00]/10 border border-[#DBFF00]/20 text-[#DBFF00] hover:bg-[#DBFF00]/20 hover:border-[#DBFF00]/40 active:scale-[0.98] shadow-[inset_0_2px_10px_rgba(219,255,0,0.05)]"
-        } ${isClaiming ? "opacity-70 scale-[0.98] cursor-not-allowed" : "disabled:opacity-100"}`}
-      >
-        {isClaiming ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> <span className="text-[11px] font-mono tracking-[0.2em] uppercase opacity-80">Claiming...</span></>
-        ) : hasClaimed ? (
-          <span className="text-[11px] font-mono tracking-[0.2em] uppercase opacity-80">Reward Claimed</span>
-        ) : pendingRewardValue <= 0 ? (
-          <span className="text-[11px] font-mono tracking-[0.2em] uppercase opacity-80">No Pending Reward</span>
-        ) : (
-          <><Zap className="w-4 h-4 drop-shadow-[0_0_8px_#DBFF00]" /> <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-[#DBFF00] font-bold">Claim Reward</span></>
-        )}
-      </button>
-
       <p className="text-[11px] text-white/50 font-mono text-center mb-0 mt-1 uppercase tracking-widest">
-        Share Poster to Claim Yield
+        Share poster or copy your invite
       </p>
 
       {/* Poster Generator Mock */}
