@@ -140,7 +140,17 @@ export async function submitMerkleClaimReceipt(req: Request, res: Response, next
       return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
     }
 
-    await verifyMerkleClaimReceipt();
+    const proof = await getMerkleProofForLedger(ledgerId, user.id);
+    if (!proof || proof.batch_status !== 'active') {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'MERKLE_PROOF_NOT_AVAILABLE', message: 'Merkle proof is not available for this reward' } });
+    }
+
+    await verifyMerkleClaimReceipt({
+      txHash,
+      beneficiaryWallet: proof.beneficiary_wallet,
+      amountRaw: proof.amount_raw,
+      leafHash: proof.leaf_hash,
+    });
     const pending = await markMerkleClaimPending(ledgerId, user.id, txHash);
     return res.json({ request_id: req.id || '', data: pending });
   } catch (err) {

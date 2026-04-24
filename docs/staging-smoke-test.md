@@ -75,6 +75,23 @@ Top-level result:
 | Risk resolve | Admin resolved risk flag `ded87b81-298b-4d8c-9f4c-e8da207a8730` | Pass |
 | Claim retry after risk resolve | Previously blocked reward claim returned `200`, status became `claimed` | Pass |
 
+## Next Staging Admin Ops Evidence
+
+The next staging smoke must keep mutating admin checks in staging and record:
+
+- smoke run id
+- commit SHA
+- control key toggled
+- restored control state
+- audit log id/action for the control update
+- `GET /v1/admin/chain-events?apply_status=applied` result count and filter
+- `/v1/admin/ops` receipt verifier mode/status
+
+Production smoke remains GET-only and must not include admin control toggles,
+deposits, reward claims, risk mutations, or Merkle draft creation unless a
+separate production canary approval records the operator, canary account,
+amount, and rollback window.
+
 ## Real Cloudflare Smoke IDs
 
 - Wave: `1`

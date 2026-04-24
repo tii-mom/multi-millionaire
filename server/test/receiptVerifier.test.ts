@@ -99,4 +99,51 @@ describe('chain receipt verifier selection', () => {
       finalized: false,
     })).rejects.toBeInstanceOf(ReceiptVerificationError);
   });
+
+  it('verifies TON deposit receipts through RPC responses', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt';
+    const body = (await import('@ton/core')).beginCell()
+      .storeUint(0x4c4f434b, 32)
+      .storeUint(BigInt('1'), 64)
+      .storeUint(7, 32)
+      .storeUint(BigInt('1000'), 128)
+      .storeUint(BigInt('42'), 64)
+      .endCell()
+      .toBoc()
+      .toString('base64');
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        result: [{
+          transaction_id: { lt: '123', hash: 'tx-hash' },
+          utime: 1777027651,
+          in_msg: {
+            source: 'kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl',
+            destination: 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt',
+            body,
+          },
+        }],
+      }),
+    } as any);
+
+    const receipt = await verifyDepositReceipt({
+      txHash: 'tx-hash',
+      waveId: 7,
+      amountRaw: '1000',
+    });
+
+    expect(receipt).toMatchObject({
+      chainId: 'ton-testnet',
+      txHash: 'tx-hash',
+      amountRaw: '1000',
+      positionId: '42',
+      finalized: true,
+    });
+    fetchMock.mockRestore();
+  });
 });

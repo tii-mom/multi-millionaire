@@ -165,6 +165,25 @@ describe('Admin read API', () => {
     expect(listAppControlsMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['GET /v1/admin/controls', 'get', '/v1/admin/controls', undefined],
+    ['PATCH /v1/admin/controls/:key', 'patch', '/v1/admin/controls/pause_deposits', { enabled: true, reason: 'blocked' }],
+    ['GET /v1/admin/audit-logs', 'get', '/v1/admin/audit-logs', undefined],
+    ['GET /v1/admin/chain-events?apply_status=applied', 'get', '/v1/admin/chain-events?apply_status=applied', undefined],
+    ['GET /v1/admin/ops', 'get', '/v1/admin/ops', undefined],
+  ] as const)('requires admin access for %s', async (_label, method, path, body) => {
+    const pending = request(app)[method](path).set('Authorization', `Bearer ${userToken}`);
+    const res = body ? await pending.send(body) : await pending;
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ADMIN_REQUIRED');
+    expect(listAppControlsMock).not.toHaveBeenCalled();
+    expect(setAppControlMock).not.toHaveBeenCalled();
+    expect(createAdminAuditLogMock).not.toHaveBeenCalled();
+    expect(listAdminAuditLogsMock).not.toHaveBeenCalled();
+    expect(listChainEventsMock).not.toHaveBeenCalled();
+  });
+
   it('lists operations controls for admins', async () => {
     listAppControlsMock.mockResolvedValue([
       { key: 'pause_deposits', enabled: false, reason: null, updated_by: null, updated_at: new Date() },

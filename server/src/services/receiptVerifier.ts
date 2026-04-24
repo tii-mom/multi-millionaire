@@ -1,10 +1,12 @@
 import { loadContractIntegrationConfig } from './contracts/config';
+import { findDepositTransaction, TonMessageParseError, TonTransactionLike } from './tonMessages';
 
-export type ChainReceiptVerifierStatus = 'disabled' | 'test' | 'not_configured';
+export type ChainReceiptVerifierStatus = 'disabled' | 'test' | 'ton_rpc' | 'not_configured';
 
 export interface DepositReceiptInput {
   txHash: string;
   logIndex?: number;
+  waveId?: number;
   walletAddress?: string;
   contractAddress?: string;
   amountRaw?: string;
@@ -151,6 +153,72 @@ class TestChainReceiptVerifier implements ChainReceiptVerifier {
   }
 }
 
+class TonRpcReceiptVerifier implements ChainReceiptVerifier {
+  readonly mode = 'ton_rpc' as const;
+
+  getDiagnostics(): ChainReceiptVerifierDiagnostics {
+    const config = loadContractIntegrationConfig();
+    return {
+      configured: true,
+      status: 'ton_rpc',
+      mode: 'ton_rpc',
+      receiptVerificationEnabled: config.receipt.enabled,
+    };
+  }
+
+  async verifyDepositReceipt(input: DepositReceiptInput): Promise<VerifiedDepositReceipt> {
+    const config = loadContractIntegrationConfig();
+    const txHash = ensureString(input.txHash, 'INVALID_RECEIPT', 'txHash is required');
+    if (!config.rpcUrl) {
+      throw new ReceiptVerificationError(503, 'CHAIN_RPC_NOT_CONFIGURED', 'CHAIN_RPC_URL is required for TON receipt verification');
+    }
+    if (!config.lockVault.address) {
+      throw new ReceiptVerificationError(503, 'LOCK_VAULT_NOT_CONFIGURED', 'LOCK_VAULT_ADDRESS is required for TON receipt verification');
+    }
+
+    const transactions = await fetchTonTransactions(config.rpcUrl, config.lockVault.address, txHash);
+    let match: ReturnType<typeof findDepositTransaction>;
+    try {
+      match = findDepositTransaction({
+        transactions,
+        txHash,
+        lockVaultAddress: config.lockVault.address,
+      });
+    } catch (error) {
+      if (error instanceof TonMessageParseError) {
+        throw new ReceiptVerificationError(409, error.code, error.message);
+      }
+      throw error;
+    }
+
+    if (!match) {
+      throw new ReceiptVerificationError(404, 'RECEIPT_NOT_FOUND', 'Deposit transaction was not found on the configured LockVault');
+    }
+    if (match.deposit.amountRaw === '0') {
+      throw new ReceiptVerificationError(400, 'INVALID_AMOUNT', 'Receipt amount must be a positive raw token amount');
+    }
+    if (input.waveId !== undefined && match.deposit.waveId !== input.waveId) {
+      throw new ReceiptVerificationError(409, 'WAVE_MISMATCH', 'Receipt wave does not match requested wave');
+    }
+    if (input.amountRaw && input.amountRaw !== match.deposit.amountRaw) {
+      throw new ReceiptVerificationError(409, 'AMOUNT_MISMATCH', 'Receipt amount does not match submitted amount');
+    }
+
+    return {
+      chainId: config.chainId,
+      txHash,
+      logIndex: 0,
+      walletAddress: match.message.source,
+      contractAddress: match.message.destination,
+      amountRaw: match.deposit.amountRaw,
+      positionId: match.deposit.positionId,
+      blockNumber: match.transaction.transaction_id?.lt ? Number(match.transaction.transaction_id.lt) : null,
+      blockTime: match.transaction.utime ? new Date(match.transaction.utime * 1000).toISOString() : null,
+      finalized: true,
+    };
+  }
+}
+
 function getRequestedVerifierMode(): string {
   return (process.env.CHAIN_RECEIPT_VERIFIER || '').trim().toLowerCase();
 }
@@ -165,6 +233,10 @@ export function getChainReceiptVerifier(): ChainReceiptVerifier {
     return new TestChainReceiptVerifier();
   }
 
+  if (getRequestedVerifierMode() === 'ton_rpc') {
+    return new TonRpcReceiptVerifier();
+  }
+
   return new NotConfiguredChainReceiptVerifier();
 }
 
@@ -174,4 +246,29 @@ export function getReceiptVerifierDiagnostics(): ChainReceiptVerifierDiagnostics
 
 export async function verifyDepositReceipt(input: DepositReceiptInput): Promise<VerifiedDepositReceipt> {
   return getChainReceiptVerifier().verifyDepositReceipt(input);
+}
+
+async function fetchTonTransactions(rpcUrl: string, address: string, txHash: string): Promise<TonTransactionLike[]> {
+  const response = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: `receipt-${Date.now()}`,
+      method: 'getTransactions',
+      params: {
+        address,
+        limit: Number(process.env.TON_RECEIPT_LOOKBACK_LIMIT || 20),
+        hash: txHash,
+      },
+    }),
+  });
+  if (!response.ok) {
+    throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', `TON RPC returned HTTP ${response.status}`);
+  }
+  const payload: { ok?: boolean; result?: TonTransactionLike[]; error?: { message?: string } } = await response.json();
+  if (!payload.ok || !Array.isArray(payload.result)) {
+    throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', payload.error?.message || 'TON RPC returned an invalid response');
+  }
+  return payload.result;
 }

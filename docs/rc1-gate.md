@@ -118,8 +118,14 @@ Keep these with the RC1 record:
 - seed command result
 - health/readiness responses
 - full Cloudflare smoke JSON output
-- admin control toggle/restore evidence, audit log id/action, chain event query
-  result, and `/v1/admin/ops` receipt verifier diagnostics
+- staging admin control toggle/restore evidence, including control key and
+  restored state
+- admin audit log id/action for the control update
+- chain-events query result count and `apply_status` filter
+- `/v1/admin/ops` receipt verifier mode/status
+- smoke run id for the staging evidence
+- confirmation that production smoke remained GET-only, or the separate
+  mutating canary approval if production admin checks were run
 - any local rehearsal smoke JSON output, clearly labeled as local evidence only
 - rollback decision notes if any gate item failed
 

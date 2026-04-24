@@ -45,7 +45,7 @@ Run migrations strictly in numeric order:
 
 Use `npm run migrate:up` for normal rollout. Use `npm run migrate:reset` only in local or staging environments.
 
-## Smoke Test Checklist
+## Staging Mutating Smoke Checklist
 
 - `GET /health`
 - `GET /ready`
@@ -84,9 +84,19 @@ Expected staging outcome:
 - Merkle draft batch/proof generation is visible to admins, and claim receipt
   submission remains fail-closed until the real chain verifier is configured.
 
-Production smoke must stay non-mutating by default. Do not run the staging
-mutating smoke or admin control toggles against production unless a named
-operator, canary account, amount, and rollback window have been approved.
+## Production GET-Only Smoke Checklist
+
+Production smoke must stay non-mutating by default and is limited to read-only
+health and public bootstrap checks such as:
+
+- `GET /health`
+- `GET /ready`
+- `GET /v1/app/bootstrap`
+- `GET /v1/waves/current`
+
+Do not run the staging mutating smoke, admin control toggles, reward claims,
+deposits, risk mutations, or Merkle draft creation against production unless a
+named operator, canary account, amount, and rollback window have been approved.
 
 ## Rollback Plan
 
@@ -112,12 +122,15 @@ operator, canary account, amount, and rollback window have been approved.
 
 For the next staging release record, capture:
 
-- smoke run id and commit SHA
-- control key toggled and restored state
+- smoke run id
+- commit SHA
+- control key toggled
+- restored control state
 - audit log id/action for the control update
 - chain-events query result count and `apply_status` filter used
-- `/v1/admin/ops` receipt verifier, wallet signature verifier, Merkle claim
-  verifier, and contract integration diagnostic status
+- `/v1/admin/ops` receipt verifier mode/status
+- `/v1/admin/ops` wallet signature verifier, Merkle claim verifier, and
+  contract integration diagnostic status
 - latest Merkle batch id/root/proof count, if reward claim rehearsal is in scope
 - confirmation that production smoke remained GET-only unless a separate
   mutating canary approval was recorded

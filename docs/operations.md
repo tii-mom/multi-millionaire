@@ -82,10 +82,12 @@ API_BASE_URL="https://api.example.com" npm run smoke:production
 
 Production smoke is GET-only and checks `/health`, `/ready`,
 `/v1/app/bootstrap`, and `/v1/waves/current`. It does not register users,
-deposit, claim rewards, or call admin endpoints.
+deposit, claim rewards, call admin endpoints, toggle controls, create audit
+events, or generate Merkle draft batches.
 
 Admin operation checks are staging-only unless a production canary window has
-been explicitly approved. In staging, verify:
+been explicitly approved. Keep these mutating admin checks separate from the
+production GET-only smoke. In staging, verify:
 
 - `GET /v1/admin/controls` lists `pause_deposits`,
   `pause_reward_claims`, `pause_referral_rewards`, and
@@ -122,8 +124,9 @@ The RC1 smoke path covers:
 - Confirm `HIGH_RISK_DEPOSIT_THRESHOLD` is lower than `SMOKE_RISK_DEPOSIT_AMOUNT`.
 - Confirm CORS allows the staging frontend origin before browser QA.
 - Keep the smoke output with the release marker and commit SHA.
-- Record the admin control key toggled, restored state, audit log id/action,
-  chain event query result, and receipt verifier diagnostic values.
+- Record the smoke run id, commit SHA, admin control key toggled, restored
+  state, audit log id/action, chain-events query result and `apply_status`
+  filter, and `/v1/admin/ops` receipt verifier mode/status.
 
 ## Current Stub Boundaries
 

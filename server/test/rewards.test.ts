@@ -182,6 +182,14 @@ describe('Reward API and generation', () => {
       beneficiary_user_id: inviteeUserId,
       status: 'approved',
     });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      beneficiary_wallet: 'wallet-1',
+      amount_raw: '100',
+      leaf_hash: '0x01',
+    });
     markRewardClaimedMock.mockResolvedValue({
       id: 'ledger-1',
       beneficiary_user_id: inviteeUserId,
@@ -273,6 +281,14 @@ describe('Reward API and generation', () => {
       id: 'ledger-1',
       beneficiary_user_id: inviteeUserId,
       status: 'approved',
+    });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      beneficiary_wallet: 'wallet-1',
+      amount_raw: '100',
+      leaf_hash: '0x01',
     });
 
     const res = await request(app)

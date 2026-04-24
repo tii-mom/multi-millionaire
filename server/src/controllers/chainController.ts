@@ -38,7 +38,7 @@ export async function depositReceipt(req: Request, res: Response, next: NextFunc
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WAVE', message: 'Wave is not live for deposits' } });
     }
 
-    const receipt = await verifyDepositReceipt(req.body);
+    const receipt = await verifyDepositReceipt({ ...req.body, waveId });
     if (receipt.amountRaw !== String(req.body.amount || receipt.amountRaw)) {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'AMOUNT_MISMATCH', message: 'Receipt amount does not match submitted amount' } });
     }
