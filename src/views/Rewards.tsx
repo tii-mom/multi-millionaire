@@ -20,6 +20,7 @@ export default function Rewards() {
   const [rewards, setRewards] = useState<RewardLedger[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [proofLoadingId, setProofLoadingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadRewards = useCallback(async () => {
@@ -75,6 +76,24 @@ export default function Rewards() {
     }
   };
 
+  const handleProof = async (ledgerId: string) => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      toast.error("Sign in before loading a claim proof.");
+      return;
+    }
+    setProofLoadingId(ledgerId);
+    try {
+      const proof = await api.merkleClaimProof(ledgerId, token);
+      toast.success(`Merkle proof available: ${proof.proof.length} proof nodes.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Merkle proof is not available yet.";
+      toast.error(message);
+    } finally {
+      setProofLoadingId(null);
+    }
+  };
+
   return (
     <div className="px-6 flex flex-col gap-6 pb-10">
       <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl relative overflow-hidden">
@@ -85,7 +104,7 @@ export default function Rewards() {
             <span className="text-[11px] uppercase tracking-widest font-mono">Reward Ledger</span>
           </div>
           <div className="text-[9px] uppercase tracking-widest font-mono text-[#DBFF00]/70 border border-[#DBFF00]/20 bg-[#DBFF00]/10 rounded-full px-3 py-1.5">
-            Sprint 1 Stub
+            Merkle-ready
           </div>
         </div>
 
@@ -167,14 +186,24 @@ export default function Rewards() {
                     <span className="tabular-nums font-semibold tracking-tight text-[#DBFF00]">{formatAmount(reward.final_amount)}</span>
                     <span className="text-[9px] text-white/40 tabular-nums uppercase tracking-widest mt-0.5">72H</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleClaim(reward.id)}
-                    disabled={reward.status !== "approved" || claimingId === reward.id}
-                    className="min-w-[64px] bg-white/10 text-white border border-white/10 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-[#DBFF00] hover:text-black hover:border-[#DBFF00] transition-colors disabled:opacity-40 disabled:hover:bg-white/10 disabled:hover:text-white disabled:hover:border-white/10"
-                  >
-                    {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Claim"}
-                  </button>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleProof(reward.id)}
+                      disabled={reward.status !== "approved" || proofLoadingId === reward.id}
+                      className="min-w-[64px] bg-[#DBFF00]/10 text-[#DBFF00] border border-[#DBFF00]/20 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-[#DBFF00] hover:text-black hover:border-[#DBFF00] transition-colors disabled:opacity-40 disabled:hover:bg-[#DBFF00]/10 disabled:hover:text-[#DBFF00] disabled:hover:border-[#DBFF00]/20"
+                    >
+                      {proofLoadingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Proof"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClaim(reward.id)}
+                      disabled={reward.status !== "approved" || claimingId === reward.id}
+                      className="min-w-[64px] bg-white/10 text-white border border-white/10 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-white/15 transition-colors disabled:opacity-40"
+                    >
+                      {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Stub"}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))

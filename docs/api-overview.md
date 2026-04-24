@@ -75,11 +75,17 @@ Leaderboard ordering:
 
 - `GET /v1/rewards/summary`: current user's pending, approved, and claimed reward totals.
 - `GET /v1/rewards?status=approved`: current user's reward ledgers, optionally filtered by status.
+- `GET /v1/rewards/:ledgerId/merkle-proof`: return active Merkle proof data for the reward owner. Risk review blocks access.
+- `POST /v1/rewards/:ledgerId/claim-receipt`: submit a claim transaction hash for chain-event verification. This fails closed until the real claim verifier is configured.
 - `POST /v1/rewards/:ledgerId/claim`: claim an approved reward ledger through an off-chain status update stub.
 
 When production chain writes are required, the off-chain reward claim endpoint
 fails closed. Production reward status must follow a chain-backed or proof-backed
 reward distribution flow.
+
+The limited gray-launch reward model is Merkle Claim. Draft batches and proofs
+can be generated and inspected by admins, but ledger status must not become
+`claimed` from client input alone.
 
 Direct referral rewards are generated only when a referred user makes their first qualifying deposit and the inviter is not the same user.
 
@@ -97,6 +103,9 @@ Risk endpoints are admin-only. The authenticated user's email must be listed in 
 - `PATCH /v1/admin/controls/:key`: update an emergency control such as `pause_deposits`, `pause_reward_claims`, `pause_referral_rewards`, or `maintenance_banner`.
 - `GET /v1/admin/audit-logs`: list recent admin audit logs.
 - `GET /v1/admin/chain-events`: list chain event apply/review records.
+- `GET /v1/admin/merkle/batches`: list Merkle reward batches.
+- `POST /v1/admin/merkle/batches/draft`: generate a draft Merkle batch from eligible approved rewards.
+- `GET /v1/admin/merkle/proofs`: list Merkle reward proofs.
 
 Automatic Sprint 1 flags:
 

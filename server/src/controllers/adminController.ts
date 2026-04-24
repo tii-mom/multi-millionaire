@@ -8,7 +8,9 @@ import {
 } from '../models/adminReadModel';
 import { createAdminAuditLog, listAdminAuditLogs, listAppControls, setAppControl } from '../models/opsModel';
 import { listChainEvents } from '../models/chainEventModel';
+import { listMerkleRewardBatches, listMerkleRewardProofs } from '../models/merkleRewardModel';
 import { getReceiptVerifierDiagnostics } from '../services/receiptVerifier';
+import { createDraftMerkleRewardBatch } from '../services/merkleRewards';
 
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
@@ -123,6 +125,53 @@ export async function getOpsDiagnostics(req: Request, res: Response, next: NextF
         receipt_verifier: getReceiptVerifierDiagnostics(),
       },
     });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMerkleBatches(req: Request, res: Response, next: NextFunction) {
+  try {
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 50;
+    const batches = await listMerkleRewardBatches(Number.isInteger(limit) && limit > 0 && limit <= 200 ? limit : 50);
+    return res.json({ request_id: req.id || '', data: batches });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMerkleProofs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const batchId = typeof req.query.batch_id === 'string' ? req.query.batch_id : undefined;
+    const userId = typeof req.query.user_id === 'string' ? req.query.user_id : undefined;
+    const proofs = await listMerkleRewardProofs({ batchId, userId, limit: 50 });
+    return res.json({ request_id: req.id || '', data: proofs });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function postMerkleDraftBatch(req: Request, res: Response, next: NextFunction) {
+  try {
+    const chainId = String(req.body.chainId || process.env.CHAIN_ID || '').trim();
+    const tokenAddress = String(req.body.tokenAddress || process.env.TOKEN_ADDRESS || '').trim();
+    if (!chainId || !tokenAddress) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'chainId and tokenAddress are required' } });
+    }
+    const result = await createDraftMerkleRewardBatch({
+      chainId,
+      tokenAddress,
+      createdBy: req.user?.id || null,
+    });
+    await createAdminAuditLog({
+      actorUserId: req.user?.id || null,
+      actorEmail: req.user?.email || null,
+      action: 'merkle_reward_batch.create_draft',
+      entityType: 'merkle_reward_batch',
+      entityId: result.batch.id,
+      metadata: { reward_count: result.proofs.length, chainId, tokenAddress },
+    });
+    return res.status(201).json({ request_id: req.id || '', data: result });
   } catch (err) {
     return next(err);
   }

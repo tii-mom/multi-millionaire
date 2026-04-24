@@ -5,6 +5,7 @@ import { query } from '../src/db';
 import { createPosition } from '../src/models/positionModel';
 import { getReferral, lockReferral } from '../src/models/referralModel';
 import { createRewardLedger, getRewardLedgerById, markRewardClaimed } from '../src/models/rewardModel';
+import { getMerkleProofForLedger, markMerkleClaimPending } from '../src/models/merkleRewardModel';
 
 jest.mock('../src/db', () => {
   const query = jest.fn();
@@ -79,6 +80,11 @@ jest.mock('../src/models/riskModel', () => ({
   hasBlockingRiskForRewardClaim: jest.fn().mockResolvedValue(false),
 }));
 
+jest.mock('../src/models/merkleRewardModel', () => ({
+  getMerkleProofForLedger: jest.fn(),
+  markMerkleClaimPending: jest.fn(),
+}));
+
 const queryMock = query as jest.Mock;
 const createPositionMock = createPosition as jest.Mock;
 const getReferralMock = getReferral as jest.Mock;
@@ -86,6 +92,8 @@ const lockReferralMock = lockReferral as jest.Mock;
 const createRewardLedgerMock = createRewardLedger as jest.Mock;
 const getRewardLedgerByIdMock = getRewardLedgerById as jest.Mock;
 const markRewardClaimedMock = markRewardClaimed as jest.Mock;
+const getMerkleProofForLedgerMock = getMerkleProofForLedger as jest.Mock;
+const markMerkleClaimPendingMock = markMerkleClaimPending as jest.Mock;
 
 const inviteeUserId = '00000000-0000-0000-0000-000000000101';
 const inviterUserId = '00000000-0000-0000-0000-000000000202';
@@ -118,6 +126,8 @@ describe('Reward API and generation', () => {
     createRewardLedgerMock.mockReset();
     getRewardLedgerByIdMock.mockReset();
     markRewardClaimedMock.mockReset();
+    getMerkleProofForLedgerMock.mockReset();
+    markMerkleClaimPendingMock.mockReset();
   });
 
   it('creates a reward for the first qualifying referred deposit', async () => {
@@ -215,5 +225,63 @@ describe('Reward API and generation', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('REWARD_NOT_APPROVED');
     expect(markRewardClaimedMock).not.toHaveBeenCalled();
+  });
+
+  it('returns an active Merkle proof for the reward owner', async () => {
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      merkle_root: '0xroot',
+      proof: ['0xproof'],
+    });
+
+    const res = await request(app)
+      .get('/v1/rewards/ledger-1/merkle-proof')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.merkle_root).toBe('0xroot');
+    expect(getMerkleProofForLedgerMock).toHaveBeenCalledWith('ledger-1', inviteeUserId);
+  });
+
+  it('blocks Merkle proof access while risk is open', async () => {
+    const riskModel = jest.requireMock('../src/models/riskModel');
+    riskModel.hasBlockingRiskForRewardClaim.mockResolvedValueOnce(true);
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+
+    const res = await request(app)
+      .get('/v1/rewards/ledger-1/merkle-proof')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('RISK_REVIEW_REQUIRED');
+    expect(getMerkleProofForLedgerMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for Merkle claim receipts until a real verifier is configured', async () => {
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+
+    const res = await request(app)
+      .post('/v1/rewards/ledger-1/claim-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: '0xclaim' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('MERKLE_CLAIM_VERIFIER_NOT_CONFIGURED');
+    expect(markMerkleClaimPendingMock).not.toHaveBeenCalled();
   });
 });

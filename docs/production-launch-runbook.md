@@ -50,6 +50,9 @@ test risk thresholds in production.
   stub and fails closed when mainline chain writes are required.
 - Production reward claims must be chain-backed or proof-backed; the legacy
   claim endpoint fails closed when mainline chain writes are required.
+- Limited gray launch uses Merkle Claim by default. Admins may create draft
+  Merkle batches from approved, risk-clear reward ledgers; user claim status
+  must follow verified claim events, not client-submitted status.
 - `pause_deposits`, `pause_reward_claims`, and `pause_referral_rewards` must be
   usable before public launch.
 
@@ -79,8 +82,9 @@ and commit SHA.
 1. Confirm production resources, secrets, migrations, DNS, TLS, logging, and
    rollback ownership are ready.
 2. Confirm `CHAIN_MAINLINE_WRITES_ENABLED=false` unless the chain verifier,
-   contract ABI, RPC provider, wallet binding, receipt ingest, claim
-   verification, and emergency pause controls have all passed staging.
+   contract ABI, RPC provider, wallet binding, receipt ingest, Merkle proof
+   generation, claim-event verification, and emergency pause controls have all
+   passed staging.
 3. Deploy the API to production with public traffic disabled or routed to an
    internal canary route when supported by the hosting platform.
 4. Run `API_BASE_URL="$PRODUCTION_API_BASE_URL" npm run smoke:production`.
@@ -116,6 +120,8 @@ incident rollback owner.
   receipt verification failures.
 - Reward claim failures, duplicate claim attempts, and claim reconciliation
   mismatches.
+- Merkle batch creation, proof counts, claim pending age, and claim-event
+  verifier failures.
 - Chain RPC latency/error rate, verifier failures, block/event ingest lag, and
   contract event reconciliation gaps.
 - Emergency pause changes for deposits, reward claims, referral rewards, and

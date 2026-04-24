@@ -21,6 +21,8 @@
   - `WALLET_BINDING_MESSAGE_DOMAIN`
   - `RECEIPT_VERIFICATION_ENABLED`
   - `CHAIN_RECEIPT_VERIFIER`
+  - `WALLET_SIGNATURE_MODE`
+  - `REWARD_CLAIM_MODEL=merkle`
   - `CHAIN_MAINLINE_WRITES_ENABLED`
 - Confirm database connectivity and backup coverage.
 - Confirm the frontend build passes.
@@ -37,6 +39,7 @@ Run migrations strictly in numeric order:
 3. `server/migrations/003_rewards.sql`
 4. `server/migrations/004_risk.sql`
 5. `server/migrations/005_production_chain_ops.sql`
+6. `server/migrations/006_merkle_rewards.sql`
 
 Use `npm run migrate:up` for normal rollout. Use `npm run migrate:reset` only in local or staging environments.
 
@@ -62,6 +65,9 @@ Use `npm run migrate:up` for normal rollout. Use `npm run migrate:reset` only in
 - `GET /v1/admin/audit-logs`
 - `GET /v1/admin/chain-events?apply_status=applied`
 - `GET /v1/admin/ops`
+- `GET /v1/admin/merkle/batches`
+- `POST /v1/admin/merkle/batches/draft`
+- `GET /v1/admin/merkle/proofs`
 
 Expected staging outcome:
 
@@ -72,6 +78,8 @@ Expected staging outcome:
 - emergency controls can be toggled and restored by an admin operator,
 - control changes create admin audit log entries,
 - chain event and receipt verifier diagnostics are visible to admins.
+- Merkle draft batch/proof generation is visible to admins, and claim receipt
+  submission remains fail-closed until the real chain verifier is configured.
 
 Production smoke must stay non-mutating by default. Do not run the staging
 mutating smoke or admin control toggles against production unless a named
@@ -106,6 +114,7 @@ For the next staging release record, capture:
 - audit log id/action for the control update
 - chain-events query result count and `apply_status` filter used
 - `/v1/admin/ops` receipt verifier `mode`, `status`, and `configured`
+- latest Merkle batch id/root/proof count, if reward claim rehearsal is in scope
 - confirmation that production smoke remained GET-only unless a separate
   mutating canary approval was recorded
 

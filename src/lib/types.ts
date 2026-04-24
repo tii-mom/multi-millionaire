@@ -160,6 +160,47 @@ export interface RewardLedger {
   updated_at: string;
 }
 
+export type MerkleRewardBatchStatus = 'draft' | 'published' | 'active' | 'superseded' | 'settled';
+export type MerkleRewardClaimStatus = 'proof_available' | 'claim_pending' | 'claimed' | 'rejected';
+
+export interface MerkleRewardBatch {
+  id: string;
+  chain_id: string;
+  token_address: string;
+  merkle_root: string;
+  total_amount_raw: string;
+  status: MerkleRewardBatchStatus;
+  published_tx_hash: string | null;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MerkleRewardProof {
+  id: string;
+  batch_id: string;
+  reward_ledger_id: string;
+  beneficiary_user_id: string;
+  beneficiary_wallet: string;
+  amount_raw: string;
+  leaf_hash: string;
+  proof: string[];
+  claim_status: MerkleRewardClaimStatus;
+  claim_tx_hash: string | null;
+  claim_chain_event_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MerkleRewardProofWithBatch extends MerkleRewardProof {
+  chain_id: string;
+  token_address: string;
+  merkle_root: string;
+  batch_status: MerkleRewardBatchStatus;
+  published_tx_hash: string | null;
+}
+
 export interface AdminWave extends Wave {
   unlock_multiplier_bps: number;
   price_freshness_ttl_seconds: number;

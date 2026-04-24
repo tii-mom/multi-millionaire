@@ -125,6 +125,14 @@ function validateReceiptVerifier(value: string, profile: Profile): string | null
   return null;
 }
 
+function validateWalletSignatureMode(value: string, profile: Profile): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (profile === 'production' && ['test', 'disabled', ''].includes(normalized)) {
+    return 'Production wallet signature mode must not be test or disabled';
+  }
+  return null;
+}
+
 function validateProductionAdminEmails(value: string, profile: Profile): string | null {
   const placeholder = validateProductionValue(value, profile);
   if (placeholder) return placeholder;
@@ -163,6 +171,14 @@ const contractEnv: EnvCheck[] = [
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Reward distributor address. Current claim API is an off-chain status update stub.', validate: validateContractValue },
 ];
 
+const productionMerkleContractEnv: EnvCheck[] = [
+  { name: 'CHAIN_ID', hint: 'Target production chain identifier.', validate: validateContractValue },
+  { name: 'CHAIN_RPC_URL', hint: 'Production RPC endpoint for receipt and claim-event verification.', validate: (value) => validateUrl(value) },
+  { name: 'TOKEN_ADDRESS', hint: 'Production reward/deposit token address.', validate: validateContractValue },
+  { name: 'LOCK_VAULT_ADDRESS', hint: 'Production lock vault contract address.', validate: validateContractValue },
+  { name: 'ORACLE_ADDRESS', hint: 'Production oracle contract address.', validate: validateContractValue },
+];
+
 const productionChainRecommended: EnvCheck[] = [
   { name: 'CHAIN_INTEGRATION_ENABLED', hint: 'Set true only after production chain resources are ready.', validate: (value) => validateBoolean(value) },
   { name: 'CHAIN_READ_ONLY_ENABLED', hint: 'Set true only after production RPC and read-only checks are configured.', validate: (value) => validateBoolean(value) },
@@ -170,8 +186,11 @@ const productionChainRecommended: EnvCheck[] = [
   { name: 'CHAIN_MAINLINE_WRITES_ENABLED', hint: 'Must remain false until production chain writes are approved.', validate: (value) => validateBoolean(value) },
   { name: 'WALLET_BINDING_ENABLED', hint: 'Enable only when wallet signature verification is configured.', validate: (value) => validateBoolean(value) },
   { name: 'WALLET_BINDING_MESSAGE_DOMAIN', hint: 'Domain included in wallet binding signable messages.', validate: validateProductionValue },
+  { name: 'WALLET_SIGNATURE_MODE', hint: 'Production wallet signature verifier implementation. Must not be test or disabled.', validate: validateWalletSignatureMode },
   { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Enable only when chain receipt verification is configured.', validate: (value) => validateBoolean(value) },
   { name: 'CHAIN_RECEIPT_VERIFIER', hint: 'Production receipt verifier implementation. Must not be test or disabled.', validate: validateReceiptVerifier },
+  { name: 'REWARD_CLAIM_MODEL', hint: 'Production reward claim model. Use merkle for limited gray launch.', validate: validateProductionValue },
+  { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Only required when REWARD_CLAIM_MODEL=distributor.', validate: validateContractValue },
   { name: 'RECEIPT_REQUIRED_CONFIRMATIONS', hint: 'Finality confirmations required before applying receipts.', validate: (value) => validateInteger(value) },
 ];
 
@@ -194,7 +213,7 @@ const profileChecks: Record<Profile, { required: EnvCheck[]; recommended: EnvChe
   production: {
     required: [
       ...stagingRequired,
-      ...contractEnv,
+      ...productionMerkleContractEnv,
     ],
     recommended: [
       { name: 'API_BASE_URL', hint: 'Production API base URL for manual smoke checks only.', validate: (value) => validateUrl(value) },
@@ -236,6 +255,7 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
   const receiptEnabled = isTruthy(process.env.RECEIPT_VERIFICATION_ENABLED);
   const walletEnabled = isTruthy(process.env.WALLET_BINDING_ENABLED);
   const verifier = (process.env.CHAIN_RECEIPT_VERIFIER || '').trim().toLowerCase();
+  const walletVerifier = (process.env.WALLET_SIGNATURE_MODE || '').trim().toLowerCase();
 
   if (chainWrites && !receiptEnabled) {
     checks.push({
@@ -251,6 +271,14 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
       status: 'invalid',
       hint: 'Production chain writes require wallet ownership verification.',
       message: 'CHAIN_MAINLINE_WRITES_ENABLED=true requires WALLET_BINDING_ENABLED=true',
+    });
+  }
+  if (chainWrites && ['test', 'disabled', ''].includes(walletVerifier)) {
+    checks.push({
+      name: 'WALLET_SIGNATURE_MODE',
+      status: 'invalid',
+      hint: 'Production chain writes require a real wallet signature verifier.',
+      message: 'CHAIN_MAINLINE_WRITES_ENABLED=true cannot use test/disabled wallet signature verifier',
     });
   }
   if (chainWrites && ['test', 'disabled', ''].includes(verifier)) {

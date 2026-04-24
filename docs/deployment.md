@@ -38,6 +38,7 @@ Current migration order is lexical and numeric:
 3. `003_rewards.sql`
 4. `004_risk.sql`
 5. `005_production_chain_ops.sql`
+6. `006_merkle_rewards.sql`
 
 Do not run `migrate:reset` outside local or controlled staging rehearsal databases.
 
@@ -84,8 +85,8 @@ npm run smoke
 Before any production launch with real funds:
 
 - provision production Cloudflare Worker, Pages, Hyperdrive, Neon Postgres, and secrets separately from staging
-- run migrations through `005_production_chain_ops.sql`
-- keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until wallet binding, receipt verification, chain event ingest, reward claim verification, emergency controls, and audit logs are verified on staging
+- run migrations through `006_merkle_rewards.sql`
+- keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until wallet binding, receipt verification, chain event ingest, Merkle proof generation, claim receipt verification, emergency controls, and audit logs are verified on staging
 - use non-mutating production smoke by default
 - require an approved small-value canary before any mutating production transaction
 
@@ -93,6 +94,8 @@ Before any production launch with real funds:
 
 - `POST /v1/waves/:waveId/deposit` records an off-chain database position. It does not verify or submit a real token lock.
 - `POST /v1/rewards/:ledgerId/claim` marks an approved reward ledger as claimed. It does not transfer tokens on-chain.
+- `GET /v1/rewards/:ledgerId/merkle-proof` exposes proof-backed claim data only after an active Merkle batch exists.
+- `POST /v1/rewards/:ledgerId/claim-receipt` fails closed until a real chain claim-event verifier is configured.
 - Risk blocking is enforced through `risk_flags` rows with `open` or `reviewing` status.
 - Chain-related env values are tracked for readiness, but RC1 smoke does not prove chain settlement.
 - When production chain writes are required, the legacy off-chain deposit and reward claim endpoints fail closed.

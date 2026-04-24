@@ -10,6 +10,9 @@ import type {
   AuthResult,
   BootstrapData,
   DepositReceiptResult,
+  MerkleRewardBatch,
+  MerkleRewardProof,
+  MerkleRewardProofWithBatch,
   Position,
   RewardLedger,
   RewardSummary,
@@ -152,6 +155,18 @@ export const api = {
     });
   },
 
+  merkleClaimProof(ledgerId: string, token: string) {
+    return requestJson<MerkleRewardProofWithBatch>(`/v1/rewards/${ledgerId}/merkle-proof`, { token });
+  },
+
+  submitMerkleClaimReceipt(ledgerId: string, txHash: string, token: string) {
+    return requestJson<MerkleRewardProof>(`/v1/rewards/${ledgerId}/claim-receipt`, {
+      method: "POST",
+      token,
+      body: { txHash },
+    });
+  },
+
   adminDashboard(token: string) {
     return requestJson<AdminDashboard>("/v1/admin/dashboard", { token });
   },
@@ -179,6 +194,23 @@ export const api = {
   updateAdminControl(key: AppControlKey, input: { enabled: boolean; reason?: string | null }, token: string) {
     return requestJson<AppControl>(`/v1/admin/controls/${key}`, {
       method: "PATCH",
+      token,
+      body: input,
+    });
+  },
+
+  adminMerkleBatches(token: string) {
+    return requestJson<MerkleRewardBatch[]>("/v1/admin/merkle/batches", { token });
+  },
+
+  adminMerkleProofs(token: string, batchId?: string) {
+    const query = batchId ? `?batch_id=${encodeURIComponent(batchId)}` : "";
+    return requestJson<MerkleRewardProof[]>(`/v1/admin/merkle/proofs${query}`, { token });
+  },
+
+  createAdminMerkleDraftBatch(input: { chainId: string; tokenAddress: string }, token: string) {
+    return requestJson<{ batch: MerkleRewardBatch; proofs: MerkleRewardProof[] }>("/v1/admin/merkle/batches/draft", {
+      method: "POST",
       token,
       body: input,
     });

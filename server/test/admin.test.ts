@@ -4,6 +4,8 @@ import app from '../src/app';
 import { getAdminDashboard, listAdminRewards } from '../src/models/adminReadModel';
 import { createAdminAuditLog, listAdminAuditLogs, listAppControls, setAppControl } from '../src/models/opsModel';
 import { listChainEvents } from '../src/models/chainEventModel';
+import { listMerkleRewardBatches, listMerkleRewardProofs } from '../src/models/merkleRewardModel';
+import { createDraftMerkleRewardBatch } from '../src/services/merkleRewards';
 
 jest.mock('../src/models/adminReadModel', () => ({
   getAdminDashboard: jest.fn(),
@@ -24,6 +26,15 @@ jest.mock('../src/models/chainEventModel', () => ({
   listChainEvents: jest.fn(),
 }));
 
+jest.mock('../src/models/merkleRewardModel', () => ({
+  listMerkleRewardBatches: jest.fn(),
+  listMerkleRewardProofs: jest.fn(),
+}));
+
+jest.mock('../src/services/merkleRewards', () => ({
+  createDraftMerkleRewardBatch: jest.fn(),
+}));
+
 const getAdminDashboardMock = getAdminDashboard as jest.Mock;
 const listAdminRewardsMock = listAdminRewards as jest.Mock;
 const createAdminAuditLogMock = createAdminAuditLog as jest.Mock;
@@ -31,6 +42,9 @@ const listAdminAuditLogsMock = listAdminAuditLogs as jest.Mock;
 const listAppControlsMock = listAppControls as jest.Mock;
 const setAppControlMock = setAppControl as jest.Mock;
 const listChainEventsMock = listChainEvents as jest.Mock;
+const listMerkleRewardBatchesMock = listMerkleRewardBatches as jest.Mock;
+const listMerkleRewardProofsMock = listMerkleRewardProofs as jest.Mock;
+const createDraftMerkleRewardBatchMock = createDraftMerkleRewardBatch as jest.Mock;
 
 const adminToken = jwt.sign({ userId: 'admin-user', email: 'admin@example.com' }, 'secret');
 const userToken = jwt.sign({ userId: 'normal-user', email: 'user@example.com' }, 'secret');
@@ -47,6 +61,9 @@ describe('Admin read API', () => {
     listAppControlsMock.mockReset();
     setAppControlMock.mockReset();
     listChainEventsMock.mockReset();
+    listMerkleRewardBatchesMock.mockReset();
+    listMerkleRewardProofsMock.mockReset();
+    createDraftMerkleRewardBatchMock.mockReset();
   });
 
   it('requires admin access for dashboard reads', async () => {
@@ -217,5 +234,49 @@ describe('Admin read API', () => {
       applyStatus: 'applied',
       limit: 50,
     });
+  });
+
+  it('lists Merkle reward batches and proofs for admins', async () => {
+    listMerkleRewardBatchesMock.mockResolvedValue([{ id: 'batch-1', status: 'draft' }]);
+    listMerkleRewardProofsMock.mockResolvedValue([{ id: 'proof-1', batch_id: 'batch-1' }]);
+
+    const batches = await request(app)
+      .get('/v1/admin/merkle/batches')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const proofs = await request(app)
+      .get('/v1/admin/merkle/proofs?batch_id=batch-1')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(batches.status).toBe(200);
+    expect(batches.body.data[0].id).toBe('batch-1');
+    expect(proofs.status).toBe(200);
+    expect(proofs.body.data[0].id).toBe('proof-1');
+    expect(listMerkleRewardProofsMock).toHaveBeenCalledWith({ batchId: 'batch-1', userId: undefined, limit: 50 });
+  });
+
+  it('creates Merkle draft batches and writes audit logs', async () => {
+    createDraftMerkleRewardBatchMock.mockResolvedValue({
+      batch: { id: 'batch-1', merkle_root: '0xroot' },
+      proofs: [{ id: 'proof-1' }],
+    });
+    createAdminAuditLogMock.mockResolvedValue({ id: 'audit-1' });
+
+    const res = await request(app)
+      .post('/v1/admin/merkle/batches/draft')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ chainId: 'ton-mainnet', tokenAddress: 'token-1' });
+
+    expect(res.status).toBe(201);
+    expect(createDraftMerkleRewardBatchMock).toHaveBeenCalledWith({
+      chainId: 'ton-mainnet',
+      tokenAddress: 'token-1',
+      createdBy: 'admin-user',
+    });
+    expect(createAdminAuditLogMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorEmail: 'admin@example.com',
+      action: 'merkle_reward_batch.create_draft',
+      entityType: 'merkle_reward_batch',
+      entityId: 'batch-1',
+    }));
   });
 });

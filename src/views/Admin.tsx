@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Activity, AlertTriangle, Coins, Gift, Loader2, RefreshCw, Save, ShieldCheck, ToggleLeft, ToggleRight, Users, Waves } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/src/lib/api";
-import type { AdminDashboard, AdminReward, AdminRiskFlag, AdminSquad, AdminWave, AppControl, AppControlKey } from "@/src/lib/types";
+import type { AdminDashboard, AdminReward, AdminRiskFlag, AdminSquad, AdminWave, AppControl, AppControlKey, MerkleRewardBatch, MerkleRewardProof } from "@/src/lib/types";
 
 type ListKey = "waves" | "risk" | "rewards" | "squads";
 
@@ -257,14 +257,21 @@ export default function Admin() {
   const [lists, setLists] = useState<AdminLists>(emptyLists);
   const [controls, setControls] = useState<AppControl[]>([]);
   const [controlDrafts, setControlDrafts] = useState<ControlDrafts>(emptyControlDrafts);
+  const [merkleBatches, setMerkleBatches] = useState<MerkleRewardBatch[]>([]);
+  const [merkleProofs, setMerkleProofs] = useState<MerkleRewardProof[]>([]);
+  const [merkleChainId, setMerkleChainId] = useState("ton-mainnet");
+  const [merkleTokenAddress, setMerkleTokenAddress] = useState("");
   const [activeList, setActiveList] = useState<ListKey>("waves");
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [isListLoading, setIsListLoading] = useState(false);
   const [isControlsLoading, setIsControlsLoading] = useState(true);
+  const [isMerkleLoading, setIsMerkleLoading] = useState(true);
+  const [isMerkleCreating, setIsMerkleCreating] = useState(false);
   const [updatingControl, setUpdatingControl] = useState<AppControlKey | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [controlsError, setControlsError] = useState<string | null>(null);
+  const [merkleError, setMerkleError] = useState<string | null>(null);
 
   const getToken = useCallback(() => {
     const token = localStorage.getItem("auth_token");
@@ -369,6 +376,52 @@ export default function Admin() {
     }
   }, [controlDrafts, getToken]);
 
+  const loadMerkle = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      setIsMerkleLoading(false);
+      return;
+    }
+    setIsMerkleLoading(true);
+    setMerkleError(null);
+    try {
+      const batches = await api.adminMerkleBatches(token);
+      setMerkleBatches(batches);
+      const latestBatchId = batches[0]?.id;
+      setMerkleProofs(await api.adminMerkleProofs(token, latestBatchId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load Merkle reward state.";
+      setMerkleError(message);
+      toast.error(message);
+    } finally {
+      setIsMerkleLoading(false);
+    }
+  }, [getToken]);
+
+  const createMerkleDraft = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+    setIsMerkleCreating(true);
+    setMerkleError(null);
+    try {
+      if (!merkleChainId.trim() || !merkleTokenAddress.trim()) {
+        throw new Error("Chain id and token address are required for a draft batch.");
+      }
+      const result = await api.createAdminMerkleDraftBatch({
+        chainId: merkleChainId.trim(),
+        tokenAddress: merkleTokenAddress.trim(),
+      }, token);
+      toast.success(`Draft Merkle batch created with ${result.proofs.length} proofs.`);
+      await loadMerkle();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to create Merkle draft batch.";
+      setMerkleError(message);
+      toast.error(message);
+    } finally {
+      setIsMerkleCreating(false);
+    }
+  }, [getToken, loadMerkle, merkleChainId, merkleTokenAddress]);
+
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
@@ -376,6 +429,10 @@ export default function Admin() {
   useEffect(() => {
     loadControls();
   }, [loadControls]);
+
+  useEffect(() => {
+    loadMerkle();
+  }, [loadMerkle]);
 
   useEffect(() => {
     loadList(activeList);
@@ -416,6 +473,7 @@ export default function Admin() {
               onClick={() => {
                 loadDashboard();
                 loadControls();
+                loadMerkle();
                 loadList(activeList);
               }}
               className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs uppercase tracking-widest text-white/75 transition-colors hover:bg-[#DBFF00] hover:text-black"
@@ -554,6 +612,114 @@ export default function Admin() {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Merkle Rewards</h2>
+              <p className="mt-1 text-xs text-white/35">Draft/proof visibility only. Claim receipt verification stays fail-closed until chain RPC and ABI are configured.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={loadMerkle}
+                disabled={isMerkleLoading || isMerkleCreating}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-widest text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isMerkleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={createMerkleDraft}
+                disabled={isMerkleLoading || isMerkleCreating}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-2 text-xs uppercase tracking-widest text-[#DBFF00] transition-colors hover:bg-[#DBFF00] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isMerkleCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Create Draft
+              </button>
+            </div>
+          </div>
+
+          {merkleError ? (
+            <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/65">
+              {merkleError}
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 lg:col-span-2">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-widest text-white/30">Chain ID</span>
+                  <input
+                    value={merkleChainId}
+                    onChange={(event) => setMerkleChainId(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-[#DBFF00]/40"
+                    placeholder="ton-mainnet"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-widest text-white/30">Token Address</span>
+                  <input
+                    value={merkleTokenAddress}
+                    onChange={(event) => setMerkleTokenAddress(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-[#DBFF00]/40"
+                    placeholder="Production token address"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/35">Latest Batches</div>
+              {isMerkleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white/45" />
+              ) : merkleBatches.length === 0 ? (
+                <EmptyRows />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {merkleBatches.slice(0, 5).map((batch) => (
+                    <div key={batch.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 truncate font-mono text-xs text-white/75">{batch.id}</div>
+                        <StatusPill status={batch.status} />
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/45">
+                        <span className="truncate">root {batch.merkle_root}</span>
+                        <span className="text-right tabular-nums">{formatInteger(batch.total_amount_raw)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/35">Latest Proofs</div>
+              {isMerkleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white/45" />
+              ) : merkleProofs.length === 0 ? (
+                <EmptyRows />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {merkleProofs.slice(0, 5).map((proof) => (
+                    <div key={proof.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 truncate font-mono text-xs text-white/75">{proof.reward_ledger_id}</div>
+                        <StatusPill status={proof.claim_status} />
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/45">
+                        <span className="truncate">{proof.beneficiary_wallet}</span>
+                        <span className="text-right tabular-nums">{formatInteger(proof.amount_raw)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </section>
 

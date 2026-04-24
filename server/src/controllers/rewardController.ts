@@ -8,6 +8,8 @@ import {
 } from '../models/rewardModel';
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
 import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
+import { getMerkleProofForLedger, markMerkleClaimPending } from '../models/merkleRewardModel';
+import { MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
 
 const allowedStatuses = new Set<RewardStatus>(['pending', 'approved', 'claimed', 'rejected']);
 
@@ -86,6 +88,65 @@ export async function claimReward(req: Request, res: Response, next: NextFunctio
     const claimed = await markRewardClaimed(ledgerId, user.id);
     return res.json({ request_id: req.id || '', data: claimed });
   } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMerkleClaimProof(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
+    }
+    const ledgerId = req.params.ledgerId;
+    const ledger = await getRewardLedgerById(ledgerId);
+    if (!ledger || ledger.beneficiary_user_id !== user.id) {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'REWARD_NOT_FOUND', message: 'Reward ledger not found' } });
+    }
+    const hasBlockingRisk = await hasBlockingRiskForRewardClaim(ledgerId, user.id);
+    if (hasBlockingRisk) {
+      return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
+    }
+    const proof = await getMerkleProofForLedger(ledgerId, user.id);
+    if (!proof || proof.batch_status !== 'active') {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'MERKLE_PROOF_NOT_AVAILABLE', message: 'Merkle proof is not available for this reward' } });
+    }
+    return res.json({ request_id: req.id || '', data: proof });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function submitMerkleClaimReceipt(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
+    }
+    if (await isControlEnabled('pause_reward_claims')) {
+      return res.status(423).json({ request_id: req.id || '', error: { code: 'REWARD_CLAIMS_PAUSED', message: 'Reward claims are temporarily paused' } });
+    }
+    const ledgerId = req.params.ledgerId;
+    const txHash = typeof req.body.txHash === 'string' ? req.body.txHash.trim() : '';
+    if (!txHash) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'txHash is required' } });
+    }
+    const ledger = await getRewardLedgerById(ledgerId);
+    if (!ledger || ledger.beneficiary_user_id !== user.id) {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'REWARD_NOT_FOUND', message: 'Reward ledger not found' } });
+    }
+    const hasBlockingRisk = await hasBlockingRiskForRewardClaim(ledgerId, user.id);
+    if (hasBlockingRisk) {
+      return res.status(409).json({ request_id: req.id || '', error: { code: 'RISK_REVIEW_REQUIRED', message: 'Reward requires risk review before claim' } });
+    }
+
+    await verifyMerkleClaimReceipt();
+    const pending = await markMerkleClaimPending(ledgerId, user.id, txHash);
+    return res.json({ request_id: req.id || '', data: pending });
+  } catch (err) {
+    if (err instanceof MerkleClaimVerificationError) {
+      return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
+    }
     return next(err);
   }
 }
