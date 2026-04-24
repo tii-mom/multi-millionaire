@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Users, Crown, Sparkles, Plus, Target, Loader2, UserPlus, RefreshCw } from "lucide-react";
+import { Crown, Loader2, Plus, RefreshCw, Sparkles, Target, UserPlus, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { api } from "@/src/lib/api";
+import { formatNumber, useI18n } from "@/src/lib/i18n";
+import { readBackendAuthToken, readTonWalletSession } from "@/src/lib/tonSession";
 import type { SquadLeaderboardRow } from "@/src/lib/types";
 
 interface TeamProps {
@@ -12,11 +14,8 @@ interface TeamProps {
   setSquadGoal?: (goal: number) => void;
 }
 
-function formatNumber(value: number) {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-
 export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps) {
+  const { formatError, locale, t } = useI18n();
   const [goalInput, setGoalInput] = useState("");
   const [squadName, setSquadName] = useState("");
   const [waveId, setWaveId] = useState<number | null>(null);
@@ -39,31 +38,33 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
       const rows = await api.listSquads(Number(wave.wave_id));
       setSquads(rows);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load squads.";
+      const message = formatError(error, "team.loadFailed");
       setLoadError(message);
       setSquads([]);
       toast.error(message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [formatError]);
 
   useEffect(() => {
     loadSquads();
   }, [loadSquads]);
 
   const topSquad = squads[0] || null;
-  const squadTotalLocked = useMemo(() => {
-    if (!topSquad) return 0;
-    return Number(topSquad.total_locked || 0);
-  }, [topSquad]);
+  const squadTotalLocked = useMemo(() => Number(topSquad?.total_locked || 0), [topSquad]);
   const squadMarketValue = squadTotalLocked * tokenPrice;
   const progressPercent = Math.min((squadMarketValue / squadGoal) * 100, 100);
 
   const requireToken = () => {
-    const token = localStorage.getItem("auth_token");
+    const walletSession = readTonWalletSession();
+    if (!walletSession) {
+      toast.error(t("team.signIn"));
+      return null;
+    }
+    const token = readBackendAuthToken();
     if (!token) {
-      toast.error("Sign in before managing squads.");
+      toast.error(t("team.backendAuthPending"));
       return null;
     }
     return token;
@@ -74,7 +75,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
     const name = squadName.trim();
     if (!token || !waveId) return;
     if (!name) {
-      toast.error("Enter a squad name.");
+      toast.error(t("team.nameRequired"));
       return;
     }
 
@@ -82,11 +83,10 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
     try {
       await api.createSquad(waveId, name, token);
       setSquadName("");
-      toast.success("Squad created.");
+      toast.success(t("team.created"));
       await loadSquads();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create squad.";
-      toast.error(message);
+      toast.error(formatError(error, "team.createFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -99,164 +99,163 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
     setIsSubmitting(true);
     try {
       await api.joinSquad(waveId, squadId, token);
-      toast.success("Joined squad.");
+      toast.success(t("team.joined"));
       await loadSquads();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to join squad.";
-      toast.error(message);
+      toast.error(formatError(error, "team.joinFailed"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="px-6 flex flex-col gap-6 pb-10">
-      {/* Squad Header */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl relative overflow-hidden group">
-        <div className="absolute -right-10 -top-10 w-32 h-32 bg-[#DBFF00]/10 blur-3xl rounded-full" />
+    <div className="flex flex-col gap-5 px-6 pb-10">
+      <section className="glass-panel group relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#DBFF00]/[0.08] blur-3xl" />
 
-        <div className="flex items-center justify-between mb-4 relative z-10">
-          <div className="flex items-center gap-2 text-white/50">
-            <Users className="w-5 h-5" />
-            <span className="text-[11px] uppercase tracking-widest font-mono">
-              {topSquad ? topSquad.name : "Wave Squads"}
+        <div className="relative z-10 mb-4 flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-2 text-white/[0.52]">
+            <Users className="h-5 w-5" />
+            <span className="truncate text-[11px] uppercase tracking-widest">
+              {topSquad ? topSquad.name : t("team.header.fallback")}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[#DBFF00] bg-[#DBFF00]/10 px-3 py-1.5 rounded-full text-[10px] font-mono border border-[#DBFF00]/20 font-semibold tracking-wider">
-            <Sparkles className="w-3 h-3" /> {topSquad ? `Rank #${topSquad.rank}` : "No Rank"}
+          <div className="flex items-center gap-1.5 rounded-full border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-1.5 text-[10px] font-semibold tracking-wider text-[#DBFF00]">
+            <Sparkles className="h-3 w-3" />
+            {topSquad ? t("team.rank.value", { rank: topSquad.rank }) : t("team.rank.none")}
           </div>
         </div>
 
         <div className="relative z-10">
-          <div className="flex justify-between items-end mt-5 mb-1.5">
-            <div className="text-[10px] text-white/50 font-mono uppercase tracking-widest">
-              Top Squad Market Value
+          <div className="mb-1.5 mt-5 flex items-end justify-between">
+            <div className="text-[10px] uppercase tracking-widest text-white/[0.52]">
+              {t("team.marketValue")}
             </div>
             <div className="flex items-center gap-1.5">
               <span className="relative flex h-[5px] w-[5px]">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DBFF00] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-[5px] w-[5px] bg-[#DBFF00]"></span>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#DBFF00] opacity-70" />
+                <span className="relative inline-flex h-[5px] w-[5px] rounded-full bg-[#DBFF00]" />
               </span>
-              <span className="text-[9px] uppercase tracking-widest font-mono text-[#DBFF00]/70 flex items-center gap-1">
-                Rate:
-                <motion.span key={tokenPrice} initial={{ color: "#fff" }} animate={{ color: "#DBFF00" }} className="tabular-nums font-bold">
-                  ${tokenPrice.toFixed(3)}
+              <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest text-[#DBFF00]/[0.72]">
+                {t("common.rate")}:
+                <motion.span key={tokenPrice} initial={{ color: "#fff" }} animate={{ color: "#DBFF00" }} className="font-mono font-bold tabular-nums">
+                  ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                 </motion.span>
               </span>
             </div>
           </div>
+
           <motion.div
             key={squadMarketValue}
             initial={{ opacity: 0.8 }}
             animate={{ opacity: 1 }}
-            className="text-4xl font-mono text-transparent bg-clip-text bg-gradient-to-br from-[#DBFF00] to-[#DBFF00]/60 font-semibold tracking-tighter mb-6 tabular-nums"
+            className="mb-6 bg-gradient-to-br from-[#DBFF00] to-[#DBFF00]/60 bg-clip-text font-mono text-4xl font-semibold tracking-tighter text-transparent tabular-nums"
           >
-            ${formatNumber(squadMarketValue)}
+            ${formatNumber(squadMarketValue, locale, { maximumFractionDigits: 0 })}
           </motion.div>
 
-          {/* Custom Goal Input */}
-          <div className="flex items-center gap-2 mb-5">
+          <div className="mb-5 flex items-center gap-2">
             <input
               type="number"
               value={goalInput}
               onChange={(e) => setGoalInput(e.target.value)}
-              placeholder="Set custom goal ($)"
-              className="flex-1 bg-black/40 border border-white/10 rounded-[14px] py-2.5 px-3.5 outline-none focus:border-[#DBFF00]/50 transition-colors font-mono text-xs tabular-nums placeholder:text-white/20 focus:bg-black/80 shadow-inner"
+              placeholder={t("team.goal.placeholder")}
+              className="min-w-0 flex-1 rounded-[16px] border border-white/10 bg-black/[0.42] px-3.5 py-2.5 font-mono text-xs tabular-nums outline-none transition-colors placeholder:text-white/[0.24] focus:border-[#DBFF00]/[0.42] focus:bg-black/[0.72]"
             />
             <button
+              type="button"
               onClick={() => {
                 const val = Number(goalInput);
                 if (val > 0) {
-                  if (setSquadGoal) setSquadGoal(val);
+                  setSquadGoal?.(val);
                   setGoalInput("");
-                  toast.success(`Squad goal set to $${val.toLocaleString()}`);
+                  toast.success(t("team.goal.set", { value: formatNumber(val, locale) }));
                 } else {
-                  toast.error("Enter a valid goal amount");
+                  toast.error(t("team.goal.invalid"));
                 }
               }}
-              className="bg-white/10 text-white border border-white/20 px-4 py-2.5 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-[#DBFF00] hover:text-black hover:border-[#DBFF00] transition-colors active:scale-[0.98]"
+              className="depth-button focus-ring rounded-[16px] border border-white/20 bg-white/10 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white hover:border-[#DBFF00] hover:bg-[#DBFF00] hover:text-black"
             >
-              Set
+              {t("common.set")}
             </button>
           </div>
 
-          {/* Squad Progress Bar */}
           <div>
-            <div className="flex justify-between items-end text-[10px] font-mono text-white/50 mb-2 uppercase tracking-widest">
-              <span className="flex items-center gap-1.5 text-white/70">
-                <Target className="w-3.5 h-3.5" />
-                Goal: ${squadGoal.toLocaleString()}
+            <div className="mb-2 flex items-end justify-between text-[10px] uppercase tracking-widest text-white/[0.52]">
+              <span className="flex items-center gap-1.5 text-white/[0.72]">
+                <Target className="h-3.5 w-3.5" />
+                {t("common.goal")}: ${formatNumber(squadGoal, locale)}
               </span>
-              <span className="text-[#DBFF00] font-semibold text-[11px] tabular-nums">{progressPercent.toFixed(1)}%</span>
+              <span className="font-semibold text-[#DBFF00] tabular-nums">
+                {formatNumber(progressPercent, locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+              </span>
             </div>
-            <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden border border-white/[0.05] relative shadow-inner">
+            <div className="relative h-2 w-full overflow-hidden rounded-full border border-white/[0.05] bg-black/55 shadow-inner">
               <div
-                className="absolute top-0 left-0 h-full bg-gradient-to-r from-transparent via-[#DBFF00]/80 to-[#DBFF00] transition-all duration-1000 ease-out flex justify-end items-center"
+                className="absolute left-0 top-0 flex h-full items-center justify-end bg-gradient-to-r from-transparent via-[#DBFF00]/80 to-[#DBFF00] transition-all duration-1000 ease-out"
                 style={{ width: `${Math.max(progressPercent, topSquad ? 2 : 0)}%` }}
               >
-                <div className="w-1.5 h-1.5 bg-white rounded-full mr-0.5 shadow-[0_0_10px_2px_#DBFF00]" />
+                <div className="mr-0.5 h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_2px_#DBFF00]" />
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Create Action */}
-      <div className="w-full bg-white/[0.02] border border-dashed border-white/20 rounded-[20px] p-4 backdrop-blur-sm">
+      <section className="glass-panel w-full rounded-[22px] border border-dashed border-white/[0.18] bg-white/[0.025] p-4 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-            <Plus className="w-4 h-4 text-[#DBFF00]" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
+            <Plus className="h-4 w-4 text-[#DBFF00]" />
           </div>
           <input
             value={squadName}
             onChange={(event) => setSquadName(event.target.value)}
-            placeholder="Create a squad"
-            className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded-[14px] py-2.5 px-3.5 outline-none focus:border-[#DBFF00]/50 transition-colors font-mono text-xs placeholder:text-white/20"
+            placeholder={t("team.create.placeholder")}
+            className="min-w-0 flex-1 rounded-[16px] border border-white/10 bg-black/[0.42] px-3.5 py-2.5 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.24] focus:border-[#DBFF00]/[0.42]"
           />
           <button
             type="button"
             onClick={handleCreateSquad}
             disabled={isSubmitting || !waveId}
-            className="bg-[#DBFF00] text-black px-4 py-2.5 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-[#c4e600] transition-colors active:scale-[0.98] disabled:opacity-60"
+            className="depth-button focus-ring flex min-w-[76px] items-center justify-center rounded-[16px] bg-[#DBFF00] px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-[#d3f51c] disabled:opacity-60"
           >
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.create")}
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Leaderboard */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-2 backdrop-blur-xl">
-        <h3 className="text-[11px] uppercase tracking-[0.2em] font-mono text-white/50 p-4 pb-2 flex items-center gap-2">
-          <Crown className="w-4 h-4 text-[#DBFF00]/80" />
-          Squad Leaderboard
+      <section className="glass-panel rounded-[24px] border border-white/10 bg-white/[0.035] p-2 backdrop-blur-2xl">
+        <h3 className="flex items-center gap-2 p-4 pb-2 text-[11px] uppercase tracking-[0.2em] text-white/[0.52]">
+          <Crown className="h-4 w-4 text-[#DBFF00]/80" />
+          {t("team.leaderboard")}
         </h3>
 
-        <div className="flex flex-col gap-1 mt-2">
+        <div className="mt-2 flex flex-col gap-1">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 text-white/40 font-mono text-xs py-8">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading squads
+            <div className="flex items-center justify-center gap-2 py-8 font-mono text-xs text-white/[0.42]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("team.loading")}
             </div>
           ) : loadError ? (
-            <div className="flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
-              <div className="font-mono text-xs text-white/55 uppercase tracking-widest">
-                Squad leaderboard unavailable
+            <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              <div className="font-mono text-xs uppercase tracking-widest text-white/[0.58]">
+                {t("team.unavailable")}
               </div>
-              <div className="max-w-[280px] text-[11px] leading-5 text-white/35 font-mono">
+              <div className="max-w-[280px] font-mono text-[11px] leading-5 text-white/[0.38]">
                 {loadError}
               </div>
               <button
                 type="button"
                 onClick={loadSquads}
-                className="mt-1 inline-flex items-center gap-2 rounded-[14px] border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 transition-colors hover:border-[#DBFF00]/40 hover:bg-[#DBFF00]/10 hover:text-[#DBFF00]"
+                className="depth-button focus-ring mt-1 inline-flex items-center gap-2 rounded-[16px] border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:border-[#DBFF00]/40 hover:bg-[#DBFF00]/10 hover:text-[#DBFF00]"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Retry
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t("common.retry")}
               </button>
             </div>
           ) : squads.length === 0 ? (
-            <div className="text-center text-white/40 font-mono text-xs py-8 uppercase tracking-widest">
-              No squads in this wave yet
+            <div className="py-8 text-center font-mono text-xs uppercase tracking-widest text-white/[0.42]">
+              {t("team.empty")}
             </div>
           ) : (
             squads.map((squad, i) => {
@@ -264,42 +263,42 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
               return (
                 <div
                   key={squad.id}
-                  className={`flex items-center justify-between p-4 rounded-[16px] transition-colors ${
+                  className={`flex items-center justify-between rounded-[18px] border p-4 transition-colors ${
                     i === 0
-                      ? "bg-[#DBFF00]/5 border border-[#DBFF00]/20"
-                      : "hover:bg-white/[0.03] border border-transparent"
+                      ? "border-[#DBFF00]/20 bg-[#DBFF00]/[0.06]"
+                      : "border-transparent hover:bg-white/[0.035]"
                   }`}
                 >
-                  <div className="min-w-0 flex items-center gap-3.5">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-mono text-[10px] font-bold shadow-inner ${
-                      i === 0 ? "bg-[#DBFF00] text-black shadow-[0_0_10px_rgba(219,255,0,0.3)]" : "bg-white/5 text-white/50 border border-white/10"
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold shadow-inner ${
+                      i === 0 ? "bg-[#DBFF00] text-black shadow-[0_0_10px_rgba(219,255,0,0.3)]" : "border border-white/10 bg-white/5 text-white/50"
                     }`}>
                       #{squad.rank}
                     </div>
                     <div className="min-w-0">
-                      <div className={`truncate font-medium text-sm tracking-wide ${i === 0 ? "text-[#DBFF00]" : "text-white/90"}`}>
+                      <div className={`truncate text-sm font-medium tracking-wide ${i === 0 ? "text-[#DBFF00]" : "text-white/90"}`}>
                         {squad.name}
                       </div>
-                      <div className="text-[9px] text-white/40 font-mono uppercase tracking-widest mt-0.5">
-                        {squad.activated_member_count} activated
+                      <div className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42]">
+                        {t("team.activated", { count: squad.activated_member_count })}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="font-mono text-sm text-right flex flex-col items-end">
-                      <span className="tabular-nums font-semibold tracking-tight">${formatNumber(locked * tokenPrice)}</span>
-                      <span className="text-[9px] text-white/40 tabular-nums uppercase tracking-widest mt-0.5">
-                        ~{formatNumber(locked)} 72H
+                    <div className="flex flex-col items-end text-right font-mono text-sm">
+                      <span className="font-semibold tracking-tight tabular-nums">${formatNumber(locked * tokenPrice, locale, { maximumFractionDigits: 0 })}</span>
+                      <span className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42] tabular-nums">
+                        ~{formatNumber(locked, locale, { maximumFractionDigits: 0 })} 72H
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleJoinSquad(squad.id)}
                       disabled={isSubmitting}
-                      className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 hover:text-black hover:bg-[#DBFF00] hover:border-[#DBFF00] transition-colors disabled:opacity-50"
-                      aria-label={`Join ${squad.name}`}
+                      className="depth-button focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/[0.52] hover:border-[#DBFF00] hover:bg-[#DBFF00] hover:text-black disabled:opacity-50"
+                      aria-label={t("team.joinAria", { name: squad.name })}
                     >
-                      <UserPlus className="w-4 h-4" />
+                      <UserPlus className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -307,7 +306,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
             })
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Activity, AlertTriangle, Coins, Gift, Loader2, RefreshCw, Save, ShieldCheck, ToggleLeft, ToggleRight, Users, Waves } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/src/lib/api";
+import LanguageToggle from "@/src/components/LanguageToggle";
+import { formatNumber, useI18n } from "@/src/lib/i18n";
 import type { AdminDashboard, AdminReward, AdminRiskFlag, AdminSquad, AdminWave, AppControl, AppControlKey, MerkleRewardBatch, MerkleRewardProof } from "@/src/lib/types";
 
 type ListKey = "waves" | "risk" | "rewards" | "squads";
@@ -16,10 +18,10 @@ type AdminLists = {
 type ControlDrafts = Record<AppControlKey, string>;
 
 const listTabs = [
-  { key: "waves" as const, label: "Waves", icon: Waves },
-  { key: "risk" as const, label: "Risk", icon: AlertTriangle },
-  { key: "rewards" as const, label: "Rewards", icon: Gift },
-  { key: "squads" as const, label: "Squads", icon: Users },
+  { key: "waves" as const, labelKey: "admin.lists.waves", icon: Waves },
+  { key: "risk" as const, labelKey: "admin.lists.risk", icon: AlertTriangle },
+  { key: "rewards" as const, labelKey: "admin.lists.rewards", icon: Gift },
+  { key: "squads" as const, labelKey: "admin.lists.squads", icon: Users },
 ];
 
 const emptyLists: AdminLists = {
@@ -36,22 +38,22 @@ const controlKeys: AppControlKey[] = [
   "maintenance_banner",
 ];
 
-const controlDetails: Record<AppControlKey, { label: string; detail: string }> = {
+const controlDetails: Record<AppControlKey, { labelKey: string; detailKey: string }> = {
   pause_deposits: {
-    label: "Pause Deposits",
-    detail: "Blocks new deposit prechecks and lock submissions.",
+    labelKey: "admin.controls.pauseDeposits",
+    detailKey: "admin.controls.pauseDepositsDetail",
   },
   pause_reward_claims: {
-    label: "Pause Reward Claims",
-    detail: "Blocks reward claim requests while keeping ledgers visible.",
+    labelKey: "admin.controls.pauseRewardClaims",
+    detailKey: "admin.controls.pauseRewardClaimsDetail",
   },
   pause_referral_rewards: {
-    label: "Pause Referral Rewards",
-    detail: "Stops new referral reward creation from qualifying deposits.",
+    labelKey: "admin.controls.pauseReferralRewards",
+    detailKey: "admin.controls.pauseReferralRewardsDetail",
   },
   maintenance_banner: {
-    label: "Maintenance Banner",
-    detail: "Shows the maintenance notice in the user app.",
+    labelKey: "admin.controls.maintenanceBanner",
+    detailKey: "admin.controls.maintenanceBannerDetail",
   },
 };
 
@@ -62,16 +64,16 @@ const emptyControlDrafts: ControlDrafts = {
   maintenance_banner: "",
 };
 
-function formatInteger(value: string | number | null | undefined) {
+function formatInteger(value: string | number | null | undefined, locale: string) {
   const text = String(value ?? "0");
   if (!/^\d+$/.test(text)) return text;
-  return text.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return formatNumber(text, locale, { maximumFractionDigits: 0 });
 }
 
-function formatDate(value: string) {
+function formatDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -87,14 +89,17 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function EmptyRows() {
+  const { t } = useI18n();
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-10 text-center text-xs uppercase tracking-widest text-white/35">
-      No rows
+      {t("common.noRows")}
     </div>
   );
 }
 
 function AdminListRows({ activeList, lists }: { activeList: ListKey; lists: AdminLists }) {
+  const { locale, t } = useI18n();
+
   if (activeList === "waves") {
     if (lists.waves.length === 0) return <EmptyRows />;
 
@@ -111,20 +116,20 @@ function AdminListRows({ activeList, lists }: { activeList: ListKey; lists: Admi
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-white/55 sm:grid-cols-4">
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Starts</div>
-                <div className="mt-1 tabular-nums">{formatDate(wave.start_time)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.starts")}</div>
+                <div className="mt-1 tabular-nums">{formatDate(wave.start_time, locale)}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Ends</div>
-                <div className="mt-1 tabular-nums">{formatDate(wave.end_time)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.ends")}</div>
+                <div className="mt-1 tabular-nums">{formatDate(wave.end_time, locale)}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Min Lock</div>
-                <div className="mt-1 tabular-nums">{formatInteger(wave.min_lock_amount)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.minLock")}</div>
+                <div className="mt-1 tabular-nums">{formatInteger(wave.min_lock_amount, locale)}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Budget</div>
-                <div className="mt-1 tabular-nums">{formatInteger(wave.reward_budget)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.budget")}</div>
+                <div className="mt-1 tabular-nums">{formatInteger(wave.reward_budget, locale)}</div>
               </div>
             </div>
           </div>
@@ -151,7 +156,7 @@ function AdminListRows({ activeList, lists }: { activeList: ListKey; lists: Admi
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/50">
               <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 uppercase tracking-widest">{flag.severity}</span>
-              <span className="tabular-nums">{formatDate(flag.created_at)}</span>
+              <span className="tabular-nums">{formatDate(flag.created_at, locale)}</span>
               {flag.note ? <span className="min-w-0 truncate text-white/40">{flag.note}</span> : null}
             </div>
           </div>
@@ -178,20 +183,20 @@ function AdminListRows({ activeList, lists }: { activeList: ListKey; lists: Admi
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-white/55 sm:grid-cols-4">
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Final</div>
-                <div className="mt-1 tabular-nums">{formatInteger(reward.final_amount)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.final")}</div>
+                <div className="mt-1 tabular-nums">{formatInteger(reward.final_amount, locale)}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Gross</div>
-                <div className="mt-1 tabular-nums">{formatInteger(reward.gross_amount)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.gross")}</div>
+                <div className="mt-1 tabular-nums">{formatInteger(reward.gross_amount, locale)}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Wave</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.wave")}</div>
                 <div className="mt-1 tabular-nums">#{reward.wave_id}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Created</div>
-                <div className="mt-1 tabular-nums">{formatDate(reward.created_at)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/30">{t("common.created")}</div>
+                <div className="mt-1 tabular-nums">{formatDate(reward.created_at, locale)}</div>
               </div>
             </div>
           </div>
@@ -210,26 +215,26 @@ function AdminListRows({ activeList, lists }: { activeList: ListKey; lists: Admi
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-white/90">{squad.name}</div>
               <div className="mt-1 truncate text-[11px] uppercase tracking-widest text-white/40">
-                captain / {squad.captain_email || squad.captain_user_id}
+                {t("admin.rows.captain")} / {squad.captain_email || squad.captain_user_id}
               </div>
             </div>
             <StatusPill status={squad.status} />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-white/55 sm:grid-cols-4">
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/30">Members</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.members")}</div>
               <div className="mt-1 tabular-nums">{squad.member_count}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/30">Activated</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.activated")}</div>
               <div className="mt-1 tabular-nums">{squad.activated_member_count}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/30">Locked</div>
-              <div className="mt-1 tabular-nums">{formatInteger(squad.total_locked)}</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.locked")}</div>
+              <div className="mt-1 tabular-nums">{formatInteger(squad.total_locked, locale)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/30">Wave</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.rows.wave")}</div>
               <div className="mt-1 tabular-nums">#{squad.wave_id}</div>
             </div>
           </div>
@@ -253,6 +258,7 @@ async function fetchAdminList(key: ListKey, token: string) {
 }
 
 export default function Admin() {
+  const { formatError, locale, t } = useI18n();
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [lists, setLists] = useState<AdminLists>(emptyLists);
   const [controls, setControls] = useState<AppControl[]>([]);
@@ -276,12 +282,12 @@ export default function Admin() {
   const getToken = useCallback(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      setAuthError("Admin token required.");
+      setAuthError(t("admin.tokenRequired"));
       return null;
     }
     setAuthError(null);
     return token;
-  }, []);
+  }, [t]);
 
   const loadDashboard = useCallback(async () => {
     const token = getToken();
@@ -294,7 +300,7 @@ export default function Admin() {
     try {
       setDashboard(await api.adminDashboard(token));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load admin dashboard.";
+      const message = formatError(error, "admin.dashboardFailed");
       setAuthError(message);
       toast.error(message);
     } finally {
@@ -315,7 +321,7 @@ export default function Admin() {
       const rows = await fetchAdminList(key, token);
       setLists((current) => ({ ...current, [key]: rows }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load admin list.";
+      const message = formatError(error, "admin.listFailed");
       setListError(message);
       toast.error(message);
     } finally {
@@ -343,7 +349,7 @@ export default function Admin() {
         return next;
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load emergency controls.";
+      const message = formatError(error, "admin.controlsFailed");
       setControlsError(message);
       toast.error(message);
     } finally {
@@ -366,9 +372,9 @@ export default function Admin() {
         return current.map((control) => (control.key === key ? updated : control));
       });
       setControlDrafts((current) => ({ ...current, [key]: updated.reason || "" }));
-      toast.success(`${controlDetails[key].label} updated.`);
+      toast.success(t("admin.controlUpdated", { label: t(controlDetails[key].labelKey) }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update emergency control.";
+      const message = formatError(error, "admin.controlsFailed");
       setControlsError(message);
       toast.error(message);
     } finally {
@@ -390,7 +396,7 @@ export default function Admin() {
       const latestBatchId = batches[0]?.id;
       setMerkleProofs(await api.adminMerkleProofs(token, latestBatchId));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load Merkle reward state.";
+      const message = formatError(error, "admin.merkleFailed");
       setMerkleError(message);
       toast.error(message);
     } finally {
@@ -405,16 +411,16 @@ export default function Admin() {
     setMerkleError(null);
     try {
       if (!merkleChainId.trim() || !merkleTokenAddress.trim()) {
-        throw new Error("Chain id and token address are required for a draft batch.");
+        throw new Error(t("admin.merkleInputRequired"));
       }
       const result = await api.createAdminMerkleDraftBatch({
         chainId: merkleChainId.trim(),
         tokenAddress: merkleTokenAddress.trim(),
       }, token);
-      toast.success(`Draft Merkle batch created with ${result.proofs.length} proofs.`);
+      toast.success(t("admin.merkleDraftCreated", { count: result.proofs.length }));
       await loadMerkle();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create Merkle draft batch.";
+      const message = formatError(error, "admin.merkleDraftFailed");
       setMerkleError(message);
       toast.error(message);
     } finally {
@@ -439,12 +445,12 @@ export default function Admin() {
   }, [activeList, loadList]);
 
   const stats = [
-    { label: "Current Wave", value: dashboard?.current_wave?.code || "None", detail: dashboard?.current_wave?.status || "No live wave", icon: Waves },
-    { label: "Users", value: formatInteger(dashboard?.total_users), detail: "Total registered", icon: Users },
-    { label: "Positions", value: formatInteger(dashboard?.total_positions), detail: "Total locks", icon: Activity },
-    { label: "Pending Rewards", value: formatInteger(dashboard?.total_rewards_pending), detail: "Final amount", icon: Coins },
-    { label: "Claimed Rewards", value: formatInteger(dashboard?.total_rewards_claimed), detail: "Final amount", icon: Gift },
-    { label: "Open Flags", value: formatInteger(dashboard?.open_risk_flags), detail: "Risk queue", icon: ShieldCheck },
+    { label: t("admin.stats.currentWave"), value: dashboard?.current_wave?.code || t("common.none"), detail: dashboard?.current_wave?.status || t("admin.stats.noLiveWave"), icon: Waves },
+    { label: t("admin.stats.users"), value: formatInteger(dashboard?.total_users, locale), detail: t("admin.stats.totalRegistered"), icon: Users },
+    { label: t("admin.stats.positions"), value: formatInteger(dashboard?.total_positions, locale), detail: t("admin.stats.totalLocks"), icon: Activity },
+    { label: t("admin.stats.pendingRewards"), value: formatInteger(dashboard?.total_rewards_pending, locale), detail: t("admin.stats.finalAmount"), icon: Coins },
+    { label: t("admin.stats.claimedRewards"), value: formatInteger(dashboard?.total_rewards_claimed, locale), detail: t("admin.stats.finalAmount"), icon: Gift },
+    { label: t("admin.stats.openFlags"), value: formatInteger(dashboard?.open_risk_flags, locale), detail: t("admin.stats.riskQueue"), icon: ShieldCheck },
   ];
 
   const controlMap = controls.reduce<Partial<Record<AppControlKey, AppControl>>>((acc, control) => {
@@ -458,15 +464,16 @@ export default function Admin() {
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-6 sm:px-8">
         <header className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.28em] text-[#DBFF00]/70">Admin / Ops</div>
-            <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-white/95">Operations Control Surface</h1>
+            <div className="text-[11px] uppercase tracking-[0.28em] text-[#DBFF00]/70">{t("admin.kicker")}</div>
+            <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-white/95">{t("admin.title")}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <LanguageToggle />
             <a
               href="/"
               className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-widest text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
-              App
+              {t("admin.app")}
             </a>
             <button
               type="button"
@@ -479,7 +486,7 @@ export default function Admin() {
               className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs uppercase tracking-widest text-white/75 transition-colors hover:bg-[#DBFF00] hover:text-black"
             >
               <RefreshCw className="w-4 h-4" />
-              Refresh
+              {t("common.refresh")}
             </button>
           </div>
         </header>
@@ -510,7 +517,7 @@ export default function Admin() {
 
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Emergency Controls</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">{t("admin.controls.title")}</h2>
             <button
               type="button"
               onClick={loadControls}
@@ -518,7 +525,7 @@ export default function Admin() {
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-widest text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isControlsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Retry
+              {t("common.retry")}
             </button>
           </div>
 
@@ -540,8 +547,8 @@ export default function Admin() {
                 <div key={key} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white/90">{details.label}</div>
-                      <div className="mt-1 text-xs text-white/40">{details.detail}</div>
+                      <div className="text-sm font-semibold text-white/90">{t(details.labelKey)}</div>
+                      <div className="mt-1 text-xs text-white/40">{t(details.detailKey)}</div>
                     </div>
                     <span
                       className={`shrink-0 rounded-md border px-2 py-1 text-[10px] uppercase tracking-widest ${
@@ -550,32 +557,32 @@ export default function Admin() {
                           : "border-[#DBFF00]/25 bg-[#DBFF00]/10 text-[#DBFF00]"
                       }`}
                     >
-                      {isControlsLoading ? "Loading" : enabled ? "Enabled" : "Off"}
+                      {isControlsLoading ? t("common.status.loading") : enabled ? t("common.enabled") : t("common.off")}
                     </span>
                   </div>
 
                   <div className="mt-4 grid gap-2 text-xs text-white/45 sm:grid-cols-2">
                     <div>
-                      <div className="text-[10px] uppercase tracking-widest text-white/30">Key</div>
+                      <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.controls.key")}</div>
                       <div className="mt-1 truncate font-mono text-white/60">{key}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] uppercase tracking-widest text-white/30">Updated</div>
+                      <div className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.controls.updated")}</div>
                       <div className="mt-1 truncate tabular-nums text-white/60">
-                        {control?.updated_at ? formatDate(control.updated_at) : "Not loaded"}
+                        {control?.updated_at ? formatDate(control.updated_at, locale) : t("common.loading")}
                       </div>
                     </div>
                   </div>
 
                   <label className="mt-4 block">
-                    <span className="text-[10px] uppercase tracking-widest text-white/30">Reason</span>
+                    <span className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.controls.reason")}</span>
                     <textarea
                       value={controlDrafts[key]}
                       onChange={(event) => setControlDrafts((current) => ({ ...current, [key]: event.target.value }))}
                       disabled={isBusy}
                       rows={3}
                       className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-[#DBFF00]/40 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="Optional operator-facing reason"
+                      placeholder={t("admin.controls.reasonPlaceholder")}
                     />
                   </label>
 
@@ -597,7 +604,7 @@ export default function Admin() {
                       ) : (
                         <ToggleLeft className="w-4 h-4" />
                       )}
-                      {enabled ? "Disable" : "Enable"}
+                      {enabled ? t("common.disable") : t("common.enable")}
                     </button>
                     <button
                       type="button"
@@ -606,7 +613,7 @@ export default function Admin() {
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs uppercase tracking-widest text-white/75 transition-colors hover:bg-[#DBFF00] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Save Reason
+                      {t("common.saveReason")}
                     </button>
                   </div>
                 </div>
@@ -618,8 +625,8 @@ export default function Admin() {
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Merkle Rewards</h2>
-              <p className="mt-1 text-xs text-white/35">Draft/proof visibility only. Claim receipt verification stays fail-closed until chain RPC and ABI are configured.</p>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">{t("admin.merkle.title")}</h2>
+              <p className="mt-1 text-xs text-white/35">{t("admin.merkle.detail")}</p>
             </div>
             <div className="flex gap-2">
               <button
@@ -629,7 +636,7 @@ export default function Admin() {
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-widest text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isMerkleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Refresh
+                {t("common.refresh")}
               </button>
               <button
                 type="button"
@@ -638,7 +645,7 @@ export default function Admin() {
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-2 text-xs uppercase tracking-widest text-[#DBFF00] transition-colors hover:bg-[#DBFF00] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isMerkleCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Create Draft
+                {t("admin.merkle.createDraft")}
               </button>
             </div>
           </div>
@@ -653,7 +660,7 @@ export default function Admin() {
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 lg:col-span-2">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-widest text-white/30">Chain ID</span>
+                  <span className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.merkle.chainId")}</span>
                   <input
                     value={merkleChainId}
                     onChange={(event) => setMerkleChainId(event.target.value)}
@@ -662,19 +669,19 @@ export default function Admin() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-widest text-white/30">Token Address</span>
+                  <span className="text-[10px] uppercase tracking-widest text-white/30">{t("admin.merkle.tokenAddress")}</span>
                   <input
                     value={merkleTokenAddress}
                     onChange={(event) => setMerkleTokenAddress(event.target.value)}
                     className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-[#DBFF00]/40"
-                    placeholder="Production token address"
+                    placeholder={t("admin.merkle.tokenPlaceholder")}
                   />
                 </label>
               </div>
             </div>
 
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/35">Latest Batches</div>
+              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/35">{t("admin.merkle.latestBatches")}</div>
               {isMerkleLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-white/45" />
               ) : merkleBatches.length === 0 ? (
@@ -688,8 +695,8 @@ export default function Admin() {
                         <StatusPill status={batch.status} />
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/45">
-                        <span className="truncate">root {batch.merkle_root}</span>
-                        <span className="text-right tabular-nums">{formatInteger(batch.total_amount_raw)}</span>
+                        <span className="truncate">{t("admin.rows.root")} {batch.merkle_root}</span>
+                        <span className="text-right tabular-nums">{formatInteger(batch.total_amount_raw, locale)}</span>
                       </div>
                     </div>
                   ))}
@@ -698,7 +705,7 @@ export default function Admin() {
             </div>
 
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/35">Latest Proofs</div>
+              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/35">{t("admin.merkle.latestProofs")}</div>
               {isMerkleLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-white/45" />
               ) : merkleProofs.length === 0 ? (
@@ -713,7 +720,7 @@ export default function Admin() {
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/45">
                         <span className="truncate">{proof.beneficiary_wallet}</span>
-                        <span className="text-right tabular-nums">{formatInteger(proof.amount_raw)}</span>
+                        <span className="text-right tabular-nums">{formatInteger(proof.amount_raw, locale)}</span>
                       </div>
                     </div>
                   ))}
@@ -725,7 +732,7 @@ export default function Admin() {
 
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Read-only Lists</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">{t("admin.lists.title")}</h2>
             <div className="grid grid-cols-2 gap-2 sm:flex">
               {listTabs.map((tab) => {
                 const Icon = tab.icon;
@@ -742,7 +749,7 @@ export default function Admin() {
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    {tab.label}
+                    {t(tab.labelKey)}
                   </button>
                 );
               })}
@@ -759,7 +766,7 @@ export default function Admin() {
             {isListLoading ? (
               <div className="flex items-center justify-center gap-2 py-12 text-xs uppercase tracking-widest text-white/40">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Loading
+                {t("common.loading")}
               </div>
             ) : (
               <AdminListRows activeList={activeList} lists={lists} />

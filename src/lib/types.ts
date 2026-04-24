@@ -19,6 +19,17 @@ export interface User {
 export interface AuthResult {
   token: string;
   user: User;
+  wallet?: WalletBinding;
+}
+
+export interface WalletAuthIntent {
+  chain_id: string;
+  wallet_address: string | null;
+  nonce: string;
+  payload: string;
+  domain: string;
+  expires_at: string;
+  intent_token: string;
 }
 
 export interface Wave {

@@ -1,12 +1,17 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { ShareIcon, Download, Zap, Loader2, Copy } from "lucide-react";
+import { Copy, Download, Loader2, ShareIcon, Zap } from "lucide-react";
 import html2canvas from "html2canvas";
+import { formatNumber, useI18n } from "@/src/lib/i18n";
 
-export default function Share({ myDeposit }: any) {
+type ShareProps = {
+  myDeposit: number;
+};
+
+export default function Share({ myDeposit }: ShareProps) {
+  const { locale, t } = useI18n();
   const estimatedReferralValue = myDeposit > 0 ? (myDeposit * 0.01).toFixed(2) : "0.00";
-  const formattedProgress = myDeposit.toLocaleString();
-  
+  const formattedProgress = formatNumber(myDeposit, locale);
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -14,15 +19,15 @@ export default function Share({ myDeposit }: any) {
     if (!posterRef.current) return null;
     try {
       setIsGenerating(true);
-      const canvas = await html2canvas(posterRef.current, { 
-        backgroundColor: null, // Transparent bg
-        scale: 2, 
+      const canvas = await html2canvas(posterRef.current, {
+        backgroundColor: null,
+        scale: 2,
         useCORS: true,
         logging: false,
       });
       return canvas.toDataURL("image/png");
-    } catch(e) {
-      toast.error("Failed to generate poster");
+    } catch {
+      toast.error(t("share.generateFailed"));
       return null;
     } finally {
       setIsGenerating(false);
@@ -30,60 +35,57 @@ export default function Share({ myDeposit }: any) {
   };
 
   const handleDownload = async () => {
-    toast.message("Generating poster for download...");
+    toast.message(t("share.generatingDownload"));
     const dataUrl = await generateImage();
     if (dataUrl) {
-      const link = document.createElement('a');
-      link.download = '72H-Millionaire-Path.png';
+      const link = document.createElement("a");
+      link.download = "72H-Millionaire-Path.png";
       link.href = dataUrl;
       link.click();
-      toast.success("Poster saved to gallery!");
+      toast.success(t("share.saved"));
     }
   };
 
   const handleShare = async () => {
-    toast.message("Preparing shareable card...");
+    toast.message(t("share.preparing"));
     const dataUrl = await generateImage();
     if (!dataUrl) return;
 
     try {
       if (navigator.share) {
         const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], '72H-Millionaire-Path.png', { type: 'image/png' });
-        
+        const file = new File([blob], "72H-Millionaire-Path.png", { type: "image/png" });
+
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
-            title: 'My 72H Millionaire Path',
-            text: 'I joined the 72H gray-test path. App progress is not a chain lock; rewards require verified deposits and claim receipts.',
-            files: [file]
+            title: t("share.nativeTitle"),
+            text: t("share.nativeText"),
+            files: [file],
           });
-          toast.success("Shared successfully!");
+          toast.success(t("share.shared"));
           return;
         }
       }
-      
-      // Fallback if Web Share API with files is not supported
-      const link = document.createElement('a');
-      link.download = '72H-Millionaire-Path.png';
+
+      const link = document.createElement("a");
+      link.download = "72H-Millionaire-Path.png";
       link.href = dataUrl;
       link.click();
-      toast.message("Sharing not supported in browser, starting download instead.");
-    } catch(e: any) {
-      // Abort is normal if user cancels native share dialog
-      if (e.name !== "AbortError") {
-        console.error(e);
-        toast.error("Something went wrong while sharing.");
+      toast.message(t("share.unsupported"));
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        toast.error(t("share.shareFailed"));
       }
     }
   };
 
   const handleCopy = async () => {
-    const textToCopy = `I joined the 72H gray-test path with ${formattedProgress} 72H shown as app-recorded progress, not verified holdings. Referral rewards are estimated at 1% of valid chain-confirmed locks and require claim receipt verification: https://72h.lol`;
+    const textToCopy = t("share.copyText", { amount: formattedProgress });
     try {
       await navigator.clipboard.writeText(textToCopy);
-      toast.success("Gray-test invite text copied.");
-    } catch (err) {
-      toast.error("Failed to copy to clipboard.");
+      toast.success(t("share.copied"));
+    } catch {
+      toast.error(t("share.copyFailed"));
     }
   };
 
@@ -92,147 +94,140 @@ export default function Share({ myDeposit }: any) {
     const rect = posterRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
-    // Calculate rotation (-10 to 10 degrees)
-    const rotateY = ((x / rect.width) - 0.5) * 20;
-    const rotateX = ((y / rect.height) - 0.5) * -20;
-    
-    // Apply transform and update glare
-    posterRef.current.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
-    
+    const rotateY = (x / rect.width - 0.5) * 14;
+    const rotateX = (y / rect.height - 0.5) * -14;
+
+    posterRef.current.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.015, 1.015, 1.015)`;
+
     const glareX = (x / rect.width) * 100;
     const glareY = (y / rect.height) * 100;
-    const glareEl = posterRef.current.querySelector('.poster-glare') as HTMLDivElement;
+    const glareEl = posterRef.current.querySelector(".poster-glare") as HTMLDivElement;
     if (glareEl) {
-      glareEl.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.15) 0%, transparent 60%)`;
-      glareEl.style.opacity = '1';
+      glareEl.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.13) 0%, transparent 58%)`;
+      glareEl.style.opacity = "1";
     }
   };
 
   const handleMouseLeave = () => {
     if (!posterRef.current) return;
-    posterRef.current.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
-    const glareEl = posterRef.current.querySelector('.poster-glare') as HTMLDivElement;
+    posterRef.current.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+    const glareEl = posterRef.current.querySelector(".poster-glare") as HTMLDivElement;
     if (glareEl) {
-      glareEl.style.opacity = '0';
+      glareEl.style.opacity = "0";
     }
   };
 
   return (
-    <div className="px-6 flex flex-col gap-6 pb-10 perspective-1000">
-      
-      {/* Rewards Banner */}
-      <div className="bg-[#DBFF00] rounded-[24px] p-6 text-black flex justify-between items-center shadow-[0_0_40px_rgba(219,255,0,0.15)] relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-[shine_1.5s_ease-in-out]" />
+    <div className="perspective-1000 flex flex-col gap-5 px-6 pb-10">
+      <section className="depth-button group relative flex items-center justify-between overflow-hidden rounded-[24px] bg-[#DBFF00] p-6 text-black shadow-[0_0_42px_rgba(219,255,0,0.14)]">
+        <div className="absolute inset-0 -translate-x-[150%] skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/[0.38] to-transparent group-hover:animate-[shine_1.5s_ease-in-out]" />
         <div className="relative z-10">
-          <div className="text-[10px] uppercase tracking-[0.2em] font-mono font-bold opacity-60 mb-1">
-            Share Signal
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">
+            {t("share.signal")}
           </div>
-          <div className="text-3xl font-mono font-black tracking-tighter tabular-nums flex items-baseline gap-1">
-            <span className="text-[#DBFF00] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">~</span>{estimatedReferralValue} <span className="text-sm font-bold tracking-widest pl-1 opacity-80">72H</span>
+          <div className="flex items-baseline gap-1 font-mono text-3xl font-black tracking-tighter tabular-nums">
+            <span className="text-[#DBFF00] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">~</span>
+            {estimatedReferralValue}
+            <span className="pl-1 text-sm font-bold tracking-widest opacity-80">72H</span>
           </div>
-          <div className="mt-1 text-[9px] uppercase tracking-widest font-mono font-bold opacity-50">
-            1% estimate after valid chain lock
+          <div className="mt-1 text-[9px] font-bold uppercase tracking-widest opacity-52">
+            {t("share.estimate")}
           </div>
         </div>
-        <Zap className="w-10 h-10 opacity-90 drop-shadow-md z-10" />
-      </div>
+        <Zap className="z-10 h-10 w-10 opacity-90 drop-shadow-md" />
+      </section>
 
-      <p className="text-[11px] text-white/50 font-mono text-center mb-0 mt-1 uppercase tracking-widest">
-        Share gray-test poster or copy your invite. App progress is not verified holdings.
+      <p className="mx-auto max-w-[330px] text-center font-mono text-[11px] uppercase leading-5 tracking-widest text-white/[0.52]">
+        {t("share.helper")}
       </p>
 
-      {/* Poster Generator Mock */}
-      <div 
-        className="relative aspect-[3/4] bg-black border-[4px] border-[#1A1A1A] rounded-[32px] overflow-hidden shine-effect shadow-2xl mx-2 cursor-pointer transition-all ease-out" 
-        style={{ transformStyle: 'preserve-3d', transitionDuration: '200ms' }}
+      <section
+        className="shine-effect glass-panel relative mx-2 aspect-[3/4] cursor-pointer overflow-hidden rounded-[30px] border-[4px] border-[#1A1A1A] bg-black shadow-2xl transition-all ease-out"
+        style={{ transformStyle: "preserve-3d", transitionDuration: "200ms" }}
         ref={posterRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="poster-glare absolute inset-0 z-30 pointer-events-none transition-opacity duration-300 opacity-0 mix-blend-screen" />
-        
-        {/* Physical card glare - using slightly more solid colors to ensure html2canvas captures nicely */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-white/10 pointer-events-none z-20" />
-        
-        {/* Background Gradients inside Poster */}
-        <div className="absolute inset-0 bg-[#0A0A0A] z-0" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-[#1f201a] via-[#0A0A0A] to-[#0A0A0A] z-0" />
-        <div className="absolute -bottom-1/2 -right-1/2 w-[150%] h-[150%] bg-[#DBFF00]/10 blur-[60px] rounded-full z-0" />
-        
-        {/* Poster Content */}
-        <div className="absolute inset-0 p-8 flex flex-col z-10">
-          <div className="font-mono text-[10px] tracking-[0.3em] text-[#DBFF00] uppercase">
-            Project 72H
+        <div className="poster-glare pointer-events-none absolute inset-0 z-30 opacity-0 mix-blend-screen transition-opacity duration-300" />
+        <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-tr from-white/5 via-transparent to-white/10" />
+
+        <div className="absolute inset-0 z-0 bg-[#0A0A0A]" />
+        <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_bottom,_#272a1d,_#0A0A0A_52%,_#0A0A0A)]" />
+        <div className="absolute -bottom-1/2 -right-1/2 z-0 h-[150%] w-[150%] rounded-full bg-[#DBFF00]/10 blur-[60px]" />
+
+        <div className="absolute inset-0 z-10 flex flex-col p-8">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#DBFF00]">
+            {t("app.brand.kicker")}
           </div>
-          
-          <div className="flex-1 flex flex-col justify-center">
-            <h2 className="text-5xl font-bold leading-[0.9] tracking-tighter mb-4 text-white">
-              I am on the<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-br from-white via-white/80 to-white/10">
-                Millionaire
+
+          <div className="flex flex-1 flex-col justify-center">
+            <h2 className="mb-4 text-5xl font-bold leading-[0.9] tracking-tighter text-white">
+              {t("share.poster.line1")}<br />
+              <span className="bg-gradient-to-br from-white via-white/80 to-white/10 bg-clip-text text-transparent">
+                {t("share.poster.line2")}
               </span><br />
-              Path.
+              {t("share.poster.line3")}
             </h2>
-            
-            <div className="mt-8 relative">
-              <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#DBFF00] to-transparent" />
-              <div className="pl-5 py-1">
-                <div className="text-[9px] uppercase tracking-widest text-[#DBFF00]/80 font-mono mb-1.5">
-                  Gray-Test Progress
+
+            <div className="relative mt-8">
+              <div className="absolute bottom-0 left-0 top-0 w-[2px] bg-gradient-to-b from-[#DBFF00] to-transparent" />
+              <div className="py-1 pl-5">
+                <div className="mb-1.5 font-mono text-[9px] uppercase tracking-widest text-[#DBFF00]/80">
+                  {t("share.poster.progress")}
                 </div>
-                <div className="font-mono text-2xl text-white tabular-nums tracking-tighter">
-                  {formattedProgress} <span className="text-sm tracking-widest opacity-50 font-normal text-white">72H</span>
+                <div className="font-mono text-2xl tracking-tighter text-white tabular-nums">
+                  {formattedProgress} <span className="text-sm font-normal tracking-widest text-white/50">72H</span>
                 </div>
-                <div className="mt-1 text-[8px] uppercase tracking-widest text-white/35 font-mono leading-4">
-                  Not verified holdings
+                <div className="mt-1 font-mono text-[8px] uppercase leading-4 tracking-widest text-white/35">
+                  {t("share.poster.notHoldings")}
                 </div>
               </div>
             </div>
           </div>
-          
-          {/* Footer of Poster */}
-          <div className="w-full flex justify-between items-end pt-6">
+
+          <div className="flex w-full items-end justify-between pt-6">
             <div className="flex flex-col gap-1.5">
-              <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-mono">Scan to Join Gray Test</span>
-              <span className="text-[10px] font-mono tracking-widest text-white/70">72H.LOL</span>
+              <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-white/30">{t("share.poster.scan")}</span>
+              <span className="font-mono text-[10px] tracking-widest text-white/70">72H.LOL</span>
             </div>
-            {/* Mock QR Code */}
-            <div className="w-14 h-14 bg-white/90 rounded-xl p-1.5 shadow-[0_0_20px_rgba(219,255,0,0.1)]">
-              <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHBhdGggZD0iTTAgMGg4djhIMHptMTAgMGg4djhIMTB6TTAgMTBoOHY4SDB6bTEwIDEwaDh2OEgxMHoiIGZpbGw9IiMwMDAiLz48L3N2Zz4=')] opacity-80 bg-repeat bg-cover mix-blend-multiply" />
+            <div className="h-14 w-14 rounded-xl bg-white/90 p-1.5 shadow-[0_0_20px_rgba(219,255,0,0.1)]">
+              <div className="h-full w-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHBhdGggZD0iTTAgMGg4djhIMHptMTAgMGg4djhIMTB6TTAgMTBoOHY4SDB6bTEwIDEwaDh2OEgxMHoiIGZpbGw9IiMwMDAiLz48L3N2Zz4=')] bg-cover bg-repeat opacity-80 mix-blend-multiply" />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Actions */}
-      <div className="flex gap-3 mt-2 mx-2">
-        <button 
+      <div className="mx-2 mt-1 flex gap-3">
+        <button
+          type="button"
           onClick={handleShare}
           disabled={isGenerating}
-          className="flex-1 bg-white text-black font-semibold rounded-[20px] py-4 flex items-center justify-center gap-2.5 hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          className="depth-button focus-ring flex flex-1 items-center justify-center gap-2.5 rounded-[20px] bg-white py-4 font-semibold text-black shadow-lg hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShareIcon className="w-4 h-4" />}
-          <span className="text-sm tracking-wide">{isGenerating ? "Generating..." : "Share"}</span>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShareIcon className="h-4 w-4" />}
+          <span className="text-sm tracking-wide">{isGenerating ? t("share.generating") : t("share.share")}</span>
         </button>
-        <button 
+        <button
+          type="button"
           onClick={handleCopy}
           disabled={isGenerating}
-          className="w-[64px] flex shrink-0 items-center justify-center border border-white/10 bg-white/[0.02] backdrop-blur-md rounded-[20px] hover:bg-white/5 hover:border-white/20 transition-colors active:scale-[0.95] disabled:opacity-50 disabled:cursor-not-allowed group"
-          title="Copy Link"
+          className="depth-button focus-ring group flex w-[64px] shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.025] backdrop-blur-xl hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+          title={t("share.copy")}
+          aria-label={t("share.copy")}
         >
-          <Copy className="w-5 h-5 text-white/80 group-hover:text-white transition-colors" />
+          <Copy className="h-5 w-5 text-white/80 transition-colors group-hover:text-white" />
         </button>
-        <button 
+        <button
+          type="button"
           onClick={handleDownload}
           disabled={isGenerating}
-          className="w-[64px] flex shrink-0 items-center justify-center border border-white/10 bg-white/[0.02] backdrop-blur-md rounded-[20px] hover:bg-white/5 hover:border-white/20 transition-colors active:scale-[0.95] disabled:opacity-50 disabled:cursor-not-allowed group"
-          title="Download Poster"
+          className="depth-button focus-ring group flex w-[64px] shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.025] backdrop-blur-xl hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+          title={t("share.download")}
+          aria-label={t("share.download")}
         >
-          <Download className="w-5 h-5 text-white/80 group-hover:text-white transition-colors" />
+          <Download className="h-5 w-5 text-white/80 transition-colors group-hover:text-white" />
         </button>
       </div>
-
     </div>
   );
 }

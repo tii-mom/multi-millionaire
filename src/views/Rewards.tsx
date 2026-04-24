@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import { CheckCircle2, Coins, Gift, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { motion } from "motion/react";
 import { api } from "@/src/lib/api";
+import { formatNumber, useI18n } from "@/src/lib/i18n";
+import { readBackendAuthToken, readTonWalletSession } from "@/src/lib/tonSession";
 import type { RewardLedger, RewardSummary } from "@/src/lib/types";
 
 const emptySummary: RewardSummary = {
@@ -11,26 +13,8 @@ const emptySummary: RewardSummary = {
   claimed_amount: "0",
 };
 
-function formatAmount(value: string) {
-  return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-
-function rewardStatusLabel(status: RewardLedger["status"]) {
-  switch (status) {
-    case "pending":
-      return "review required";
-    case "approved":
-      return "proof may be available";
-    case "claimed":
-      return "claim record; receipt required";
-    case "rejected":
-      return "rejected";
-    default:
-      return status;
-  }
-}
-
 export default function Rewards() {
+  const { formatError, locale, t } = useI18n();
   const [summary, setSummary] = useState<RewardSummary>(emptySummary);
   const [rewards, setRewards] = useState<RewardLedger[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,8 +22,23 @@ export default function Rewards() {
   const [proofLoadingId, setProofLoadingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const rewardStatusLabel = (status: RewardLedger["status"]) => {
+    switch (status) {
+      case "pending":
+        return t("rewards.status.pending");
+      case "approved":
+        return t("rewards.status.approved");
+      case "claimed":
+        return t("rewards.status.claimed");
+      case "rejected":
+        return t("rewards.status.rejected");
+      default:
+        return status;
+    }
+  };
+
   const loadRewards = useCallback(async () => {
-    const token = localStorage.getItem("auth_token");
+    const token = readBackendAuthToken();
     setLoadError(null);
     if (!token) {
       setSummary(emptySummary);
@@ -57,7 +56,7 @@ export default function Rewards() {
       setSummary(nextSummary);
       setRewards(nextRewards);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load rewards.";
+      const message = formatError(error, "rewards.unavailable");
       setLoadError(message);
       setSummary(emptySummary);
       setRewards([]);
@@ -65,162 +64,172 @@ export default function Rewards() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [formatError]);
 
   useEffect(() => {
     loadRewards();
   }, [loadRewards]);
 
   const handleClaim = async (ledgerId: string) => {
-    const token = localStorage.getItem("auth_token");
+    const walletSession = readTonWalletSession();
+    if (!walletSession) {
+      toast.error(t("rewards.signInClaim"));
+      return;
+    }
+    const token = readBackendAuthToken();
     if (!token) {
-      toast.error("Sign in before recording a legacy staging claim.");
+      toast.error(t("rewards.backendAuthPending"));
       return;
     }
 
     setClaimingId(ledgerId);
     try {
       await api.claimReward(ledgerId, token);
-      toast.success("Legacy staging claim recorded. This is not an on-chain claim receipt.");
+      toast.success(t("rewards.claimRecorded"));
       await loadRewards();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to record legacy staging claim.";
-      toast.error(message);
+      toast.error(formatError(error, "rewards.claimFailed"));
     } finally {
       setClaimingId(null);
     }
   };
 
   const handleProof = async (ledgerId: string) => {
-    const token = localStorage.getItem("auth_token");
+    const walletSession = readTonWalletSession();
+    if (!walletSession) {
+      toast.error(t("rewards.signInProof"));
+      return;
+    }
+    const token = readBackendAuthToken();
     if (!token) {
-      toast.error("Sign in before loading a claim proof.");
+      toast.error(t("rewards.backendAuthPending"));
       return;
     }
     setProofLoadingId(ledgerId);
     try {
       const proof = await api.merkleClaimProof(ledgerId, token);
-      toast.success(`Merkle proof available: ${proof.proof.length} proof nodes.`);
+      toast.success(t("rewards.proofAvailable", { count: proof.proof.length }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Merkle proof is not available yet.";
-      toast.error(message);
+      toast.error(formatError(error, "rewards.proofUnavailable"));
     } finally {
       setProofLoadingId(null);
     }
   };
 
   return (
-    <div className="px-6 flex flex-col gap-6 pb-10">
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-6 backdrop-blur-xl relative overflow-hidden">
-        <div className="absolute -right-10 -top-10 w-32 h-32 bg-[#DBFF00]/10 blur-3xl rounded-full" />
-        <div className="relative z-10 flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2 text-white/50">
-            <Gift className="w-5 h-5" />
-            <span className="text-[11px] uppercase tracking-widest font-mono">Reward Ledger</span>
+    <div className="flex flex-col gap-5 px-6 pb-10">
+      <section className="glass-panel relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#DBFF00]/[0.08] blur-3xl" />
+        <div className="relative z-10 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white/[0.52]">
+            <Gift className="h-5 w-5" />
+            <span className="text-[11px] uppercase tracking-widest">{t("rewards.title")}</span>
           </div>
-          <div className="text-[9px] uppercase tracking-widest font-mono text-[#DBFF00]/70 border border-[#DBFF00]/20 bg-[#DBFF00]/10 rounded-full px-3 py-1.5">
-            Receipt-gated
+          <div className="rounded-full border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-1.5 text-[9px] uppercase tracking-widest text-[#DBFF00]/75">
+            {t("rewards.receiptGated")}
           </div>
         </div>
 
-        <div className="relative z-10 mb-5 rounded-[16px] border border-white/10 bg-black/30 px-4 py-3 text-[10px] leading-5 text-white/45 font-mono uppercase tracking-wider">
-          Ledger amounts are records, not wallet holdings. Proof shows Merkle eligibility; a reward is final only after backend verifies a chain claim receipt.
+        <div className="relative z-10 mb-5 rounded-[18px] border border-white/10 bg-black/30 px-4 py-3 font-mono text-[10px] uppercase leading-5 tracking-wider text-white/[0.46]">
+          {t("rewards.notice")}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 relative z-10">
+        <div className="relative z-10 grid grid-cols-3 gap-2">
           {[
-            ["Review", summary.pending_amount],
-            ["Proof-ready", summary.approved_amount],
-            ["Recorded", summary.claimed_amount],
+            [t("rewards.review"), summary.pending_amount],
+            [t("rewards.proofReady"), summary.approved_amount],
+            [t("rewards.recorded"), summary.claimed_amount],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-[16px] border border-white/10 bg-black/30 px-3 py-4">
-              <div className="text-[9px] uppercase tracking-widest font-mono text-white/35 mb-2">{label}</div>
+            <div key={label} className="rounded-[18px] border border-white/10 bg-black/30 px-3 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="mb-2 text-[9px] uppercase tracking-widest text-white/35">{label}</div>
               <motion.div
                 key={value}
                 initial={{ opacity: 0.6 }}
                 animate={{ opacity: 1 }}
-                className="text-[#DBFF00] font-mono text-lg font-semibold tabular-nums"
+                className="font-mono text-lg font-semibold text-[#DBFF00] tabular-nums"
               >
-                {formatAmount(value)}
+                {formatNumber(value, locale, { maximumFractionDigits: 0 })}
               </motion.div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-2 backdrop-blur-xl">
-        <h3 className="text-[11px] uppercase tracking-[0.2em] font-mono text-white/50 p-4 pb-2 flex items-center gap-2">
-          <Coins className="w-4 h-4 text-[#DBFF00]/80" />
-          Referral Reward Records
+      <section className="glass-panel rounded-[24px] border border-white/10 bg-white/[0.035] p-2 backdrop-blur-2xl">
+        <h3 className="flex items-center gap-2 p-4 pb-2 text-[11px] uppercase tracking-[0.2em] text-white/[0.52]">
+          <Coins className="h-4 w-4 text-[#DBFF00]/80" />
+          {t("rewards.records")}
         </h3>
 
-        <div className="flex flex-col gap-1 mt-2">
+        <div className="mt-2 flex flex-col gap-1">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 text-white/40 font-mono text-xs py-8">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading rewards
+            <div className="flex items-center justify-center gap-2 py-8 font-mono text-xs text-white/[0.42]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("rewards.loading")}
             </div>
           ) : loadError ? (
-            <div className="flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
-              <div className="font-mono text-xs text-white/55 uppercase tracking-widest">
-                Reward records unavailable
+            <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              <div className="font-mono text-xs uppercase tracking-widest text-white/[0.58]">
+                {t("rewards.unavailable")}
               </div>
-              <div className="max-w-[280px] text-[11px] leading-5 text-white/35 font-mono">
+              <div className="max-w-[280px] font-mono text-[11px] leading-5 text-white/[0.38]">
                 {loadError}
               </div>
               <button
                 type="button"
                 onClick={loadRewards}
-                className="mt-1 inline-flex items-center gap-2 rounded-[14px] border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 transition-colors hover:border-[#DBFF00]/40 hover:bg-[#DBFF00]/10 hover:text-[#DBFF00]"
+                className="depth-button focus-ring mt-1 inline-flex items-center gap-2 rounded-[16px] border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:border-[#DBFF00]/40 hover:bg-[#DBFF00]/10 hover:text-[#DBFF00]"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Retry
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t("common.retry")}
               </button>
             </div>
           ) : rewards.length === 0 ? (
-            <div className="text-center text-white/40 font-mono text-xs py-8 uppercase tracking-widest">
-              No reward records yet
+            <div className="py-8 text-center font-mono text-xs uppercase tracking-widest text-white/[0.42]">
+              {t("rewards.empty")}
             </div>
           ) : (
             rewards.map((reward) => (
               <div
                 key={reward.id}
-                className="flex items-center justify-between gap-3 p-4 rounded-[16px] transition-colors hover:bg-white/[0.03] border border-transparent"
+                className="flex items-center justify-between gap-3 rounded-[18px] border border-transparent p-4 transition-colors hover:bg-white/[0.035]"
               >
-                <div className="min-w-0 flex items-center gap-3.5">
-                  <div className="w-8 h-8 rounded-full bg-white/5 text-[#DBFF00] border border-white/10 flex items-center justify-center">
-                    {reward.status === "approved" ? <CheckCircle2 className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+                <div className="flex min-w-0 items-center gap-3.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#DBFF00]">
+                    {reward.status === "approved" ? <CheckCircle2 className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-medium text-sm tracking-wide text-white/90 truncate">
+                    <div className="truncate text-sm font-medium tracking-wide text-white/90">
                       {reward.reward_type.replace(/_/g, " ")}
                     </div>
-                    <div className="text-[9px] text-white/40 font-mono uppercase tracking-widest mt-0.5">
+                    <div className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42]">
                       {rewardStatusLabel(reward.status)} · wave #{reward.wave_id}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="font-mono text-sm text-right flex flex-col items-end">
-                    <span className="tabular-nums font-semibold tracking-tight text-[#DBFF00]">{formatAmount(reward.final_amount)}</span>
-                    <span className="text-[9px] text-white/40 tabular-nums uppercase tracking-widest mt-0.5">72H</span>
+                  <div className="flex flex-col items-end text-right font-mono text-sm">
+                    <span className="font-semibold tracking-tight text-[#DBFF00] tabular-nums">
+                      {formatNumber(reward.final_amount, locale, { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42] tabular-nums">72H</span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <button
                       type="button"
                       onClick={() => handleProof(reward.id)}
                       disabled={reward.status !== "approved" || proofLoadingId === reward.id}
-                      className="min-w-[64px] bg-[#DBFF00]/10 text-[#DBFF00] border border-[#DBFF00]/20 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-[#DBFF00] hover:text-black hover:border-[#DBFF00] transition-colors disabled:opacity-40 disabled:hover:bg-[#DBFF00]/10 disabled:hover:text-[#DBFF00] disabled:hover:border-[#DBFF00]/20"
+                      className="depth-button focus-ring min-w-[68px] rounded-[14px] border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#DBFF00] hover:border-[#DBFF00] hover:bg-[#DBFF00] hover:text-black disabled:opacity-40 disabled:hover:border-[#DBFF00]/20 disabled:hover:bg-[#DBFF00]/10 disabled:hover:text-[#DBFF00]"
                     >
-                      {proofLoadingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Proof"}
+                      {proofLoadingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.proof")}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleClaim(reward.id)}
                       disabled={reward.status !== "approved" || claimingId === reward.id}
-                      className="min-w-[64px] bg-white/10 text-white border border-white/10 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-white/15 transition-colors disabled:opacity-40"
+                      className="depth-button focus-ring min-w-[68px] rounded-[14px] border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/15 disabled:opacity-40"
                     >
-                      {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Stub"}
+                      {claimingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.stub")}
                     </button>
                   </div>
                 </div>
@@ -228,7 +237,7 @@ export default function Rewards() {
             ))
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

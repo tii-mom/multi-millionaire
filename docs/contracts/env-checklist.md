@@ -177,7 +177,7 @@ Operator signing is not required for the first receipt-to-position path if users
 - [x] Provide testnet MerkleClaim address, deployment LT, ABI/wrapper, and reward proof format.
 - [x] Exercise local wallet binding with `WALLET_SIGNATURE_MODE=test` for receipt apply canary.
 - [x] Add backend TON Connect `ton_proof` verifier for production wallet binding.
-- [ ] Wire frontend TON Connect proof submission to the backend verifier.
+- [x] Wire frontend TON Connect proof submission to the backend verifier.
 - [ ] Provide deposit, price, reward batch, and reward claim fixtures that line up with the parser tests.
 - [ ] Decide whether backend operator signing is in scope for Sprint 2 or postponed.
 - [ ] Decide when `chain_events` and wallet migrations may be applied to shared staging.

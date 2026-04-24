@@ -3,42 +3,105 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { THEME, TonConnectUIProvider } from "@tonconnect/ui-react";
 import Home from "./views/Home";
 import Team from "./views/Team";
 import Rewards from "./views/Rewards";
 import Share from "./views/Share";
 import Admin from "./views/Admin";
 import BottomNav from "./components/BottomNav";
+import LanguageToggle from "./components/LanguageToggle";
 import { Toaster } from "@/src/components/ui/sonner";
-import { AnimatePresence, motion } from "motion/react";
+import { LanguageProvider, formatNumber, useI18n } from "@/src/lib/i18n";
 
 export default function App() {
+  const manifestUrl =
+    typeof window === "undefined"
+      ? "/tonconnect-manifest.json"
+      : `${window.location.origin}/tonconnect-manifest.json`;
+
+  return (
+    <TonConnectUIProvider
+      manifestUrl={manifestUrl}
+      restoreConnection
+      uiPreferences={{
+        theme: THEME.DARK,
+        borderRadius: "m",
+        colorsSet: {
+          [THEME.DARK]: {
+            accent: "#DBFF00",
+            connectButton: {
+              background: "#DBFF00",
+              foreground: "#050505",
+            },
+            background: {
+              primary: "#080808",
+              secondary: "#111111",
+              segment: "#1A1A1A",
+              tint: "#DBFF00",
+              qr: "#FFFFFF",
+            },
+            text: {
+              primary: "#F7F7F7",
+              secondary: "rgba(255,255,255,0.62)",
+            },
+          },
+        },
+      }}
+      actionsConfiguration={{ returnStrategy: "back" }}
+    >
+      <LanguageProvider>
+        <AppRoutes />
+      </LanguageProvider>
+    </TonConnectUIProvider>
+  );
+}
+
+function AppRoutes() {
   const isAdminRoute = window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
 
   if (isAdminRoute) {
     return (
       <>
         <Admin />
-        <Toaster
-          toastOptions={{
-            className: "bg-[#111] border-white/10 text-white font-mono text-xs rounded-2xl",
-          }}
-          position="top-center"
-        />
+        <AppToaster />
       </>
     );
   }
 
-  return <MainApp />;
+  return (
+    <>
+      <MainApp />
+      <AppToaster />
+    </>
+  );
+}
+
+function AppToaster() {
+  return (
+    <Toaster
+      theme="dark"
+      toastOptions={{
+        classNames: {
+          toast: "border-white/10 bg-[#111]/95 text-white shadow-2xl backdrop-blur-xl font-mono text-xs rounded-2xl",
+          title: "text-white",
+          description: "text-white/70",
+        },
+      }}
+      position="top-center"
+    />
+  );
 }
 
 function MainApp() {
+  const { locale, t } = useI18n();
+  const shellRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState("home");
-  const [direction, setDirection] = useState(0); // For animating tabs
-
-  // App Global State (Persistent locally)
-  const [tokenPrice, setTokenPrice] = useState(1.42);
+  const [direction, setDirection] = useState(0);
+  const [tokenPrice] = useState(1.42);
   const [myDeposit, setMyDeposit] = useState(() => {
     const saved = localStorage.getItem("72h_deposit");
     return saved ? Number(saved) : 0;
@@ -47,11 +110,13 @@ function MainApp() {
     const saved = localStorage.getItem("72h_goal");
     return saved ? Number(saved) : 5000000;
   });
-  const targetValue = 1000000; // $1,000,000
+  const targetValue = 1000000;
 
-  // Persist State Changes
   useEffect(() => localStorage.setItem("72h_deposit", myDeposit.toString()), [myDeposit]);
   useEffect(() => localStorage.setItem("72h_goal", squadGoal.toString()), [squadGoal]);
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [activeTab]);
 
   const handleSetTab = (newTab: string) => {
     const tabs = ["home", "team", "rewards", "share"];
@@ -61,11 +126,17 @@ function MainApp() {
     setActiveTab(newTab);
   };
 
+  const handleShellPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--pointer-x", `${event.clientX - rect.left}px`);
+    event.currentTarget.style.setProperty("--pointer-y", `${event.clientY - rect.top}px`);
+  };
+
   const variants = {
     initial: (dir: number) => ({
       opacity: 0,
-      x: dir * 20,
-      scale: 0.98,
+      x: dir * 18,
+      scale: 0.992,
     }),
     animate: {
       opacity: 1,
@@ -74,87 +145,81 @@ function MainApp() {
     },
     exit: (dir: number) => ({
       opacity: 0,
-      x: dir * -20,
-      scale: 0.98,
+      x: dir * -18,
+      scale: 0.992,
     }),
   };
 
   return (
-    <div className="dark min-h-screen bg-[#050505] text-white font-sans flex justify-center overflow-hidden selection:bg-[#DBFF00]/30 selection:text-[#DBFF00]">
-      <div className="w-full max-w-[480px] h-[100dvh] flex flex-col relative sm:border-x sm:border-white/[0.05] shadow-2xl bg-black">
-        {/* Grain Texture */}
+    <div className="app-viewport dark flex min-h-screen justify-center overflow-hidden font-sans text-white selection:bg-[#DBFF00]/30 selection:text-[#DBFF00]">
+      <div
+        ref={shellRef}
+        onPointerMove={handleShellPointerMove}
+        onPointerLeave={() => {
+          shellRef.current?.style.setProperty("--pointer-x", "50%");
+          shellRef.current?.style.setProperty("--pointer-y", "18%");
+        }}
+        className="app-shell relative flex h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#060606] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:border-x sm:border-white/[0.06]"
+      >
         <div className="grain-overlay" />
-        {/* Scanlines Effect */}
         <div className="scanlines" />
 
-        {/* Background Video */}
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.25] mix-blend-screen"
-          >
-            <source src="https://72h.lol/72hours.mp4" type="video/mp4" />
-          </video>
-          {/* Advanced gradient overlay to seamlessly blend the video into the dark UI */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-transparent via-[#050505]/80 to-[#050505]" />
+        <div className="app-background" />
+
+        <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
+          <LanguageToggle />
+          <div className="flex items-center gap-2 rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+            <div className="h-1.5 w-1.5 rounded-full bg-amber-100" />
+            <span className="text-[10px] font-medium tracking-widest text-amber-50/90">{t("app.env.staging")}</span>
+          </div>
         </div>
 
-        {/* Ambient Top Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100%] h-[200px] bg-gradient-to-b from-[#DBFF00]/10 to-transparent blur-[50px] pointer-events-none z-0" />
-
-        <div className="absolute top-4 right-6 flex items-center gap-2 bg-amber-300/10 border border-amber-300/20 rounded-full px-3 py-1.5 z-20 backdrop-blur-md shadow-lg">
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-200" />
-          <span className="text-[10px] font-mono text-amber-100 tracking-widest pl-0.5">Staging</span>
-        </div>
-
-        <header className="px-6 pt-16 pb-6 shrink-0 flex items-center justify-between z-10 relative">
-          <div className="flex flex-col gap-1.5">
+        <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-5 pt-20">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#DBFF00] shadow-[0_0_8px_#DBFF00] animate-pulse" />
-              <h1 className="text-[10px] uppercase tracking-[0.25em] text-white/50 font-mono font-medium">
-                Project 72H
+              <div className="h-2 w-2 rounded-full bg-[#DBFF00] shadow-[0_0_10px_#DBFF00]" />
+              <h1 className="truncate text-[10px] font-medium uppercase tracking-[0.25em] text-white/[0.48]">
+                {t("app.brand.kicker")}
               </h1>
             </div>
-            <div className="text-xl font-semibold tracking-tight text-white/90">
-              Millionaire Path
+            <div className="mt-2 truncate text-[22px] font-semibold tracking-tight text-white/95">
+              {t("app.brand.name")}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1 top-terminal-panel">
+
+          <div className="top-terminal-panel flex shrink-0 flex-col items-end gap-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-white/40 font-mono">Display Price</span>
-              <svg className="w-2.5 h-2.5 text-[#DBFF00]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <span className="text-[9px] uppercase tracking-widest text-white/[0.38]">{t("app.price.label")}</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-[#DBFF00]/85" />
             </div>
-            <div className="text-[#DBFF00] font-mono text-[17px] font-medium flex items-center gap-2 tabular-nums">
+            <div className="flex items-center gap-2 font-mono text-[17px] font-semibold text-[#DBFF00] tabular-nums">
               <motion.span
                 key={tokenPrice}
                 initial={{ opacity: 0.5, color: "#fff" }}
                 animate={{ opacity: 1, color: "#DBFF00" }}
-                transition={{ duration: 0.8 }}
+                transition={{ duration: 0.55 }}
               >
-                ${tokenPrice.toFixed(3)}
+                ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </motion.span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-amber-300/10 text-amber-100 font-bold tracking-wider">
-                off-chain
+              <span className="rounded-full bg-amber-200/10 px-2 py-0.5 text-[9px] font-bold tracking-wider text-amber-50/80">
+                {t("app.price.offChain")}
               </span>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden z-10 pb-28 pt-2 no-scrollbar scroll-smooth relative">
-          <AnimatePresence mode="popLayout" custom={direction} initial={false}>
+        <main ref={mainRef} className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-1 no-scrollbar scroll-smooth">
+          <AnimatePresence mode="wait" custom={direction} initial={false}>
             {activeTab === "home" && (
               <motion.div
                 key="home"
                 custom={direction}
                 variants={variants}
-                initial="initial" animate="animate" exit="exit"
-                transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                className="w-full absolute left-0 top-0 mb-28"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+                className="w-full"
               >
                 <Home tokenPrice={tokenPrice} myDeposit={myDeposit} setMyDeposit={setMyDeposit} targetValue={targetValue} />
               </motion.div>
@@ -164,9 +229,11 @@ function MainApp() {
                 key="team"
                 custom={direction}
                 variants={variants}
-                initial="initial" animate="animate" exit="exit"
-                transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                className="w-full absolute left-0 top-0 mb-28"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+                className="w-full"
               >
                 <Team tokenPrice={tokenPrice} myDeposit={myDeposit} squadGoal={squadGoal} setSquadGoal={setSquadGoal} />
               </motion.div>
@@ -176,9 +243,11 @@ function MainApp() {
                 key="rewards"
                 custom={direction}
                 variants={variants}
-                initial="initial" animate="animate" exit="exit"
-                transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                className="w-full absolute left-0 top-0 mb-28"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+                className="w-full"
               >
                 <Rewards />
               </motion.div>
@@ -188,11 +257,13 @@ function MainApp() {
                 key="share"
                 custom={direction}
                 variants={variants}
-                initial="initial" animate="animate" exit="exit"
-                transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                className="w-full absolute left-0 top-0 mb-28"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+                className="w-full"
               >
-                <Share myDeposit={myDeposit} setMyDeposit={setMyDeposit} />
+                <Share myDeposit={myDeposit} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -200,12 +271,6 @@ function MainApp() {
 
         <BottomNav activeTab={activeTab} setActiveTab={handleSetTab} />
       </div>
-      <Toaster
-        toastOptions={{
-          className: "bg-[#111] border-white/10 text-white font-mono text-xs rounded-2xl",
-        }}
-        position="top-center"
-      />
     </div>
   );
 }

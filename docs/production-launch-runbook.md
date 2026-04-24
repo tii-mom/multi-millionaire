@@ -222,8 +222,8 @@ Real chain-backed production still requires verified production values for:
 
 - mainnet contract addresses and ABIs that match the production network
 - production RPC provider URLs and failover policy
-- frontend TON Connect proof submission to the backend `WALLET_SIGNATURE_MODE=ton_proof`
-  verifier
+- production smoke for TON Connect proof submission to the backend
+  `WALLET_SIGNATURE_MODE=ton_proof` verifier
 - finality/confirmation depth and replay protection rules
 - frontend TonConnect transaction builders for LockVault Jetton transfer and
   MerkleClaim `ClaimReward`

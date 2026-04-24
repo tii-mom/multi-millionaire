@@ -19,6 +19,7 @@ import type {
   RewardSummary,
   SquadLeaderboardRow,
   Wave,
+  WalletAuthIntent,
   WalletBindIntent,
   WalletBinding,
 } from "./types";
@@ -75,6 +76,20 @@ export const api = {
     return requestJson<AuthResult>("/v1/auth/login", {
       method: "POST",
       body: { email, password },
+    });
+  },
+
+  createWalletAuthIntent(walletAddress?: string) {
+    return requestJson<WalletAuthIntent>("/v1/auth/wallet-intent", {
+      method: "POST",
+      body: walletAddress ? { walletAddress } : {},
+    });
+  },
+
+  walletLogin(input: { walletAddress: string; signature: string; intentToken: string; walletType?: string | null }) {
+    return requestJson<AuthResult>("/v1/auth/wallet", {
+      method: "POST",
+      body: input,
     });
   },
 
