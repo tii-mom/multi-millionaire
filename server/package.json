@@ -12,7 +12,8 @@
     "migrate:up": "ts-node src/scripts/migrate.ts up",
     "migrate:reset": "ts-node src/scripts/migrate.ts reset",
     "seed:dev": "ts-node src/scripts/seedDev.ts",
-    "smoke": "ts-node src/scripts/smoke.ts"
+    "smoke": "ts-node src/scripts/smoke.ts",
+    "smoke:production": "ts-node src/scripts/productionSmoke.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

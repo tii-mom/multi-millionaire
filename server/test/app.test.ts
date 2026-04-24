@@ -62,10 +62,18 @@ describe('API integration tests', () => {
   });
 
   it('GET /v1/app/bootstrap should return bootstrap payload', async () => {
+    delete process.env.RECEIPT_VERIFICATION_ENABLED;
+    delete process.env.CHAIN_RECEIPT_VERIFIER;
+
     const res = await request(app).get('/v1/app/bootstrap');
     expect(res.status).toBe(200);
     expect(res.body.data).toBeDefined();
     expect(res.body.data.current_wave).toBeDefined();
     expect(res.body.data.latest_price).toBeDefined();
+    expect(res.body.data.ops.receipt_verifier).toMatchObject({
+      configured: false,
+      status: 'disabled',
+      mode: 'disabled',
+    });
   });
 });

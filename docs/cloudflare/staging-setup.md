@@ -23,15 +23,19 @@ contains the Cloudflare backend staging host, not a Vercel/Neon endpoint.
   - Hyperdrive caching: `disabled`
 - Backend staging health checks:
   - `GET /health`: `200`
-  - `GET /ready`: `200`
-  - readiness payload: `{"status":"ready","database":"ok"}`
+  - latest live `GET /ready` check in this thread: `503`
+  - latest readiness payload: `{"status":"not_ready","database":"error"}`
+  - earlier RC1 smoke readiness result: `200`, `database=ok`
 - Real Cloudflare smoke result:
   - run id: `cf-20260424-rc1-final`
   - status: `pass`
+- Functional assessment:
+  - RC1 candidate validation: `pass`
+  - sustainable RC1 environment: `blocked`
 
-## Working Database Route
+## Temporary Database Route
 
-The final working Cloudflare-first route is:
+The current temporary Cloudflare-first route is:
 
 `Cloudflare Worker -> Hyperdrive -> Workers VPC Service -> Cloudflare Tunnel -> existing Postgres`
 
@@ -56,7 +60,9 @@ Details:
 Operational note:
 
 - this staging path remains dependent on the local PostgreSQL process and the
-  running local `cloudflared` tunnel session staying up on this machine
+  local `cloudflared` tunnel session staying up on this machine
+- the latest live check found `/health=200` but `/ready=503`, which is
+  consistent with the tunnel-backed data plane being unavailable
 - Earlier exploratory VPC Service:
   - service id: `019dbb2e-01d8-7ef3-9d24-1d58ba219294`
   - name: `mm-pg-staging-tcp`
@@ -90,6 +96,28 @@ migrated to D1.
   - `admin@example.com`
   - `member@example.com`
   - `risk@example.com`
+
+## Sustainability Assessment
+
+- Target route:
+  `Cloudflare Worker -> Hyperdrive -> managed Postgres`
+- Single blocker:
+  `No managed Postgres instance and connection string are provisioned for
+  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be
+  rerun on a persistent origin.`
+- Verified temporary-origin facts on 2026-04-24:
+  - `wrangler hyperdrive get 88b8cd7fd84e4064ad29b43a16c579f2` still reports
+    `service_id=019dbb34-5edb-7101-804f-1a62f6a9c105`
+  - `wrangler vpc service get 019dbb34-5edb-7101-804f-1a62f6a9c105` resolves to
+    `127.0.0.1:5432`
+  - local Postgres is running from `/tmp/mm-pg`
+  - the latest process check did not find a running `cloudflared` process
+  - `brew services list` shows `cloudflared` and `postgresql@14` as `none`
+- The persistent cutover plan and fallback operating notes are tracked in
+  `docs/cloudflare/persistent-db-plan.md`.
+- After Hyperdrive points to managed Postgres, migrations and seed pass on that
+  origin, and a new full Cloudflare smoke passes, the sustainable RC1 blocker
+  can be removed.
 
 ## Commands Used
 
@@ -146,6 +174,9 @@ npm run smoke
 
 ## RC1 State
 
-- Current blocker count: `0`
-- Current status: Cloudflare staging is usable
-- RC1 recommendation: ready to enter Cloudflare RC1
+- Current blocker count: `1`
+- Current status: prior Cloudflare smoke supports internal RC1 candidate
+  evidence, but the latest live readiness check is failing
+- Sustainable RC1 status: not yet achieved
+- RC1 recommendation: acceptable for current RC1 candidate work, not yet a
+  sustainable RC1 environment

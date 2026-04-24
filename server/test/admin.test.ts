@@ -20,6 +20,8 @@ const userToken = jwt.sign({ userId: 'normal-user', email: 'user@example.com' },
 describe('Admin read API', () => {
   beforeEach(() => {
     process.env.ADMIN_EMAILS = 'admin@example.com';
+    delete process.env.RECEIPT_VERIFICATION_ENABLED;
+    delete process.env.CHAIN_RECEIPT_VERIFIER;
     getAdminDashboardMock.mockReset();
     listAdminRewardsMock.mockReset();
   });
@@ -81,5 +83,18 @@ describe('Admin read API', () => {
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].status).toBe('approved');
     expect(listAdminRewardsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes ops diagnostics for admins', async () => {
+    const res = await request(app)
+      .get('/v1/admin/ops')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.receipt_verifier).toMatchObject({
+      configured: false,
+      status: 'disabled',
+      mode: 'disabled',
+    });
   });
 });

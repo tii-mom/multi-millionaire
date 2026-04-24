@@ -40,6 +40,7 @@ export interface BootstrapData {
   latest_price: unknown;
   me: User | null;
   feature_flags: Record<string, boolean>;
+  controls?: Record<string, { enabled: boolean; reason: string | null }>;
 }
 
 export interface Position {
@@ -50,6 +51,62 @@ export interface Position {
   onchain_position_id: string;
   qualifies_for_activation: boolean;
   is_first_qualifying_for_user: boolean;
+}
+
+export type WalletBindingStatus = 'pending' | 'verified' | 'revoked';
+export type WalletBindIntentStatus = 'pending' | 'verified' | 'expired' | 'cancelled';
+
+export interface WalletBindIntent {
+  id: string;
+  user_id: string;
+  chain_id: string;
+  wallet_address: string;
+  normalized_address: string;
+  nonce: string;
+  message_domain: string;
+  signable_message: string;
+  status: WalletBindIntentStatus;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WalletBinding {
+  id: string;
+  user_id: string;
+  chain_id: string;
+  wallet_address: string;
+  normalized_address: string;
+  wallet_type: string | null;
+  status: WalletBindingStatus;
+  is_primary: boolean;
+  verified_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChainEvent {
+  id: string;
+  chain_id: string;
+  contract_address: string;
+  contract_role: string;
+  event_name: string;
+  tx_hash: string;
+  log_index: number;
+  block_number: string;
+  block_time: string;
+  finalized: boolean;
+  payload: Record<string, unknown>;
+  apply_status: string;
+  review_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DepositReceiptResult {
+  position: Position;
+  chain_event: ChainEvent;
 }
 
 export interface SquadLeaderboardRow {

@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { getCurrentWave } from '../models/waveModel';
 import { getLatestConfirmedPrice } from '../models/priceModel';
+import { listAppControls } from '../models/opsModel';
+import { loadContractIntegrationConfig } from '../services/contracts/config';
+import { getReceiptVerifierDiagnostics } from '../services/receiptVerifier';
 
 /**
  * Handles GET /v1/app/bootstrap
@@ -14,6 +17,8 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
   try {
     const wave = await getCurrentWave();
     const price = await getLatestConfirmedPrice();
+    const controls = await listAppControls().catch(() => []);
+    const contractConfig = loadContractIntegrationConfig();
     // TODO: Resolve actual user from auth token. Here we provide a minimal stub.
     const me = null;
     const contracts = {
@@ -23,6 +28,8 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
       oracle: process.env.ORACLE_ADDRESS || '',
       reward_distributor: process.env.REWARD_DISTRIBUTOR_ADDRESS || '',
     };
+    const controlMap = Object.fromEntries(controls.map((control) => [control.key, { enabled: control.enabled, reason: control.reason }]));
+    const receiptVerifier = getReceiptVerifierDiagnostics();
     return res.json({
       request_id: req.id || '',
       data: {
@@ -34,7 +41,18 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
         feature_flags: {
           permit_supported: false,
           poster_enabled: false,
+          wallet_binding_enabled: process.env.WALLET_BINDING_ENABLED === 'true',
+          receipt_verification_enabled: contractConfig.receipt.enabled,
+          chain_mainline_writes_enabled: contractConfig.mainlineWritesEnabled,
         },
+        ops: {
+          receipt_verifier: {
+            configured: receiptVerifier.configured,
+            status: receiptVerifier.status,
+            mode: receiptVerifier.mode,
+          },
+        },
+        controls: controlMap,
       },
     });
   } catch (err) {

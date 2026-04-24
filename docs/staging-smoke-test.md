@@ -6,7 +6,8 @@
 - Date: `2026-04-24`
 - Backend staging URL: `https://multi-millionaire-api-staging.348421501.workers.dev`
 - Frontend staging URL: `https://staging.multi-millionaire-staging.pages.dev`
-- Database route: `Hyperdrive + existing Postgres`
+- Database route used by this evidence:
+  `Hyperdrive -> VPC Service -> Tunnel -> local Postgres`
 - Smoke run id: `cf-20260424-rc1-final`
 - Smoke status: `pass`
 - Runtime: `NODE_ENV=staging`
@@ -18,6 +19,20 @@ This document separates:
 2. Earlier local rehearsal evidence against the prepared origin database
 
 Only the first one counts as Cloudflare RC1 evidence.
+
+## Evidence Classification
+
+This smoke proves that the deployed Cloudflare Worker completed the RC1
+functional path against the temporary tunnel-backed Postgres route at the time
+of the run. It does not prove a sustainable RC1 environment because the data
+plane still depended on a workstation-local Postgres process and an interactive
+Cloudflare Tunnel session.
+
+As of the latest live check in this thread, `/health` returns `200` but
+`/ready` returns `503` with `database=error`. After Hyperdrive is repointed to
+managed Postgres, migrations and seed must be rerun on that origin and this
+full Cloudflare smoke must be rerun before the RC1 decision can change to
+`sustainable RC1 environment: yes`.
 
 ## Real Cloudflare Smoke Result
 

@@ -7,6 +7,7 @@ import { createRewardLedger } from '../models/rewardModel';
 import { createRiskFlag } from '../models/riskModel';
 import { activateSquadMember } from '../models/squadModel';
 import { query } from '../db';
+import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
 
 function calculateDirectReward(amountRaw: string, rewardRateBps: number, perInviteCapRaw: string): { grossAmount: string; finalAmount: string } {
   const grossAmount = (BigInt(amountRaw) * BigInt(rewardRateBps)) / BigInt(10000);
@@ -60,7 +61,9 @@ export async function depositPrecheck(req: Request, res: Response, next: NextFun
           bound: !!req.user,
           primary_wallet: null,
         },
-        notes: [],
+        notes: productionChainRequired()
+          ? ['Production deposits require wallet binding and a verified chain receipt.']
+          : ['Current deposit endpoint records an off-chain staging deposit stub.'],
       },
     });
   } catch (err) {
@@ -82,6 +85,18 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
     if (!user) {
       return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
     }
+    if (productionChainRequired()) {
+      return res.status(409).json({
+        request_id: req.id || '',
+        error: {
+          code: 'CHAIN_RECEIPT_REQUIRED',
+          message: 'Production deposits must use /v1/waves/:waveId/deposit-receipt with a verified chain receipt',
+        },
+      });
+    }
+    if (await isControlEnabled('pause_deposits')) {
+      return res.status(423).json({ request_id: req.id || '', error: { code: 'DEPOSITS_PAUSED', message: 'Deposits are temporarily paused' } });
+    }
     const waveId = Number(req.params.waveId);
     const { amount } = req.body;
     if (!amount) {
@@ -98,7 +113,7 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
     }
     // Ensure the wave is valid and live
     const wave = await getWaveById(waveId);
-    if (!wave || wave.status !== 'live') {
+    if (!wave || wave.status !== 'live' || wave.deposits_disabled) {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WAVE', message: 'Wave is not live' } });
     }
     // Determine if deposit qualifies for activation
@@ -125,7 +140,7 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
       qualifies,
       isFirst
     );
-    if (qualifies && isFirst) {
+    if (qualifies && isFirst && !(await isControlEnabled('pause_referral_rewards'))) {
       const referral = await getReferral(user.id);
       if (referral?.inviter_user_id && referral.inviter_user_id !== user.id) {
         const rewardAmounts = calculateDirectReward(amount, wave.direct_reward_rate_bps, wave.per_invite_cap);

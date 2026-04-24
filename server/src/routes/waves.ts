@@ -2,6 +2,7 @@ import express from 'express';
 import { getCurrent, getById } from '../controllers/waveController';
 import { claimPass } from '../controllers/passController';
 import { depositPrecheck, deposit } from '../controllers/positionController';
+import { depositReceipt } from '../controllers/chainController';
 import { requireAuth } from '../middlewares/auth';
 import squadsRouter from './squads';
 import { requireFields, requirePositiveIntParam } from '../middlewares/validation';
@@ -33,6 +34,16 @@ router.post(
   requirePositiveIntParam('waveId'),
   requireFields('body', ['amount']),
   deposit
+);
+
+// POST /v1/waves/:waveId/deposit-receipt
+router.post(
+  '/:waveId/deposit-receipt',
+  requireAuth,
+  depositRateLimit,
+  requirePositiveIntParam('waveId'),
+  requireFields('body', ['txHash']),
+  depositReceipt
 );
 
 export default router;

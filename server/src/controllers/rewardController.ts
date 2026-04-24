@@ -7,6 +7,7 @@ import {
   RewardStatus,
 } from '../models/rewardModel';
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
+import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
 
 const allowedStatuses = new Set<RewardStatus>(['pending', 'approved', 'claimed', 'rejected']);
 
@@ -55,6 +56,18 @@ export async function claimReward(req: Request, res: Response, next: NextFunctio
     const user = req.user;
     if (!user) {
       return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
+    }
+    if (await isControlEnabled('pause_reward_claims')) {
+      return res.status(423).json({ request_id: req.id || '', error: { code: 'REWARD_CLAIMS_PAUSED', message: 'Reward claims are temporarily paused' } });
+    }
+    if (productionChainRequired()) {
+      return res.status(409).json({
+        request_id: req.id || '',
+        error: {
+          code: 'CHAIN_REWARD_CLAIM_REQUIRED',
+          message: 'Production reward claims must be confirmed by the chain-backed reward distribution flow',
+        },
+      });
     }
 
     const ledgerId = req.params.ledgerId;

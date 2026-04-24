@@ -116,11 +116,20 @@ const stagingRequired: EnvCheck[] = [
 
 const contractEnv: EnvCheck[] = [
   { name: 'CHAIN_ID', hint: 'Target chain identifier. Current RC1 smoke records off-chain stubs only.' },
-  { name: 'RPC_URL', hint: 'RPC endpoint for future on-chain lock/settlement integration.', validate: (value) => validateUrl(value) },
+  { name: 'CHAIN_RPC_URL', hint: 'RPC endpoint for chain-backed lock/settlement integration.', validate: (value) => validateUrl(value) },
   { name: 'TOKEN_ADDRESS', hint: 'Token contract address for future on-chain lock integration.' },
   { name: 'LOCK_VAULT_ADDRESS', hint: 'Lock vault contract address. Currently documented as a stub boundary.' },
   { name: 'ORACLE_ADDRESS', hint: 'Oracle contract address. Currently documented as a stub boundary.' },
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Reward distributor address. Current claim API is an off-chain status update stub.' },
+];
+
+const productionChainRecommended: EnvCheck[] = [
+  { name: 'CHAIN_INTEGRATION_ENABLED', hint: 'Set true only after production chain resources are ready.' },
+  { name: 'CHAIN_MAINLINE_WRITES_ENABLED', hint: 'Must remain false until production chain writes are approved.' },
+  { name: 'WALLET_BINDING_ENABLED', hint: 'Enable only when wallet signature verification is configured.' },
+  { name: 'WALLET_BINDING_MESSAGE_DOMAIN', hint: 'Domain included in wallet binding signable messages.' },
+  { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Enable only when chain receipt verification is configured.' },
+  { name: 'RECEIPT_REQUIRED_CONFIRMATIONS', hint: 'Finality confirmations required before applying receipts.', validate: (value) => validateInteger(value) },
 ];
 
 const profileChecks: Record<Profile, { required: EnvCheck[]; recommended: EnvCheck[] }> = {
@@ -146,6 +155,7 @@ const profileChecks: Record<Profile, { required: EnvCheck[]; recommended: EnvChe
     ],
     recommended: [
       { name: 'API_BASE_URL', hint: 'Production API base URL for manual smoke checks only.', validate: (value) => validateUrl(value) },
+      ...productionChainRecommended,
     ],
   },
 };

@@ -7,11 +7,14 @@ import type {
   AdminWave,
   AuthResult,
   BootstrapData,
+  DepositReceiptResult,
   Position,
   RewardLedger,
   RewardSummary,
   SquadLeaderboardRow,
   Wave,
+  WalletBindIntent,
+  WalletBinding,
 } from "./types";
 
 type RequestOptions = {
@@ -81,6 +84,34 @@ export const api = {
       method: "POST",
       token,
       body: { amount },
+    });
+  },
+
+  createWalletBindIntent(walletAddress: string, token: string) {
+    return requestJson<WalletBindIntent>("/v1/wallet/bind-intent", {
+      method: "POST",
+      token,
+      body: { walletAddress },
+    });
+  },
+
+  bindWallet(input: { nonce: string; walletAddress: string; signature: string; walletType?: string | null }, token: string) {
+    return requestJson<WalletBinding>("/v1/wallet/bind", {
+      method: "POST",
+      token,
+      body: input,
+    });
+  },
+
+  myWallets(token: string) {
+    return requestJson<WalletBinding[]>("/v1/wallet/me", { token });
+  },
+
+  submitDepositReceipt(waveId: number, input: { txHash: string; amount?: string; walletAddress?: string }, token: string) {
+    return requestJson<DepositReceiptResult>(`/v1/waves/${waveId}/deposit-receipt`, {
+      method: "POST",
+      token,
+      body: input,
     });
   },
 

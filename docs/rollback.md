@@ -28,6 +28,19 @@ API_BASE_URL="$API_BASE_URL" npm run smoke
 
 For production, run only non-mutating checks unless an explicit production smoke window has been approved.
 
+## Emergency Controls
+
+If user-facing behavior is unsafe but the platform remains reachable, pause
+affected flows before rollback:
+
+- `pause_deposits`
+- `pause_reward_claims`
+- `pause_referral_rewards`
+- `maintenance_banner`
+
+Environment variable overrides are available through `PAUSE_DEPOSITS`,
+`PAUSE_REWARD_CLAIMS`, and `PAUSE_REFERRAL_REWARDS`.
+
 ## Database Rollback
 
 The current migration tool supports `up` and controlled `reset`; it does not provide down migrations. The rollback strategy is:
@@ -50,3 +63,7 @@ Do not run `npm run migrate:reset` against production. It drops application tabl
 - Deposit records are database rows, not chain positions.
 - Reward claims are database status changes, not token transfers.
 - There is no on-chain reversal path for RC1 because no on-chain lock or reward transfer is executed by the current API stubs.
+
+For production chain releases, rollback cannot undo finalized chain
+transactions. The incident owner must separate application rollback from chain
+reconciliation and user support.

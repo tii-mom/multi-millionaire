@@ -74,6 +74,16 @@ Optional controls:
 
 The smoke script prints a JSON report with top-level `status`, step-level `pass` or `fail`, generated account emails, created IDs, and failure details. It exits non-zero when any required step fails.
 
+For production, use the non-mutating smoke instead:
+
+```bash
+API_BASE_URL="https://api.example.com" npm run smoke:production
+```
+
+Production smoke is GET-only and checks `/health`, `/ready`,
+`/v1/app/bootstrap`, and `/v1/waves/current`. It does not register users,
+deposit, claim rewards, or call admin endpoints.
+
 ## Smoke Coverage
 
 The RC1 smoke path covers:

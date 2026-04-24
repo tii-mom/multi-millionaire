@@ -1,0 +1,30 @@
+import { getAppControl } from '../models/opsModel';
+
+export function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+export function isTruthyEnv(value: string | undefined): boolean {
+  if (!value) return false;
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+export async function isControlEnabled(key: string): Promise<boolean> {
+  const envKey = key.toUpperCase();
+  if (isTruthyEnv(process.env[envKey])) {
+    return true;
+  }
+  if (!isProductionRuntime() && !isTruthyEnv(process.env.APP_CONTROLS_DB_ENABLED)) {
+    return false;
+  }
+  try {
+    const control = await getAppControl(key);
+    return !!control?.enabled;
+  } catch {
+    return false;
+  }
+}
+
+export function productionChainRequired(): boolean {
+  return isProductionRuntime() || isTruthyEnv(process.env.CHAIN_MAINLINE_WRITES_ENABLED);
+}

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { ArrowRight, KeyRound, LogOut, Wallet, Target, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "@/src/lib/api";
+import type { BootstrapData, WalletBindIntent, WalletBinding } from "@/src/lib/types";
 
 interface HomeProps {
   tokenPrice: number;
@@ -18,8 +19,16 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const [password, setPassword] = useState("");
   const [authToken, setAuthToken] = useState(() => localStorage.getItem("auth_token"));
   const [waveId, setWaveId] = useState<number | null>(null);
+  const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletSignature, setWalletSignature] = useState("");
+  const [bindIntent, setBindIntent] = useState<WalletBindIntent | null>(null);
+  const [wallets, setWallets] = useState<WalletBinding[]>([]);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [txHash, setTxHash] = useState("");
+  const [receiptLoading, setReceiptLoading] = useState(false);
   const availableBalance = 2450000 - myDeposit; // Make balance strictly dynamic according to local storage changes
 
   useEffect(() => {
@@ -28,8 +37,11 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     async function loadBootstrap() {
       try {
         const data = await api.bootstrap();
-        if (!cancelled && data.current_wave?.wave_id) {
-          setWaveId(Number(data.current_wave.wave_id));
+        if (!cancelled) {
+          setBootstrap(data);
+          if (data.current_wave?.wave_id) {
+            setWaveId(Number(data.current_wave.wave_id));
+          }
         }
       } catch {
         // The API is optional while developing the standalone frontend.
@@ -50,6 +62,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const clearToken = () => {
     setAuthToken(null);
     localStorage.removeItem("auth_token");
+    setWallets([]);
+    setBindIntent(null);
     toast.message("Signed out.");
   };
 
@@ -76,6 +90,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   };
 
   const handleDeposit = async () => {
+    if (bootstrap?.controls?.pause_deposits?.enabled) {
+      toast.error(bootstrap.controls.pause_deposits.reason || "Deposits are paused.");
+      return;
+    }
     const val = Number(inputValue);
     if (!val || val <= 0) {
       toast.error("Enter a valid amount");
@@ -97,6 +115,11 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     if (!waveId) {
       setApiError("No active Wave loaded from backend.");
       toast.error("No active Wave available.");
+      return;
+    }
+    if (bootstrap?.feature_flags?.chain_mainline_writes_enabled) {
+      setApiError("Production deposits require the wallet binding and receipt submit form.");
+      toast.error("Wallet transaction flow required.");
       return;
     }
 
@@ -123,12 +146,155 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     }
   };
 
+  const loadWallets = async () => {
+    if (!authToken) return;
+
+    try {
+      setWallets(await api.myWallets(authToken));
+    } catch {
+      // Wallet binding is optional in staging/off-chain mode.
+    }
+  };
+
+  const requestBindIntent = async () => {
+    if (!chainMainlineEnabled) {
+      setApiError("Wallet binding is disabled while chain mainline writes are off.");
+      return;
+    }
+    if (!authToken) {
+      setApiError("Sign in before binding a wallet.");
+      return;
+    }
+    if (!walletAddress.trim()) {
+      setApiError("Wallet address is required.");
+      return;
+    }
+
+    setWalletLoading(true);
+    setApiError(null);
+
+    try {
+      const intent = await api.createWalletBindIntent(walletAddress.trim(), authToken);
+      setBindIntent(intent);
+      setWalletSignature("");
+      toast.success("Wallet bind nonce created.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Wallet bind intent failed.";
+      setApiError(message);
+      toast.error(message);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const submitWalletBind = async () => {
+    if (!chainMainlineEnabled) {
+      setApiError("Wallet binding is disabled while chain mainline writes are off.");
+      return;
+    }
+    if (!authToken || !bindIntent) {
+      setApiError("Create a wallet bind nonce first.");
+      return;
+    }
+    if (!walletSignature.trim()) {
+      setApiError("Signature is required.");
+      return;
+    }
+
+    setWalletLoading(true);
+    setApiError(null);
+
+    try {
+      const wallet = await api.bindWallet(
+        {
+          nonce: bindIntent.nonce,
+          walletAddress: walletAddress.trim(),
+          signature: walletSignature.trim(),
+        },
+        authToken
+      );
+      setWallets((current) => [wallet, ...current.filter((item) => item.id !== wallet.id)]);
+      setBindIntent(null);
+      setWalletSignature("");
+      toast.success("Wallet binding submitted.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Wallet binding failed.";
+      setApiError(message);
+      toast.error(message);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const submitReceipt = async () => {
+    if (!chainMainlineEnabled) {
+      setApiError("Receipt submit is disabled while chain mainline writes are off.");
+      return;
+    }
+    if (!authToken) {
+      setApiError("Sign in before submitting a receipt.");
+      return;
+    }
+    if (!waveId) {
+      setApiError("No active Wave loaded from backend.");
+      return;
+    }
+    if (!txHash.trim()) {
+      setApiError("Transaction hash is required.");
+      return;
+    }
+
+    setReceiptLoading(true);
+    setApiError(null);
+
+    try {
+      const result = await api.submitDepositReceipt(
+        waveId,
+        {
+          txHash: txHash.trim(),
+          amount: inputValue || undefined,
+          walletAddress: walletAddress.trim() || undefined,
+        },
+        authToken
+      );
+      setMyDeposit((p: number) => p + Number(result.position.amount_raw || 0));
+      setTxHash("");
+      setInputValue("");
+      toast.success("Deposit receipt submitted for backend verification.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Receipt submit failed.";
+      setApiError(message);
+      toast.error(message);
+    } finally {
+      setReceiptLoading(false);
+    }
+  };
+
   const currentFiatValue = myDeposit * tokenPrice;
   const progressPercent = Math.min((currentFiatValue / targetValue) * 100, 100);
   const needed72H = Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
+  const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
+  const depositsPaused = !!bootstrap?.controls?.pause_deposits?.enabled;
+  const maintenanceBanner = bootstrap?.controls?.maintenance_banner;
+  const chainActionDisabled = !chainMainlineEnabled || !authToken || depositsPaused;
+
+  useEffect(() => {
+    if (authToken && chainMainlineEnabled) {
+      loadWallets();
+    }
+  }, [authToken, chainMainlineEnabled]);
 
   return (
     <div className="px-6 flex flex-col gap-6 pb-10">
+      {(maintenanceBanner?.enabled || depositsPaused || !chainMainlineEnabled) && (
+        <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-[11px] font-mono leading-relaxed text-amber-100">
+          {maintenanceBanner?.enabled
+            ? maintenanceBanner.reason || "Maintenance mode is active."
+            : depositsPaused
+              ? bootstrap?.controls?.pause_deposits?.reason || "Deposits are paused."
+              : "Staging mode: deposits and reward claims are backend records until the chain receipt flow is enabled."}
+        </div>
+      )}
       {/* Account Section */}
       <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-5 backdrop-blur-xl relative overflow-hidden">
         <div className="absolute -left-10 -top-10 w-24 h-24 bg-[#DBFF00]/10 blur-3xl rounded-full" />
@@ -337,10 +503,93 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               </div>
             </div>
           </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/25 p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-mono">Wallet Binding</div>
+                <div className="text-[11px] text-white/35 font-mono mt-1">
+                  {chainMainlineEnabled ? "Bind a verified wallet before submitting a chain receipt." : "Staging/off-chain: chain writes are disabled by feature flag."}
+                </div>
+              </div>
+              <div className={`text-[9px] uppercase tracking-widest font-mono ${chainMainlineEnabled ? "text-[#DBFF00]" : "text-amber-200"}`}>
+                {chainMainlineEnabled ? "Chain Enabled" : "Off-Chain"}
+              </div>
+            </div>
+
+            <input
+              type="text"
+              value={walletAddress}
+              onChange={(event) => setWalletAddress(event.target.value)}
+              placeholder="walletAddress"
+              disabled={chainActionDisabled || walletLoading}
+              className="w-full bg-[#050505]/60 border border-white/10 rounded-xl px-3 py-3 outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-xs placeholder:text-white/20 disabled:opacity-50"
+            />
+
+            {bindIntent && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <div className="text-[9px] uppercase tracking-widest text-white/35 font-mono mb-2">Signable Message</div>
+                <pre className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-white/55 font-mono">{bindIntent.signable_message}</pre>
+              </div>
+            )}
+
+            <input
+              type="text"
+              value={walletSignature}
+              onChange={(event) => setWalletSignature(event.target.value)}
+              placeholder="signature"
+              disabled={chainActionDisabled || walletLoading || !bindIntent}
+              className="w-full bg-[#050505]/60 border border-white/10 rounded-xl px-3 py-3 outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-xs placeholder:text-white/20 disabled:opacity-50"
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={requestBindIntent}
+                disabled={chainActionDisabled || walletLoading || !walletAddress.trim()}
+                className="rounded-xl border border-white/10 bg-white/10 py-3 text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {walletLoading ? "Working..." : "Get Nonce"}
+              </button>
+              <button
+                type="button"
+                onClick={submitWalletBind}
+                disabled={chainActionDisabled || walletLoading || !bindIntent || !walletSignature.trim()}
+                className="rounded-xl bg-[#DBFF00] py-3 text-[10px] font-bold uppercase tracking-widest text-black disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Bind Wallet
+              </button>
+            </div>
+
+            {wallets.length > 0 && (
+              <div className="text-[10px] font-mono text-white/45">
+                Bound: {wallets[0].wallet_address} ({wallets[0].status})
+              </div>
+            )}
+
+            <div className="h-px bg-white/10" />
+
+            <input
+              type="text"
+              value={txHash}
+              onChange={(event) => setTxHash(event.target.value)}
+              placeholder="txHash receipt submit"
+              disabled={chainActionDisabled || receiptLoading}
+              className="w-full bg-[#050505]/60 border border-white/10 rounded-xl px-3 py-3 outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-xs placeholder:text-white/20 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={submitReceipt}
+              disabled={chainActionDisabled || receiptLoading || !txHash.trim()}
+              className="rounded-xl border border-[#DBFF00]/20 bg-[#DBFF00]/10 py-3 text-[10px] font-bold uppercase tracking-widest text-[#DBFF00] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {receiptLoading ? "Submitting..." : "Submit Receipt"}
+            </button>
+          </div>
           
           <button 
             onClick={handleDeposit}
-            disabled={isConfirming || !inputValue || Number(inputValue) <= 0}
+            disabled={isConfirming || chainMainlineEnabled || !inputValue || Number(inputValue) <= 0}
             className="w-full bg-[#DBFF00] text-black shadow-[0_0_20px_rgba(219,255,0,0.15)] rounded-2xl py-4 flex items-center justify-center gap-2 hover:bg-[#c4e600] transition-all active:scale-[0.98] font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
           >
             {/* Shimmer effect inside button */}
@@ -353,7 +602,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               </>
             ) : (
               <>
-                <span>Lock & Deposit</span>
+                <span>{chainMainlineEnabled ? "Use Receipt Form Above" : "Record Staging Deposit"}</span>
                 <ArrowRight className="w-5 h-5" />
               </>
             )}
@@ -362,7 +611,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           <div className="flex items-center justify-between w-full mt-2">
             <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 font-mono flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-              72H Lock • Gas paid by user
+              {chainMainlineEnabled ? "Chain receipt required" : "Off-chain staging record"}
             </p>
             {/* Network Pulse Tracker */}
             <div className="flex items-center gap-1.5 opacity-50">
