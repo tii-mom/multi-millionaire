@@ -17,7 +17,8 @@
     "contract:build": "blueprint build LockVault && blueprint build MerkleClaim",
     "contract:test": "blueprint test",
     "test": "jest",
-    "contract:deploy:testnet": "tsx scripts/deployTestnetContracts.ts"
+    "contract:deploy:testnet": "tsx scripts/deployTestnetContracts.ts",
+    "contract:canary:deposit:testnet": "tsx scripts/sendTestnetDeposit.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

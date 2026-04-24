@@ -5,6 +5,7 @@ import html2canvas from "html2canvas";
 
 export default function Share({ myDeposit }: any) {
   const estimatedReferralValue = myDeposit > 0 ? (myDeposit * 0.01).toFixed(2) : "0.00";
+  const formattedProgress = myDeposit.toLocaleString();
   
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -53,7 +54,7 @@ export default function Share({ myDeposit }: any) {
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             title: 'My 72H Millionaire Path',
-            text: 'I joined the 72H gray-test path. Chain verification is required before any real lock or reward claim.',
+            text: 'I joined the 72H gray-test path. App progress is not a chain lock; rewards require verified deposits and claim receipts.',
             files: [file]
           });
           toast.success("Shared successfully!");
@@ -77,10 +78,10 @@ export default function Share({ myDeposit }: any) {
   };
 
   const handleCopy = async () => {
-    const textToCopy = `I joined the 72H gray-test path with ${myDeposit.toLocaleString()} 72H shown as app-recorded progress. Real locks and rewards require chain verification: https://72h.lol`;
+    const textToCopy = `I joined the 72H gray-test path with ${formattedProgress} 72H shown as app-recorded progress, not verified holdings. Referral rewards are estimated at 1% of valid chain-confirmed locks and require claim receipt verification: https://72h.lol`;
     try {
       await navigator.clipboard.writeText(textToCopy);
-      toast.success("App link & deposit copied to clipboard!");
+      toast.success("Gray-test invite text copied.");
     } catch (err) {
       toast.error("Failed to copy to clipboard.");
     }
@@ -131,14 +132,14 @@ export default function Share({ myDeposit }: any) {
             <span className="text-[#DBFF00] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">~</span>{estimatedReferralValue} <span className="text-sm font-bold tracking-widest pl-1 opacity-80">72H</span>
           </div>
           <div className="mt-1 text-[9px] uppercase tracking-widest font-mono font-bold opacity-50">
-            Estimated referral preview
+            1% estimate after valid chain lock
           </div>
         </div>
         <Zap className="w-10 h-10 opacity-90 drop-shadow-md z-10" />
       </div>
 
       <p className="text-[11px] text-white/50 font-mono text-center mb-0 mt-1 uppercase tracking-widest">
-        Share gray-test poster or copy your invite
+        Share gray-test poster or copy your invite. App progress is not verified holdings.
       </p>
 
       {/* Poster Generator Mock */}
@@ -178,10 +179,13 @@ export default function Share({ myDeposit }: any) {
               <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#DBFF00] to-transparent" />
               <div className="pl-5 py-1">
                 <div className="text-[9px] uppercase tracking-widest text-[#DBFF00]/80 font-mono mb-1.5">
-                  App-Recorded Progress
+                  Gray-Test Progress
                 </div>
                 <div className="font-mono text-2xl text-white tabular-nums tracking-tighter">
-                  {myDeposit.toLocaleString()} <span className="text-sm tracking-widest opacity-50 font-normal text-white">72H</span>
+                  {formattedProgress} <span className="text-sm tracking-widest opacity-50 font-normal text-white">72H</span>
+                </div>
+                <div className="mt-1 text-[8px] uppercase tracking-widest text-white/35 font-mono leading-4">
+                  Not verified holdings
                 </div>
               </div>
             </div>

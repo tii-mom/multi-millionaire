@@ -15,6 +15,21 @@ function formatAmount(value: string) {
   return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
+function rewardStatusLabel(status: RewardLedger["status"]) {
+  switch (status) {
+    case "pending":
+      return "review required";
+    case "approved":
+      return "proof may be available";
+    case "claimed":
+      return "claim record; receipt required";
+    case "rejected":
+      return "rejected";
+    default:
+      return status;
+  }
+}
+
 export default function Rewards() {
   const [summary, setSummary] = useState<RewardSummary>(emptySummary);
   const [rewards, setRewards] = useState<RewardLedger[]>([]);
@@ -59,17 +74,17 @@ export default function Rewards() {
   const handleClaim = async (ledgerId: string) => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      toast.error("Sign in before claiming rewards.");
+      toast.error("Sign in before recording a legacy staging claim.");
       return;
     }
 
     setClaimingId(ledgerId);
     try {
       await api.claimReward(ledgerId, token);
-      toast.success("Staging reward marked as claimed.");
+      toast.success("Legacy staging claim recorded. This is not an on-chain claim receipt.");
       await loadRewards();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to claim reward.";
+      const message = error instanceof Error ? error.message : "Unable to record legacy staging claim.";
       toast.error(message);
     } finally {
       setClaimingId(null);
@@ -104,15 +119,19 @@ export default function Rewards() {
             <span className="text-[11px] uppercase tracking-widest font-mono">Reward Ledger</span>
           </div>
           <div className="text-[9px] uppercase tracking-widest font-mono text-[#DBFF00]/70 border border-[#DBFF00]/20 bg-[#DBFF00]/10 rounded-full px-3 py-1.5">
-            Chain-gated
+            Receipt-gated
           </div>
+        </div>
+
+        <div className="relative z-10 mb-5 rounded-[16px] border border-white/10 bg-black/30 px-4 py-3 text-[10px] leading-5 text-white/45 font-mono uppercase tracking-wider">
+          Ledger amounts are records, not wallet holdings. Proof shows Merkle eligibility; a reward is final only after backend verifies a chain claim receipt.
         </div>
 
         <div className="grid grid-cols-3 gap-2 relative z-10">
           {[
-            ["Pending", summary.pending_amount],
-            ["Approved", summary.approved_amount],
-            ["Claimed", summary.claimed_amount],
+            ["Review", summary.pending_amount],
+            ["Proof-ready", summary.approved_amount],
+            ["Recorded", summary.claimed_amount],
           ].map(([label, value]) => (
             <div key={label} className="rounded-[16px] border border-white/10 bg-black/30 px-3 py-4">
               <div className="text-[9px] uppercase tracking-widest font-mono text-white/35 mb-2">{label}</div>
@@ -132,7 +151,7 @@ export default function Rewards() {
       <div className="bg-white/[0.02] border border-white/10 rounded-[24px] p-2 backdrop-blur-xl">
         <h3 className="text-[11px] uppercase tracking-[0.2em] font-mono text-white/50 p-4 pb-2 flex items-center gap-2">
           <Coins className="w-4 h-4 text-[#DBFF00]/80" />
-          Direct Referral Rewards
+          Referral Reward Records
         </h3>
 
         <div className="flex flex-col gap-1 mt-2">
@@ -144,7 +163,7 @@ export default function Rewards() {
           ) : loadError ? (
             <div className="flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
               <div className="font-mono text-xs text-white/55 uppercase tracking-widest">
-                Rewards unavailable
+                Reward records unavailable
               </div>
               <div className="max-w-[280px] text-[11px] leading-5 text-white/35 font-mono">
                 {loadError}
@@ -160,7 +179,7 @@ export default function Rewards() {
             </div>
           ) : rewards.length === 0 ? (
             <div className="text-center text-white/40 font-mono text-xs py-8 uppercase tracking-widest">
-              No rewards yet
+              No reward records yet
             </div>
           ) : (
             rewards.map((reward) => (
@@ -177,7 +196,7 @@ export default function Rewards() {
                       {reward.reward_type.replace(/_/g, " ")}
                     </div>
                     <div className="text-[9px] text-white/40 font-mono uppercase tracking-widest mt-0.5">
-                      {reward.status} · wave #{reward.wave_id}
+                      {rewardStatusLabel(reward.status)} · wave #{reward.wave_id}
                     </div>
                   </div>
                 </div>
@@ -201,7 +220,7 @@ export default function Rewards() {
                       disabled={reward.status !== "approved" || claimingId === reward.id}
                       className="min-w-[64px] bg-white/10 text-white border border-white/10 px-3 py-2 rounded-[14px] font-bold text-[10px] uppercase tracking-widest hover:bg-white/15 transition-colors disabled:opacity-40"
                     >
-                      {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Stage"}
+                      {claimingId === reward.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Stub"}
                     </button>
                   </div>
                 </div>

@@ -42,6 +42,21 @@ Use these terms consistently:
   verified the claim event.
 - `Claimed`: backend verified the claim event and updated the ledger.
 
+## Frontend Copy Guardrails
+
+- Share surfaces may show app-recorded progress, but must not describe it as
+  locked funds, wallet holdings, or active earnings until a chain receipt is
+  verified.
+- Referral estimates should use the MVP recommendation of `1%` of valid
+  chain-confirmed locks, or be explicitly labeled as estimates.
+- Rewards summaries should describe database rows as records or ledger entries,
+  not transferable balances or wallet holdings.
+- The legacy reward claim endpoint is a staging/off-chain stub. UI actions that
+  call it must not say the user has completed an on-chain claim.
+- Merkle proof availability and claim completion are separate states: proof
+  availability means eligibility data exists; completion requires backend
+  verification of a chain claim receipt/event.
+
 ## Support Responses
 
 Deposit issue:
