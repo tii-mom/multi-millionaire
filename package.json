@@ -18,6 +18,8 @@
     "contract:test": "blueprint test",
     "test": "jest",
     "contract:deploy:testnet": "tsx scripts/deployTestnetContracts.ts",
+    "contract:deploy:lock-vault:mainnet": "blueprint run deployLockVault --mainnet --tonconnect",
+    "contract:deploy:merkle-claim:mainnet": "blueprint run deployMerkleClaim --mainnet --tonconnect",
     "contract:canary:deposit:testnet": "tsx scripts/sendTestnetDeposit.ts"
   },
   "dependencies": {

@@ -139,6 +139,35 @@ Any production canary that submits a transaction or mutates application state
 requires an approved operator, documented account, documented amount, and an
 incident rollback owner.
 
+## Mainnet Contract Deployment
+
+Mainnet contract deployment uses Blueprint with TonConnect. The connected
+Tonkeeper wallet must match `CHAIN_ADMIN_ADDRESS`; the scripts refuse to deploy
+if a different wallet is connected.
+
+Required environment:
+
+```bash
+export CHAIN_ADMIN_ADDRESS="UQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQfRq"
+export TOKEN_ADDRESS="EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8"
+```
+
+Deploy with Tonkeeper confirmation:
+
+```bash
+npm run contract:build
+npm run contract:deploy:lock-vault:mainnet
+npm run contract:deploy:merkle-claim:mainnet
+```
+
+After deployment:
+
+- record the printed LockVault and MerkleClaim addresses
+- update `server/wrangler.jsonc` production `LOCK_VAULT_ADDRESS`
+- add the MerkleClaim address to production env as `MERKLE_CLAIM_ADDRESS`
+- keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until wallet proof, receipt
+  verification, claim verification, and a small canary pass
+
 ## Monitoring And Alerts
 
 - `/health` and `/ready` availability, with readiness failure paging the API
