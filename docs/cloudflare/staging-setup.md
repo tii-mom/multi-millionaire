@@ -91,8 +91,8 @@ had already been inserted into Postgres.
 
 ## Migration And Seed State
 
-The prepared origin database remains on the existing local Postgres route and
-was not migrated to D1.
+The historical local-origin database remains on the existing local Postgres
+route and was not migrated to D1.
 
 - historical local-origin migrations `001 -> 004`: pass
 - historical local-origin `seed:dev`: pass
@@ -100,16 +100,31 @@ was not migrated to D1.
   - `admin@example.com`
   - `member@example.com`
   - `risk@example.com`
-- managed Postgres migrations: not run
-- managed Postgres `seed:dev`: not run
-- managed Postgres validation data: not available
+- live Hyperdrive managed-origin cutover: not complete
+
+Neon staging origin:
+
+- project: `dry-art-24207577`
+- branch: `br-curly-mud-an2nh595`
+- database: `neondb`
+- role: `neondb_owner`
+- direct host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- connection mode: direct/unpooled, `sslmode=require`
+- migrations `001 -> 004`: pass
+- `npm run seed:dev`: pass
+- seeded users:
+  - `admin@example.com`
+  - `member@example.com`
+  - `risk@example.com`
+- active wave: present
+- confirmed price round: present
+- Neon `DATABASE_URL`: not stored in git, docs, PR text, or Worker vars
 
 ## Sustainability Assessment
 
 - Single blocker:
-  `No managed Postgres instance and connection string are provisioned for
-  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be
-  rerun on a persistent origin.`
+  `Cloudflare management authentication is invalid, so Hyperdrive cannot be
+  repointed from the VPC Service / Tunnel origin to the prepared Neon origin.`
 - Current Worker bindings do not include a direct `DATABASE_URL`; staging uses
   only the `HYPERDRIVE` binding for database access.
 - The persistent cutover plan and fallback operating notes are tracked in
@@ -177,6 +192,6 @@ npm run smoke
   currently unhealthy
 - Sustainable RC1 status: not yet achieved
 - Stub boundary: deposit and reward claim remain off-chain stubs
-- RC1 recommendation: do not cut RC1 until a managed Postgres origin is
-  provisioned, Hyperdrive is repointed, migrations/seed are run there, `/ready`
-  returns `200`, and the complete Cloudflare smoke passes again
+- RC1 recommendation: do not cut RC1 until Cloudflare auth is fixed,
+  Hyperdrive is repointed to Neon, `/ready` returns `200`, and the complete
+  Cloudflare smoke passes again

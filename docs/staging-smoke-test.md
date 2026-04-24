@@ -30,6 +30,8 @@ As of `2026-04-24`, the current live backend is not smokeable:
 - readiness database status: `error`
 - Hyperdrive origin: still the local tunnel-backed Postgres route
 - Cloudflare tunnel `mm-pg-staging`: `down`, with no active connections
+- Neon Postgres origin: provisioned and initialized, but not yet bound to the
+  Worker because Cloudflare management authentication is invalid
 - current complete Cloudflare smoke: not run because readiness fails
 
 The historical `cf-20260424-rc1-final` pass is retained below, but it no longer
@@ -122,8 +124,8 @@ Cloudflare smoke run:
   - reason: the live backend currently returns `/ready=503`, so there is no
     current complete Cloudflare smoke pass
 - Sustainable RC1 environment: `no`
-  - reason: the staging database origin still depends on the local PostgreSQL
-    process plus the local Cloudflare Tunnel on this machine
+  - reason: the prepared Neon origin is not yet the live Hyperdrive origin, so
+    the Worker still depends on the local PostgreSQL plus Cloudflare Tunnel path
 
 ## Boundary Notes
 

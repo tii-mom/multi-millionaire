@@ -22,6 +22,10 @@ RC1 gate:
   `Hyperdrive -> VPC Service -> Tunnel -> this machine`
 - Cloudflare tunnel `mm-pg-staging` is currently down with no active
   connections
+- Neon Postgres origin is provisioned and initialized:
+  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- Hyperdrive cutover to Neon is blocked by invalid Cloudflare management
+  authentication
 - historical Cloudflare smoke run `cf-20260424-rc1-final`: `pass`
 - current complete Cloudflare smoke: not rerun because readiness fails before
   the smoke can proceed
@@ -33,12 +37,11 @@ returns `503`.
 ## Sustainability Gate
 
 For the environment to be called a sustainable RC1 environment, staging must
-move from the current local-origin route to `Hyperdrive + managed Postgres`.
+move from the current local-origin route to `Hyperdrive + Neon Postgres`.
 
 - Single blocker:
-  `No managed Postgres instance and connection string are provisioned for
-  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be run
-  on a persistent origin.`
+  `Cloudflare management authentication is invalid, so Hyperdrive cannot be
+  repointed from the VPC Service / Tunnel origin to the prepared Neon origin.`
 - Tracking doc: `docs/cloudflare/persistent-db-plan.md`
 
 ## Entry Criteria
@@ -120,8 +123,8 @@ Keep these with the RC1 record:
 
 ## Current Decision
 
-Current result: Cloudflare RC1 is blocked. The only product/environment blocker
-is the missing managed Postgres `DATABASE_URL`; without it, Hyperdrive cannot be
-repointed away from the local tunnel-backed origin, migrations/seed cannot be
-run on a persistent origin, `/ready` remains `503`, and a current complete
-Cloudflare smoke cannot pass.
+Current result: Cloudflare RC1 is blocked. Neon Postgres is provisioned,
+migrated, seeded, and validated, but Hyperdrive still points at the local
+tunnel-backed origin because current Cloudflare management credentials are
+invalid. Until Hyperdrive is repointed to Neon, `/ready` remains `503` and a
+current complete Cloudflare smoke cannot pass.

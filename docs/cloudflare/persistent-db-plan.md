@@ -4,9 +4,8 @@ Date: 2026-04-24
 
 ## Current Result
 
-Sustainable RC1 is blocked by one environment input:
-
-`No managed Postgres DATABASE_URL exists for staging.`
+Neon Postgres has been provisioned and initialized for RC1 staging, but
+sustainable RC1 is still blocked by Cloudflare management authentication.
 
 Current facts:
 
@@ -20,58 +19,58 @@ Current facts:
   `7ae7d04e-ca98-40d9-9f5d-fd52aa100b32`
 - tunnel status: `down`, with no active connections
 - current Worker bindings do not include `DATABASE_URL`
+- Neon project: `dry-art-24207577`
+- Neon branch: `br-curly-mud-an2nh595`
+- Neon database: `neondb`
+- Neon role: `neondb_owner`
+- Neon direct host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- Neon connection mode: direct/unpooled, `sslmode=require`
+- Neon `DATABASE_URL`: not stored in git, docs, or Worker vars
 
-The current data plane still depends on a local PostgreSQL process plus a local
-Cloudflare Tunnel. That is not a sustainable RC1 environment.
+The Neon origin is ready, but the live Cloudflare data plane still depends on a
+local PostgreSQL process plus a local Cloudflare Tunnel because Hyperdrive could
+not be updated with the current Cloudflare credentials.
 
-## Required Input
+## Completed Neon Initialization
 
-Provision a managed Postgres database for staging and provide one connection
-string:
+- migrations `001_init.sql`, `002_squads.sql`, `003_rewards.sql`, and
+  `004_risk.sql`: applied on Neon
+- `npm run seed:dev`: completed against Neon using the direct/unpooled Neon
+  connection string
+- verified seed users:
+  - `admin@example.com`
+  - `member@example.com`
+  - `risk@example.com`
+- verified active wave count: `1`
+- verified confirmed price round count: `1`
 
-```text
-DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require
-```
+## Current Blocker
 
-The provider can be any managed Postgres service that Cloudflare Hyperdrive can
-reach. Do not use D1 for this RC1 path.
+The remaining blocker is:
 
-## Cutover Steps After DATABASE_URL Exists
+`Cloudflare management authentication is invalid, so Hyperdrive cannot be
+patched from the VPC Service / Tunnel origin to the Neon direct origin.`
+
+Observed failures:
+
+- `wrangler whoami`: `Invalid access token [code: 9109]`
+- `wrangler hyperdrive get`: Cloudflare API authentication failure
+- Cloudflare API MCP GET/PATCH calls: `Authentication error [code: 10000]`
+
+## Remaining Cutover Steps After Cloudflare Auth Is Fixed
 
 1. Create or update a staging Hyperdrive config whose origin points at the
-   managed Postgres host, database, user, password, and SSL settings.
+   Neon direct host, database, user, password, and SSL settings.
 2. Update `server/wrangler.jsonc` staging `HYPERDRIVE` binding only if the
    cutover creates a new Hyperdrive id.
 3. Deploy the staging Worker.
-4. Run migrations on the managed origin:
-
-```bash
-cd server
-NODE_ENV=staging DATABASE_URL="<managed-postgres-url>" npm run migrate:up
-```
-
-5. Seed the managed origin:
-
-```bash
-cd server
-NODE_ENV=staging DATABASE_URL="<managed-postgres-url>" npm run seed:dev
-```
-
-6. Verify the seeded data exists on the managed origin:
-
-- `admin@example.com`
-- `member@example.com`
-- `risk@example.com`
-- active wave
-- confirmed price round
-
-7. Confirm live Cloudflare health:
+4. Confirm live Cloudflare health:
 
 - `GET /health`: `200`
 - `GET /ready`: `200`
 - readiness database status: `ok`
 
-8. Run the complete Cloudflare smoke against the deployed backend:
+5. Run the complete Cloudflare smoke against the deployed backend:
 
 ```bash
 cd server
@@ -84,7 +83,8 @@ npm run smoke
 
 Sustainable RC1 is achieved only when:
 
-- Hyperdrive origin no longer depends on VPC Service / Tunnel / local Postgres
+- Hyperdrive origin is Neon direct Postgres and no longer depends on VPC Service
+  / Tunnel / local Postgres
 - migrations `001_init.sql` through `004_risk.sql` have run on the managed
   origin
 - `npm run seed:dev` has run on the managed origin
