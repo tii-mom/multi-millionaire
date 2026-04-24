@@ -41,6 +41,14 @@ export interface BootstrapData {
   me: User | null;
   feature_flags: Record<string, boolean>;
   controls?: Record<string, { enabled: boolean; reason: string | null }>;
+  ops?: {
+    receipt_verifier?: {
+      configured: boolean;
+      status: string;
+      mode: string;
+      receipt_verification_enabled: boolean;
+    };
+  };
 }
 
 export interface Position {

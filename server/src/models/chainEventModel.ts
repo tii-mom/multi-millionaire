@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { query, QueryExecutor } from '../db';
 
 export type ChainEventApplyStatus = 'pending' | 'applied' | 'review_required' | 'rejected';
 
@@ -40,8 +40,10 @@ export async function insertChainEvent(input: {
   payload: Record<string, unknown>;
   applyStatus?: ChainEventApplyStatus;
   reviewReason?: string | null;
+  executor?: QueryExecutor;
 }): Promise<{ event: ChainEventRecord; inserted: boolean }> {
-  const result = await query<ChainEventRecord & { inserted_marker: number }>(
+  const db = input.executor || { query };
+  const result = await db.query<ChainEventRecord & { inserted_marker: number }>(
     `INSERT INTO chain_events (
        chain_id, contract_address, contract_role, event_name, tx_hash,
        log_index, block_number, block_time, finalized, payload,

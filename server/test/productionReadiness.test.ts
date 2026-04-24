@@ -5,6 +5,8 @@ import { createWalletBindIntent, getWalletBindIntentForUser, listWalletBindingsF
 import { getRewardLedgerById, markRewardClaimed } from '../src/models/rewardModel';
 import { ReceiptVerificationError, verifyDepositReceipt } from '../src/services/receiptVerifier';
 import { insertChainEvent } from '../src/models/chainEventModel';
+import { withTransaction } from '../src/db';
+import { createPosition } from '../src/models/positionModel';
 
 jest.mock('../src/models/walletBindingModel', () => ({
   createWalletBindIntent: jest.fn(),
@@ -14,6 +16,11 @@ jest.mock('../src/models/walletBindingModel', () => ({
   markWalletBindIntentVerified: jest.fn(),
   normalizeWalletAddress: jest.fn((value: string) => value.trim().toLowerCase()),
   upsertVerifiedWalletBinding: jest.fn(),
+}));
+
+jest.mock('../src/db', () => ({
+  query: jest.fn(),
+  withTransaction: jest.fn(),
 }));
 
 jest.mock('../src/services/receiptVerifier', () => ({
@@ -100,10 +107,13 @@ const getWalletBindIntentForUserMock = getWalletBindIntentForUser as jest.Mock;
 const listWalletBindingsForUserMock = listWalletBindingsForUser as jest.Mock;
 const walletBindingModel = jest.requireMock('../src/models/walletBindingModel');
 const upsertVerifiedWalletBindingMock = walletBindingModel.upsertVerifiedWalletBinding as jest.Mock;
+const findVerifiedWalletBindingMock = walletBindingModel.findVerifiedWalletBinding as jest.Mock;
 const getRewardLedgerByIdMock = getRewardLedgerById as jest.Mock;
 const markRewardClaimedMock = markRewardClaimed as jest.Mock;
 const verifyDepositReceiptMock = verifyDepositReceipt as jest.Mock;
 const insertChainEventMock = insertChainEvent as jest.Mock;
+const withTransactionMock = withTransaction as jest.Mock;
+const createPositionMock = createPosition as jest.Mock;
 
 const userId = '00000000-0000-0000-0000-000000000777';
 const token = jwt.sign({ userId, email: 'user@example.com' }, 'secret');
@@ -121,6 +131,12 @@ describe('Production readiness gates', () => {
     markRewardClaimedMock.mockReset();
     verifyDepositReceiptMock.mockReset();
     insertChainEventMock.mockReset();
+    findVerifiedWalletBindingMock.mockReset();
+    createPositionMock.mockReset();
+    withTransactionMock.mockReset();
+    withTransactionMock.mockImplementation(async (fn: any) => fn({
+      query: jest.fn().mockResolvedValue({ rows: [{ count: '0' }] }),
+    }));
   });
 
   afterAll(() => {
@@ -270,5 +286,92 @@ describe('Production readiness gates', () => {
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe('RECEIPT_VERIFICATION_DISABLED');
     expect(insertChainEventMock).not.toHaveBeenCalled();
+  });
+
+  it('applies verified deposit receipts inside one transaction', async () => {
+    verifyDepositReceiptMock.mockResolvedValue({
+      chainId: 'ton-mainnet',
+      txHash: '0xtx',
+      logIndex: 0,
+      walletAddress: 'wallet-1',
+      contractAddress: 'lock-vault',
+      amountRaw: '1000',
+      positionId: 'chain-position-1',
+      blockNumber: 123,
+      blockTime: null,
+      finalized: true,
+    });
+    findVerifiedWalletBindingMock.mockResolvedValue({
+      user_id: userId,
+      chain_id: 'ton-mainnet',
+      normalized_address: 'wallet-1',
+    });
+    insertChainEventMock.mockResolvedValue({
+      inserted: true,
+      event: { id: 'event-1', tx_hash: '0xtx', log_index: 0, apply_status: 'applied' },
+    });
+    createPositionMock.mockResolvedValue({
+      id: 'position-1',
+      user_id: userId,
+      wave_id: 1,
+      amount_raw: '1000',
+      onchain_position_id: 'chain-position-1',
+    });
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: '0xtx', amount: '1000' });
+
+    expect(res.status).toBe(201);
+    expect(withTransactionMock).toHaveBeenCalledTimes(1);
+    const tx = expect.objectContaining({ query: expect.any(Function) });
+    expect(insertChainEventMock).toHaveBeenCalledWith(expect.objectContaining({ applyStatus: 'applied', executor: tx }));
+    expect(createPositionMock).toHaveBeenCalledWith(
+      userId,
+      1,
+      '1000',
+      'chain-position-1',
+      '100',
+      15000,
+      true,
+      true,
+      tx
+    );
+  });
+
+  it('does not treat a failed receipt apply as permanently duplicated', async () => {
+    verifyDepositReceiptMock.mockResolvedValue({
+      chainId: 'ton-mainnet',
+      txHash: '0xtx',
+      logIndex: 0,
+      walletAddress: 'wallet-1',
+      contractAddress: 'lock-vault',
+      amountRaw: '1000',
+      positionId: 'chain-position-1',
+      blockNumber: 123,
+      blockTime: null,
+      finalized: true,
+    });
+    findVerifiedWalletBindingMock.mockResolvedValue({
+      user_id: userId,
+      chain_id: 'ton-mainnet',
+      normalized_address: 'wallet-1',
+    });
+    insertChainEventMock.mockResolvedValue({
+      inserted: true,
+      event: { id: 'event-1', tx_hash: '0xtx', log_index: 0, apply_status: 'applied' },
+    });
+    createPositionMock.mockRejectedValue(new Error('position insert failed'));
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: '0xtx', amount: '1000' });
+
+    expect(res.status).toBe(500);
+    expect(withTransactionMock).toHaveBeenCalledTimes(1);
+    expect(insertChainEventMock).toHaveBeenCalledWith(expect.objectContaining({ applyStatus: 'applied' }));
+    expect(res.body.error.code).not.toBe('DUPLICATE_CHAIN_EVENT');
   });
 });

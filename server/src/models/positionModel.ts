@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { query, QueryExecutor } from '../db';
 
 export interface Position {
   id: string;
@@ -29,9 +29,11 @@ export async function createPosition(
   entryPrice: string,
   unlockMultiplierBps: number,
   qualifiesForActivation: boolean,
-  isFirstQualifyingForUser: boolean
+  isFirstQualifyingForUser: boolean,
+  executor?: QueryExecutor
 ): Promise<Position> {
-  const result = await query<Position>(
+  const db = executor || { query };
+  const result = await db.query<Position>(
     `INSERT INTO positions (
       user_id, wave_id, amount_raw, onchain_position_id,
       entry_price, unlock_multiplier_bps,

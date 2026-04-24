@@ -12,16 +12,21 @@
   - `HIGH_RISK_DEPOSIT_THRESHOLD`
   - `CORS_ALLOWED_ORIGINS`
   - `CHAIN_ID`
-  - `RPC_URL`
+  - `CHAIN_RPC_URL` or compatibility `RPC_URL`
   - `TOKEN_ADDRESS`
   - `LOCK_VAULT_ADDRESS`
   - `ORACLE_ADDRESS`
   - `REWARD_DISTRIBUTOR_ADDRESS`
+  - `WALLET_BINDING_ENABLED`
+  - `WALLET_BINDING_MESSAGE_DOMAIN`
+  - `RECEIPT_VERIFICATION_ENABLED`
+  - `CHAIN_RECEIPT_VERIFIER`
+  - `CHAIN_MAINLINE_WRITES_ENABLED`
 - Confirm database connectivity and backup coverage.
 - Confirm the frontend build passes.
 - Confirm the backend build and test suite pass.
 - Confirm no staging-only secrets are checked into the repo.
-- Confirm the release branch still states that deposit and reward claim are off-chain stubs.
+- Confirm the release branch still states that legacy deposit and reward claim endpoints are off-chain stubs unless the chain receipt/reward claim production gates are explicitly enabled.
 
 ## Migration Order
 
@@ -31,6 +36,7 @@ Run migrations strictly in numeric order:
 2. `server/migrations/002_squads.sql`
 3. `server/migrations/003_rewards.sql`
 4. `server/migrations/004_risk.sql`
+5. `server/migrations/005_production_chain_ops.sql`
 
 Use `npm run migrate:up` for normal rollout. Use `npm run migrate:reset` only in local or staging environments.
 
@@ -86,8 +92,8 @@ Still not implemented in Sprint 1:
 - real on-chain deposit locking,
 - real reward distribution,
 - on-chain reward claim verification,
-- wallet binding and signature verification,
-- chain event ingestion beyond database stubs.
+- production wallet signature verification,
+- real chain receipt verification beyond fail-closed/test verifier mode,
+- chain event ingestion beyond receipt submission/database apply scaffolding.
 
 Sprint 2 is where those chain-backed paths should be connected.
-

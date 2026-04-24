@@ -10,6 +10,10 @@ dotenv.config();
 let pool: Pool | null = null;
 let poolConnectionString: string | null = null;
 
+export interface QueryExecutor {
+  query<T extends QueryResultRow = QueryResultRow>(text: string, params?: any[]): Promise<{ rows: T[] }>;
+}
+
 function getDatabaseConnectionString() {
   const hyperdriveConnectionString = getHyperdriveConnectionString();
   if (hyperdriveConnectionString) {
@@ -107,6 +111,37 @@ export async function withClient<T>(fn: (client: PoolClient) => Promise<T>): Pro
   const client = await getOrCreatePool(getDatabaseConnectionString()).connect();
   try {
     return await fn(client);
+  } finally {
+    client.release();
+  }
+}
+
+export async function withTransaction<T>(fn: (client: QueryExecutor) => Promise<T>): Promise<T> {
+  if (getHyperdriveConnectionString()) {
+    const client = new Client({ connectionString: getDatabaseConnectionString() });
+    await client.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      await client.end();
+    }
+  }
+
+  const client = await getOrCreatePool(getDatabaseConnectionString()).connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }

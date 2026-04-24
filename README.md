@@ -110,15 +110,17 @@ Backend:
 - Reward summary, reward listing, and off-chain claim status update stub.
 - Risk flag creation/list/update with an email-based admin guard.
 - Automatic risk flags for self-referral attempts, rapid deposit bursts, and high-value first locks.
+- Fail-closed wallet binding and deposit receipt endpoints for production chain readiness.
+- Admin operations endpoints for emergency controls, audit logs, chain events, and receipt verifier diagnostics.
 
 ## Not Yet Implemented
 
 - Real on-chain token lock transactions.
 - Real vault/position contract integration.
 - Real on-chain reward distribution or Merkle claim publishing.
-- Wallet binding and transaction signature verification.
+- Production wallet signature verification and live receipt verification.
 - Production-grade anti-sybil scoring.
-- Full admin console UI.
+- Full admin console UI for emergency controls and operations.
 - End-to-end settlement, unlock, and withdrawal flows.
 
 ## Development Roadmap

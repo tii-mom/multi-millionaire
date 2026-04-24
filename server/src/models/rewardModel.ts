@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { query, QueryExecutor } from '../db';
 
 export type RewardStatus = 'pending' | 'approved' | 'claimed' | 'rejected';
 
@@ -38,8 +38,9 @@ const rewardLedgerColumns = `
   reward_type, gross_amount, final_amount, status, created_at, updated_at
 `;
 
-export async function createRewardLedger(input: CreateRewardLedgerInput): Promise<RewardLedger | null> {
-  const result = await query<RewardLedger>(
+export async function createRewardLedger(input: CreateRewardLedgerInput, executor?: QueryExecutor): Promise<RewardLedger | null> {
+  const db = executor || { query };
+  const result = await db.query<RewardLedger>(
     `INSERT INTO reward_ledgers (
        beneficiary_user_id, source_user_id, source_position_id, wave_id,
        reward_type, gross_amount, final_amount, status, created_at, updated_at

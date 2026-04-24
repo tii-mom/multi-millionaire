@@ -20,6 +20,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const [authToken, setAuthToken] = useState(() => localStorage.getItem("auth_token"));
   const [waveId, setWaveId] = useState<number | null>(null);
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState("");
@@ -39,12 +40,15 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         const data = await api.bootstrap();
         if (!cancelled) {
           setBootstrap(data);
+          setBootstrapError(null);
           if (data.current_wave?.wave_id) {
             setWaveId(Number(data.current_wave.wave_id));
           }
         }
-      } catch {
-        // The API is optional while developing the standalone frontend.
+      } catch (error) {
+        if (!cancelled) {
+          setBootstrapError(error instanceof Error ? error.message : "Backend bootstrap failed.");
+        }
       }
     }
 
@@ -90,6 +94,11 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   };
 
   const handleDeposit = async () => {
+    if (bootstrapError && !bootstrap) {
+      setApiError("Backend is unavailable. Deposits are disabled until bootstrap succeeds.");
+      toast.error("Backend unavailable.");
+      return;
+    }
     if (bootstrap?.controls?.pause_deposits?.enabled) {
       toast.error(bootstrap.controls.pause_deposits.reason || "Deposits are paused.");
       return;
@@ -273,10 +282,23 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const currentFiatValue = myDeposit * tokenPrice;
   const progressPercent = Math.min((currentFiatValue / targetValue) * 100, 100);
   const needed72H = Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
+  const backendUnavailable = !!bootstrapError && !bootstrap;
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
   const depositsPaused = !!bootstrap?.controls?.pause_deposits?.enabled;
   const maintenanceBanner = bootstrap?.controls?.maintenance_banner;
-  const chainActionDisabled = !chainMainlineEnabled || !authToken || depositsPaused;
+  const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;
+  const chainDisabledReason = backendUnavailable
+    ? "Backend unavailable: wallet and receipt actions are disabled."
+    : !authToken
+      ? "Sign in to bind a wallet or submit a receipt."
+      : depositsPaused
+        ? bootstrap?.controls?.pause_deposits?.reason || "Deposits are paused."
+        : !chainMainlineEnabled
+          ? "Chain mainline writes are disabled for this environment."
+          : !receiptVerifierConfigured
+            ? "Receipt verifier is not configured yet."
+            : null;
+  const chainActionDisabled = !!chainDisabledReason;
 
   useEffect(() => {
     if (authToken && chainMainlineEnabled) {
@@ -286,9 +308,11 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
   return (
     <div className="px-6 flex flex-col gap-6 pb-10">
-      {(maintenanceBanner?.enabled || depositsPaused || !chainMainlineEnabled) && (
-        <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-[11px] font-mono leading-relaxed text-amber-100">
-          {maintenanceBanner?.enabled
+      {(backendUnavailable || maintenanceBanner?.enabled || depositsPaused || !chainMainlineEnabled) && (
+        <div className={`rounded-2xl border px-4 py-3 text-[11px] font-mono leading-relaxed ${backendUnavailable ? "border-red-400/25 bg-red-500/10 text-red-100" : "border-amber-300/20 bg-amber-300/10 text-amber-100"}`}>
+          {backendUnavailable
+            ? `Backend unavailable: ${bootstrapError}`
+            : maintenanceBanner?.enabled
             ? maintenanceBanner.reason || "Maintenance mode is active."
             : depositsPaused
               ? bootstrap?.controls?.pause_deposits?.reason || "Deposits are paused."
@@ -425,7 +449,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         
         <div className="flex flex-col gap-1 items-center">
           <div className="text-white/40 font-mono text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-            Based on Live Price: 
+            Based on Display Price:
             <motion.span 
               key={tokenPrice}
               initial={{ color: "#ffffff" }}
@@ -481,7 +505,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="0"
-              disabled={isConfirming}
+              disabled={isConfirming || backendUnavailable}
               className="w-full bg-[#050505]/60 hover:bg-[#050505]/80 border border-white/5 rounded-2xl py-6 pl-6 pr-[120px] outline-none focus:border-[#DBFF00]/40 transition-colors font-mono text-4xl tabular-nums shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] placeholder:text-white/5 focus:bg-black/60 focus:ring-2 ring-[#DBFF00]/5 disabled:opacity-50"
             />
             
@@ -509,7 +533,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               <div>
                 <div className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-mono">Wallet Binding</div>
                 <div className="text-[11px] text-white/35 font-mono mt-1">
-                  {chainMainlineEnabled ? "Bind a verified wallet before submitting a chain receipt." : "Staging/off-chain: chain writes are disabled by feature flag."}
+                  {chainDisabledReason || "Bind a verified wallet before submitting a chain receipt."}
                 </div>
               </div>
               <div className={`text-[9px] uppercase tracking-widest font-mono ${chainMainlineEnabled ? "text-[#DBFF00]" : "text-amber-200"}`}>
@@ -589,7 +613,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           
           <button 
             onClick={handleDeposit}
-            disabled={isConfirming || chainMainlineEnabled || !inputValue || Number(inputValue) <= 0}
+            disabled={isConfirming || backendUnavailable || chainMainlineEnabled || !inputValue || Number(inputValue) <= 0}
             className="w-full bg-[#DBFF00] text-black shadow-[0_0_20px_rgba(219,255,0,0.15)] rounded-2xl py-4 flex items-center justify-center gap-2 hover:bg-[#c4e600] transition-all active:scale-[0.98] font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
           >
             {/* Shimmer effect inside button */}
@@ -602,7 +626,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               </>
             ) : (
               <>
-                <span>{chainMainlineEnabled ? "Use Receipt Form Above" : "Record Staging Deposit"}</span>
+                <span>{backendUnavailable ? "Backend Unavailable" : chainMainlineEnabled ? "Use Receipt Form Above" : "Record Staging Deposit"}</span>
                 <ArrowRight className="w-5 h-5" />
               </>
             )}

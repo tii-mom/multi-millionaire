@@ -6,7 +6,7 @@ import { createRewardLedger } from '../models/rewardModel';
 import { createRiskFlag } from '../models/riskModel';
 import { activateSquadMember } from '../models/squadModel';
 import { getWaveById } from '../models/waveModel';
-import { query } from '../db';
+import { withTransaction } from '../db';
 import { insertChainEvent } from '../models/chainEventModel';
 import { findVerifiedWalletBinding } from '../models/walletBindingModel';
 import { isControlEnabled } from '../services/productionGuards';
@@ -88,73 +88,85 @@ export async function depositReceipt(req: Request, res: Response, next: NextFunc
       });
     }
 
-    const eventResult = await insertChainEvent({
-      chainId: receipt.chainId,
-      contractAddress: receipt.contractAddress,
-      contractRole: 'lock_vault',
-      eventName: 'Deposited',
-      txHash: receipt.txHash,
-      logIndex: receipt.logIndex,
-      blockNumber: receipt.blockNumber,
-      blockTime: receipt.blockTime,
-      finalized: receipt.finalized,
-      payload: receiptPayload(receipt),
-      applyStatus: 'applied',
-    });
-    if (!eventResult.inserted) {
-      return res.status(409).json({ request_id: req.id || '', error: { code: 'DUPLICATE_CHAIN_EVENT', message: 'Deposit receipt was already submitted' } });
-    }
-
     const amountRaw = BigInt(receipt.amountRaw);
     const qualifies = amountRaw >= BigInt(wave.min_lock_amount);
-    const existing = await query<{ count: string }>(
-      `SELECT COUNT(*) FROM positions WHERE user_id = $1 AND qualifies_for_activation = TRUE`,
-      [user.id]
-    );
-    const isFirst = qualifies && existing.rows[0].count === '0';
     const price = await getLatestConfirmedPrice();
-    const position = await createPosition(
-      user.id,
-      waveId,
-      receipt.amountRaw,
-      receipt.positionId,
-      price ? price.price : '0',
-      wave.unlock_multiplier_bps,
-      qualifies,
-      isFirst
-    );
-
-    if (qualifies && isFirst && !(await isControlEnabled('pause_referral_rewards'))) {
-      const referral = await getReferral(user.id);
-      if (referral?.inviter_user_id && referral.inviter_user_id !== user.id) {
-        const rewardAmounts = calculateDirectReward(receipt.amountRaw, wave.direct_reward_rate_bps, wave.per_invite_cap);
-        await createRewardLedger({
-          beneficiaryUserId: referral.inviter_user_id,
-          sourceUserId: user.id,
-          sourcePositionId: position.id,
-          waveId,
-          grossAmount: rewardAmounts.grossAmount,
-          finalAmount: rewardAmounts.finalAmount,
-          status: 'approved',
-        });
-      }
-    }
-    if (isFirst) {
-      await lockReferral(user.id);
-    }
-    if (qualifies) {
-      await activateSquadMember(waveId, user.id);
-    }
-
     const highRiskThreshold = getHighRiskDepositThreshold();
-    if (qualifies && isFirst && highRiskThreshold !== null && amountRaw > highRiskThreshold) {
-      await createRiskFlag({
-        entityType: 'position',
-        entityId: position.id,
-        flagType: 'high_value_first_lock',
-        severity: 'medium',
-        note: `First qualifying chain lock exceeded configured threshold ${highRiskThreshold.toString()}`,
+    const referralRewardsPaused = await isControlEnabled('pause_referral_rewards');
+
+    const { eventResult, position } = await withTransaction(async (tx) => {
+      const appliedEvent = await insertChainEvent({
+        chainId: receipt.chainId,
+        contractAddress: receipt.contractAddress,
+        contractRole: 'lock_vault',
+        eventName: 'Deposited',
+        txHash: receipt.txHash,
+        logIndex: receipt.logIndex,
+        blockNumber: receipt.blockNumber,
+        blockTime: receipt.blockTime,
+        finalized: receipt.finalized,
+        payload: receiptPayload(receipt),
+        applyStatus: 'applied',
+        executor: tx,
       });
+      if (!appliedEvent.inserted) {
+        return { eventResult: appliedEvent, position: null };
+      }
+
+      const existing = await tx.query<{ count: string }>(
+        `SELECT COUNT(*) FROM positions WHERE user_id = $1 AND qualifies_for_activation = TRUE`,
+        [user.id]
+      );
+      const isFirst = qualifies && existing.rows[0].count === '0';
+      const createdPosition = await createPosition(
+        user.id,
+        waveId,
+        receipt.amountRaw,
+        receipt.positionId,
+        price ? price.price : '0',
+        wave.unlock_multiplier_bps,
+        qualifies,
+        isFirst,
+        tx
+      );
+
+      if (qualifies && isFirst && !referralRewardsPaused) {
+        const referral = await getReferral(user.id, tx);
+        if (referral?.inviter_user_id && referral.inviter_user_id !== user.id) {
+          const rewardAmounts = calculateDirectReward(receipt.amountRaw, wave.direct_reward_rate_bps, wave.per_invite_cap);
+          await createRewardLedger({
+            beneficiaryUserId: referral.inviter_user_id,
+            sourceUserId: user.id,
+            sourcePositionId: createdPosition.id,
+            waveId,
+            grossAmount: rewardAmounts.grossAmount,
+            finalAmount: rewardAmounts.finalAmount,
+            status: 'approved',
+          }, tx);
+        }
+      }
+      if (isFirst) {
+        await lockReferral(user.id, tx);
+      }
+      if (qualifies) {
+        await activateSquadMember(waveId, user.id, tx);
+      }
+
+      if (qualifies && isFirst && highRiskThreshold !== null && amountRaw > highRiskThreshold) {
+        await createRiskFlag({
+          entityType: 'position',
+          entityId: createdPosition.id,
+          flagType: 'high_value_first_lock',
+          severity: 'medium',
+          note: `First qualifying chain lock exceeded configured threshold ${highRiskThreshold.toString()}`,
+        }, tx);
+      }
+
+      return { eventResult: appliedEvent, position: createdPosition };
+    });
+
+    if (!eventResult.inserted || !position) {
+      return res.status(409).json({ request_id: req.id || '', error: { code: 'DUPLICATE_CHAIN_EVENT', message: 'Deposit receipt was already submitted' } });
     }
 
     return res.status(201).json({ request_id: req.id || '', data: { position, chain_event: eventResult.event } });

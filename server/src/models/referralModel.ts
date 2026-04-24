@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { query, QueryExecutor } from '../db';
 
 export interface Referral {
   id: string;
@@ -10,8 +10,9 @@ export interface Referral {
   updated_at: Date;
 }
 
-export async function getReferral(inviteeUserId: string): Promise<Referral | null> {
-  const result = await query<Referral>(
+export async function getReferral(inviteeUserId: string, executor?: QueryExecutor): Promise<Referral | null> {
+  const db = executor || { query };
+  const result = await db.query<Referral>(
     `SELECT id, invitee_user_id, inviter_user_id, status, locked_at, created_at, updated_at
      FROM referrals
      WHERE invitee_user_id = $1`,
@@ -37,8 +38,9 @@ export async function upsertReferral(inviteeUserId: string, inviterUserId: strin
  * Lock the referral relationship. This should be called when the invitee makes
  * their first qualifying lock. After locking, the inviter cannot be changed.
  */
-export async function lockReferral(inviteeUserId: string) {
-  await query(
+export async function lockReferral(inviteeUserId: string, executor?: QueryExecutor) {
+  const db = executor || { query };
+  await db.query(
     `UPDATE referrals
      SET status = 'locked', locked_at = NOW(), updated_at = NOW()
      WHERE invitee_user_id = $1 AND status = 'pending'`,

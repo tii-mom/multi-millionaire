@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { query, QueryExecutor } from '../db';
 
 export interface Squad {
   id: number;
@@ -127,8 +127,9 @@ export async function joinSquad(waveId: number, squadId: number, userId: string)
   return result.rows[0];
 }
 
-export async function activateSquadMember(waveId: number, userId: string): Promise<SquadMember | null> {
-  const result = await query<SquadMember>(
+export async function activateSquadMember(waveId: number, userId: string, executor?: QueryExecutor): Promise<SquadMember | null> {
+  const db = executor || { query };
+  const result = await db.query<SquadMember>(
     `UPDATE squad_members
      SET status = 'activated', activated_at = NOW()
      WHERE wave_id = $1
