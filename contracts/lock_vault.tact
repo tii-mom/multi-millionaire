@@ -141,6 +141,7 @@ contract LockVault with Ownable {
         throwUnless(1002, msg.amount > 0);
         throwUnless(1003, self.vaultJettonWallet != null && sender() == self.vaultJettonWallet!!);
         throwUnless(1004, !msg.forwardPayload.empty());
+        throwUnless(1008, !self.isGoalLatched(msg.sender));
 
         let payload: DepositPayload = self.parseDepositPayload(msg.forwardPayload);
         throwUnless(1005, payload.positionId > 0);
@@ -196,7 +197,11 @@ contract LockVault with Ownable {
         self.totalWithdrawnRaw += position.amountRaw;
         self.totalActiveRaw -= position.amountRaw;
         self.withdrawCount += 1;
-        self.activeRawByUser.set(position.owner, activeRaw - position.amountRaw);
+        let nextActiveRaw: Int = activeRaw - position.amountRaw;
+        self.activeRawByUser.set(position.owner, nextActiveRaw);
+        if (nextActiveRaw == 0) {
+            self.goalReachedByUser.set(position.owner, false);
+        }
 
         let jettonWallet: Address? = self.vaultJettonWallet;
         throwUnless(1024, jettonWallet != null);
@@ -251,14 +256,18 @@ contract LockVault with Ownable {
     }
 
     fun hasReachedGoal(user: Address, activeRaw: Int): Bool {
-        let latched: Bool? = self.goalReachedByUser.get(user);
-        if (latched != null && latched!!) {
+        if (self.isGoalLatched(user)) {
             return true;
         }
         if (self.priceUsdE6 == 0) {
             return false;
         }
         return activeRaw * self.priceUsdE6 >= self.userTarget(user) * self.tokenScale;
+    }
+
+    fun isGoalLatched(user: Address): Bool {
+        let latched: Bool? = self.goalReachedByUser.get(user);
+        return latched != null && latched!!;
     }
 
     fun refreshGoalReached(user: Address, activeRaw: Int) {

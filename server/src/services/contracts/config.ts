@@ -278,7 +278,6 @@ export function validateContractIntegrationConfig(
     requireField('CHAIN_RPC_URL', config.rpcUrl, 'CHAIN_RPC_URL or RPC_URL is required when chain integration is enabled');
     requireField('TOKEN_ADDRESS', config.token.address, 'TOKEN_ADDRESS is required when chain integration is enabled');
     requireField('LOCK_VAULT_ADDRESS', config.lockVault.address, 'LOCK_VAULT_ADDRESS is required when chain integration is enabled');
-    requireField('ORACLE_ADDRESS', config.oracle.address, 'ORACLE_ADDRESS is required when chain integration is enabled');
     if (config.rewardClaim.model === 'distributor') {
       requireField(
         'REWARD_DISTRIBUTOR_ADDRESS',

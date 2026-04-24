@@ -1,7 +1,7 @@
 # TON Testnet Contract Deployment - 2026-04-24
 
-This record captures the current testnet-only contract deployment. These
-addresses are not mainnet production addresses.
+This record tracks the current testnet-only deployment line. These addresses are
+not mainnet production addresses.
 
 ## Network
 
@@ -10,64 +10,106 @@ addresses are not mainnet production addresses.
 - Admin wallet: `kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl`
 - Mainnet deployment: not performed
 
-## Contracts
+## Current Testnet Addresses
+
+- LockVault: `kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt`
+- LockVault deployment LT: `65129793000003`
+- MerkleClaim: `kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg`
+- MerkleClaim deployment LT: `65129811000003`
+
+These addresses were produced by an earlier testnet deployment. Because the
+contract code has since changed to real Jetton custody and Merkle proof
+verification, a fresh testnet deployment is required before canary evidence can
+be treated as valid.
+
+## Current Contract Semantics
 
 ### LockVault
 
-- Address: `kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt`
-- Deployment LT: `65129793000003`
 - Source: `contracts/lock_vault.tact`
 - ABI: `server/src/services/contracts/abi/lock-vault/lock-vault.abi.json`
-
-Messages:
-
-- `Deposit`
-  - opcode: `0x4c4f434b`
-  - fields: `queryId:uint64`, `waveId:uint32`, `amountRaw:uint128`,
-    `positionId:uint64`
-- `SetPaused`
-  - opcode: `0x50415553`
-  - fields: `paused:bool`
-
-Current limitation:
-
-- This testnet contract records receipt data and pause state. It does not yet
-  custody Jettons through a Jetton wallet transfer notification path.
+- Constructor: `owner`, `tokenAddress`
+- Deposit path: standard Jetton `transfer_notification` from the configured
+  vault Jetton wallet only.
+- Deposit forward payload: `storeBit(false)`, `waveId:uint32`,
+  `positionId:uint64`.
+- Withdraw path: `WithdrawPosition`, callable only by the position owner.
+- Unlock condition: either the user's active raw balance multiplied by current
+  `priceUsdE6` reaches the user's target, or the individual position is at least
+  one year old.
+- Cycle rule: after a user's goal is reached, new deposits are blocked until the
+  active cycle is fully withdrawn. Once active balance returns to zero, the next
+  deposit starts a new locked cycle.
 
 ### MerkleClaim
 
-- Address: `kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg`
-- Deployment LT: `65129811000003`
 - Source: `contracts/merkle_claim.tact`
 - ABI: `server/src/services/contracts/abi/merkle-claim/merkle-claim.abi.json`
+- Constructor: `owner`, `tokenAddress`
+- Reward path: user sends `ClaimReward` with `batchId`, `ledgerIdHash`,
+  `recipient`, `amountRaw`, and proof cell.
+- The contract verifies the active Merkle root, blocks duplicate ledgers, and
+  transfers Jettons from its configured reward Jetton wallet to the claimant.
 
-Messages:
+## Fresh Testnet Canary Flow
 
-- `SetMerkleRoot`
-  - opcode: `0x524f4f54`
-  - fields: `batchId:uint64`, `merkleRoot:uint256`
-- `ClaimReward`
-  - opcode: `0x434c414d`
-  - fields: `queryId:uint64`, `batchId:uint64`, `ledgerIdHash:uint256`,
-    `amountRaw:uint128`, `leafHash:uint256`
-- `SetPaused`
-  - opcode: `0x50415553`
-  - fields: `paused:bool`
+The canary must use a real testnet Jetton master. Do not use the admin wallet as
+a placeholder token address.
 
-Current limitation:
+1. Provide or deploy `TOKEN_ADDRESS_TESTNET`.
+2. Build contracts:
 
-- This testnet contract records root and claim receipt state. It does not yet
-  verify Merkle proof paths on-chain and does not transfer Jettons.
+```bash
+npm run contract:build
+```
 
-## Verification
+3. Deploy contracts:
 
-- `npm run contract:build`
-- `npm run contract:test`
+```bash
+UPDATE_ENV=true npm run contract:deploy:testnet
+```
+
+4. Derive LockVault and MerkleClaim Jetton wallet addresses from the testnet
+   Jetton master:
+
+```bash
+UPDATE_ENV=true npm run contract:jetton-wallets:testnet
+```
+
+5. Configure the deployed contracts with those Jetton wallets:
+
+```bash
+npm run contract:configure:testnet
+```
+
+Optionally set the testnet unlock price in the same step:
+
+```bash
+LOCK_VAULT_PRICE_USD_E6_TESTNET=1000 npm run contract:configure:testnet
+```
+
+6. Fund the depositor's testnet Jetton wallet and, for rewards, fund
+   MerkleClaim's reward Jetton wallet.
+7. Send one small canary deposit:
+
+```bash
+TESTNET_CANARY_WAVE_ID=1 \
+TESTNET_CANARY_AMOUNT_RAW=<small_raw_amount> \
+npm run contract:canary:deposit:testnet
+```
+
+The script submits a standard Jetton transfer to the user's Jetton wallet with
+`destination=LockVault`, then polls LockVault transactions and prints the
+receipt hash for backend `/v1/waves/:waveId/deposit-receipt`.
 
 ## Mainnet Blockers
 
-- Implement Jetton transfer notification handling for LockVault.
-- Implement or intentionally replace on-chain Merkle proof verification.
-- Add backend verifier support for TON transaction parsing.
-- Use a new non-public mainnet admin wallet. The testnet mnemonic used during
-  this deployment must not be used for mainnet funds.
+- Fresh testnet deployment with current code.
+- Testnet 72H Jetton master address, or an intentionally deployed testnet-only
+  Jetton master.
+- Testnet canary deposit receipt verified by backend `CHAIN_RECEIPT_VERIFIER=ton_rpc`.
+- Merkle claim canary with an active backend batch and verified on-chain claim
+  receipt.
+- Frontend TonConnect transaction builders for deposit and claim, or a limited
+  operator canary flow documented separately.
+- Mainnet deployment via the admin Tonkeeper wallet only after the above passes.

@@ -178,7 +178,7 @@ const productionMerkleContractEnv: EnvCheck[] = [
   { name: 'CHAIN_RPC_URL', hint: 'Production RPC endpoint for receipt and claim-event verification.', validate: (value) => validateUrl(value) },
   { name: 'TOKEN_ADDRESS', hint: 'Production reward/deposit token address.', validate: validateContractValue },
   { name: 'LOCK_VAULT_ADDRESS', hint: 'Production lock vault contract address.', validate: validateContractValue },
-  { name: 'ORACLE_ADDRESS', hint: 'Production oracle contract address.', validate: validateContractValue },
+  { name: 'MERKLE_CLAIM_ADDRESS', hint: 'Production MerkleClaim contract address when REWARD_CLAIM_MODEL=merkle.', validate: validateContractValue },
 ];
 
 const productionChainRecommended: EnvCheck[] = [
@@ -192,6 +192,7 @@ const productionChainRecommended: EnvCheck[] = [
   { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Enable only when chain receipt verification is configured.', validate: (value) => validateBoolean(value) },
   { name: 'CHAIN_RECEIPT_VERIFIER', hint: 'Production receipt verifier implementation. Must not be test or disabled.', validate: validateReceiptVerifier },
   { name: 'REWARD_CLAIM_MODEL', hint: 'Production reward claim model. Use merkle for limited gray launch.', validate: validateProductionValue },
+  { name: 'ORACLE_ADDRESS', hint: 'Optional external oracle contract address. Current LockVault uses owner-signed SetPrice instead.', validate: validateContractValue },
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Only required when REWARD_CLAIM_MODEL=distributor.', validate: validateContractValue },
   { name: 'RECEIPT_REQUIRED_CONFIRMATIONS', hint: 'Finality confirmations required before applying receipts.', validate: (value) => validateInteger(value) },
 ];

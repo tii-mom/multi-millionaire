@@ -52,6 +52,20 @@ describe('contract config loader', () => {
     ]);
   });
 
+  it('does not require a separate oracle contract when LockVault owner-signed pricing is used', () => {
+    const config = loadContractIntegrationConfig({
+      CHAIN_READ_ONLY_ENABLED: 'true',
+      CHAIN_RPC_URL: 'https://rpc.example.invalid',
+      CHAIN_ID: 'ton-mainnet',
+      TOKEN_ADDRESS: 'TOKEN',
+      LOCK_VAULT_ADDRESS: 'LOCK',
+      REWARD_CLAIM_MODEL: 'merkle',
+    });
+
+    expect(getContractIntegrationDiagnostics(config).issues).toEqual([]);
+    expect(getContractIntegrationDiagnostics(config).readyForReads).toBe(true);
+  });
+
   it('fails closed when chain integration is enabled without addresses', () => {
     expect(() =>
       loadValidatedContractIntegrationConfig({

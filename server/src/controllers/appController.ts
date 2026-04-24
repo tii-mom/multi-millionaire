@@ -27,6 +27,7 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
       vault: process.env.LOCK_VAULT_ADDRESS || process.env.VAULT_ADDRESS || '',
       oracle: process.env.ORACLE_ADDRESS || '',
       reward_distributor: process.env.REWARD_DISTRIBUTOR_ADDRESS || '',
+      merkle_claim: process.env.MERKLE_CLAIM_ADDRESS || process.env.MERKLE_CLAIM_ADDRESS_TESTNET || '',
     };
     const controlMap = Object.fromEntries(controls.map((control) => [control.key, { enabled: control.enabled, reason: control.reason }]));
     const receiptVerifier = getReceiptVerifierDiagnostics();

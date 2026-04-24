@@ -24,7 +24,7 @@ function optionalAddress(...names: string[]): Address | null {
 }
 
 function optionalApiKey(): string | undefined {
-  return process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
+  return process.env.TONCENTER_TESTNET_API_KEY?.trim() || process.env.TONCENTER_API_KEY?.trim() || undefined;
 }
 
 function updateEnv(updates: Record<string, string>) {
@@ -88,7 +88,7 @@ async function main() {
   const sender = openedWallet.sender(keyPair.secretKey);
   const seqno = await withToncenterRetry('get wallet seqno', () => openedWallet.getSeqno());
   const owner = wallet.address;
-  const tokenAddress = Address.parse(process.env.TOKEN_ADDRESS_TESTNET || process.env.CHAIN_ADMIN_ADDRESS_TESTNET || owner.toString({ testOnly: true }));
+  const tokenAddress = Address.parse(required('TOKEN_ADDRESS_TESTNET'));
   const vaultJettonWallet = optionalAddress('LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET', 'VAULT_JETTON_WALLET_ADDRESS_TESTNET');
   const rewardJettonWallet = optionalAddress('REWARD_JETTON_WALLET_ADDRESS_TESTNET');
 

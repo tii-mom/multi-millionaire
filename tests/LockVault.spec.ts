@@ -174,6 +174,70 @@ describe('LockVault', () => {
         expect(state.totalActiveRaw).toBe(0n);
     });
 
+    it('blocks new deposits after a user reaches the target until the active cycle is withdrawn', async () => {
+        await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'SetPrice', queryId: 1n, priceUsdE6: 1000n },
+        );
+
+        const oneBillionTokensRaw = 1_000_000_000n * TOKEN_SCALE;
+        await lockVault.send(
+            vaultJettonWallet.getSender(),
+            { value: toNano('0.05') },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId: 2n,
+                amount: oneBillionTokensRaw,
+                sender: user.address,
+                forwardPayload: depositPayload(1n, 101n),
+            },
+        );
+
+        const blockedTopUp = await lockVault.send(
+            vaultJettonWallet.getSender(),
+            { value: toNano('0.05') },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId: 3n,
+                amount: 1n,
+                sender: user.address,
+                forwardPayload: depositPayload(1n, 102n),
+            },
+        );
+
+        expect(blockedTopUp.transactions).toHaveTransaction({
+            from: vaultJettonWallet.address,
+            to: lockVault.address,
+            success: false,
+            exitCode: 1008,
+        });
+
+        await lockVault.send(
+            user.getSender(),
+            { value: toNano('0.15') },
+            { $$type: 'WithdrawPosition', queryId: 4n, positionId: 101n },
+        );
+
+        const nextCycleDeposit = await lockVault.send(
+            vaultJettonWallet.getSender(),
+            { value: toNano('0.05') },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId: 5n,
+                amount: 1n,
+                sender: user.address,
+                forwardPayload: depositPayload(1n, 103n),
+            },
+        );
+
+        expect(nextCycleDeposit.transactions).toHaveTransaction({
+            from: vaultJettonWallet.address,
+            to: lockVault.address,
+            success: true,
+        });
+    });
+
     it('keeps funds locked until either target or one-year time lock is satisfied', async () => {
         await lockVault.send(
             vaultJettonWallet.getSender(),
