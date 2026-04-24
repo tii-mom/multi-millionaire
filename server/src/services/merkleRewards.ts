@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Address, beginCell, Cell } from '@ton/core';
 import { withTransaction } from '../db';
 import { loadContractIntegrationConfig } from './contracts/config';
 import { findMerkleClaimTransaction, normalizeTonAddress, TonMessageParseError, TonTransactionLike } from './tonMessages';
@@ -17,7 +18,12 @@ export interface MerkleLeafInput {
 }
 
 export interface MerkleLeaf extends MerkleLeafInput {
+  ledgerIdHash: string;
   leafHash: string;
+}
+
+export interface MerkleTreeOptions {
+  batchId?: string;
 }
 
 export interface MerkleTreeBuild {
@@ -46,7 +52,8 @@ export interface MerkleClaimReceiptInput {
   txHash: string;
   beneficiaryWallet: string;
   amountRaw: string;
-  leafHash: string;
+  leafHash?: string;
+  ledgerIdHash?: string;
   batchId?: string;
 }
 
@@ -54,26 +61,53 @@ function sha256(value: string): string {
   return `0x${crypto.createHash('sha256').update(value).digest('hex')}`;
 }
 
-function hashPair(left: string, right: string): string {
-  return sha256([left, right].sort().join(''));
+function cellHashHex(cell: Cell): string {
+  return `0x${cell.hash().toString('hex')}`;
 }
 
-export function buildMerkleLeaf(input: MerkleLeafInput): MerkleLeaf {
+function normalizeUint64(value: string): bigint {
+  const parsed = BigInt(value);
+  const maxUint64 = (BigInt(1) << BigInt(64)) - BigInt(1);
+  if (parsed < BigInt(0) || parsed > maxUint64) {
+    throw new Error('Merkle batch contract id must fit uint64');
+  }
+  return parsed;
+}
+
+function normalizeUint256Hex(value: string): bigint {
+  return BigInt(value);
+}
+
+export function hashLedgerId(ledgerId: string): string {
+  return sha256(ledgerId);
+}
+
+function hashPair(left: string, right: string): string {
+  return cellHashHex(beginCell()
+    .storeUint(normalizeUint256Hex(left), 256)
+    .storeUint(normalizeUint256Hex(right), 256)
+    .endCell());
+}
+
+export function buildMerkleLeaf(input: MerkleLeafInput, options: MerkleTreeOptions = {}): MerkleLeaf {
+  const batchId = normalizeUint64(options.batchId || '1');
+  const ledgerIdHash = hashLedgerId(input.ledgerId);
   return {
     ...input,
-    leafHash: sha256([
-      input.ledgerId,
-      input.beneficiaryUserId,
-      input.beneficiaryWallet.toLowerCase(),
-      input.amountRaw,
-    ].join(':')),
+    ledgerIdHash,
+    leafHash: cellHashHex(beginCell()
+      .storeUint(batchId, 64)
+      .storeUint(normalizeUint256Hex(ledgerIdHash), 256)
+      .storeAddress(Address.parse(input.beneficiaryWallet))
+      .storeCoins(BigInt(input.amountRaw))
+      .endCell()),
   };
 }
 
-export function buildMerkleTree(inputs: MerkleLeafInput[]): MerkleTreeBuild {
-  const leaves = inputs.map(buildMerkleLeaf);
+export function buildMerkleTree(inputs: MerkleLeafInput[], options: MerkleTreeOptions = {}): MerkleTreeBuild {
+  const leaves = inputs.map((input) => buildMerkleLeaf(input, options));
   if (leaves.length === 0) {
-    return { root: sha256('empty'), leaves: [] };
+    return { root: cellHashHex(beginCell().endCell()), leaves: [] };
   }
 
   const proofs = new Map<string, string[]>();
@@ -88,11 +122,11 @@ export function buildMerkleTree(inputs: MerkleLeafInput[]): MerkleTreeBuild {
       const left = level[i];
       const right = level[i + 1] || left;
       for (const index of left.indexes) {
-        proofs.get(String(index))?.push(right.hash);
+        proofs.get(String(index))?.push(`right:${right.hash}`);
       }
       for (const index of right.indexes) {
         if (right !== left) {
-          proofs.get(String(index))?.push(left.hash);
+          proofs.get(String(index))?.push(`left:${left.hash}`);
         }
       }
       next.push({ hash: hashPair(left.hash, right.hash), indexes: [...left.indexes, ...right.indexes] });
@@ -106,18 +140,33 @@ export function buildMerkleTree(inputs: MerkleLeafInput[]): MerkleTreeBuild {
   };
 }
 
+export function encodeMerkleProofCell(proof: string[]): string {
+  let builder = beginCell().storeUint(proof.length, 8);
+  for (const item of proof) {
+    const [side, hash] = item.split(':');
+    if ((side !== 'left' && side !== 'right') || !hash) {
+      throw new Error(`Invalid Merkle proof item: ${item}`);
+    }
+    builder = builder
+      .storeBit(side === 'right')
+      .storeUint(normalizeUint256Hex(hash), 256);
+  }
+  return builder.endCell().toBoc().toString('base64');
+}
+
 export async function createDraftMerkleRewardBatch(input: {
   chainId: string;
   tokenAddress: string;
   createdBy?: string | null;
 }) {
   const eligible = await listEligibleRewardsForMerkle();
+  const contractBatchId = String(Date.now());
   const tree = buildMerkleTree(eligible.map((reward: EligibleRewardForMerkle) => ({
     ledgerId: reward.ledger_id,
     beneficiaryUserId: reward.beneficiary_user_id,
     beneficiaryWallet: reward.beneficiary_wallet,
     amountRaw: reward.amount_raw,
-  })));
+  })), { batchId: contractBatchId });
   const totalAmountRaw = eligible.reduce((sum, item) => sum + BigInt(item.amount_raw), BigInt(0)).toString();
 
   return withTransaction(async (tx) => {
@@ -127,7 +176,7 @@ export async function createDraftMerkleRewardBatch(input: {
       merkleRoot: tree.root,
       totalAmountRaw,
       status: 'draft',
-      metadata: { reward_count: eligible.length },
+      metadata: { reward_count: eligible.length, contract_batch_id: contractBatchId, merkle_hash: 'ton-cell-v1' },
       createdBy: input.createdBy || null,
     }, tx);
 
@@ -187,14 +236,17 @@ export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): 
   if (normalizeTonAddress(match.message.source) !== normalizeTonAddress(input.beneficiaryWallet)) {
     throw new MerkleClaimVerificationError(409, 'BENEFICIARY_MISMATCH', 'Claim receipt sender does not match the Merkle proof beneficiary wallet');
   }
+  if (match.claim.recipient !== normalizeTonAddress(input.beneficiaryWallet)) {
+    throw new MerkleClaimVerificationError(409, 'RECIPIENT_MISMATCH', 'Claim receipt recipient does not match the Merkle proof beneficiary wallet');
+  }
   if (input.batchId && match.claim.batchId !== input.batchId) {
     throw new MerkleClaimVerificationError(409, 'BATCH_MISMATCH', 'Claim receipt batch does not match the Merkle proof batch');
   }
+  if (input.ledgerIdHash && match.claim.ledgerIdHash !== normalizeUint256(input.ledgerIdHash)) {
+    throw new MerkleClaimVerificationError(409, 'LEDGER_MISMATCH', 'Claim receipt ledger does not match the Merkle proof ledger');
+  }
   if (match.claim.amountRaw !== input.amountRaw) {
     throw new MerkleClaimVerificationError(409, 'AMOUNT_MISMATCH', 'Claim receipt amount does not match the Merkle proof');
-  }
-  if (match.claim.leafHash !== normalizeUint256(input.leafHash)) {
-    throw new MerkleClaimVerificationError(409, 'LEAF_MISMATCH', 'Claim receipt leaf does not match the Merkle proof');
   }
 }
 

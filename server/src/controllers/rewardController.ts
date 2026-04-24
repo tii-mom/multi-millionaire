@@ -9,7 +9,7 @@ import {
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
 import { isControlEnabled, productionChainRequired, riskReviewEnabled } from '../services/productionGuards';
 import { getMerkleProofForLedger, markMerkleClaimPending } from '../models/merkleRewardModel';
-import { MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
+import { encodeMerkleProofCell, hashLedgerId, MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
 
 const allowedStatuses = new Set<RewardStatus>(['pending', 'approved', 'claimed', 'rejected']);
 
@@ -111,7 +111,18 @@ export async function getMerkleClaimProof(req: Request, res: Response, next: Nex
     if (!proof || proof.batch_status !== 'active') {
       return res.status(404).json({ request_id: req.id || '', error: { code: 'MERKLE_PROOF_NOT_AVAILABLE', message: 'Merkle proof is not available for this reward' } });
     }
-    return res.json({ request_id: req.id || '', data: proof });
+    const contractBatchId = typeof proof.batch_metadata?.contract_batch_id === 'string'
+      ? proof.batch_metadata.contract_batch_id
+      : '';
+    return res.json({
+      request_id: req.id || '',
+      data: {
+        ...proof,
+        contract_batch_id: contractBatchId,
+        ledger_id_hash: hashLedgerId(ledgerId),
+        proof_boc: encodeMerkleProofCell(proof.proof),
+      },
+    });
   } catch (err) {
     return next(err);
   }
@@ -149,7 +160,8 @@ export async function submitMerkleClaimReceipt(req: Request, res: Response, next
       txHash,
       beneficiaryWallet: proof.beneficiary_wallet,
       amountRaw: proof.amount_raw,
-      leafHash: proof.leaf_hash,
+      ledgerIdHash: hashLedgerId(ledgerId),
+      batchId: typeof proof.batch_metadata?.contract_batch_id === 'string' ? proof.batch_metadata.contract_batch_id : undefined,
     });
     const pending = await markMerkleClaimPending(ledgerId, user.id, txHash);
     return res.json({ request_id: req.id || '', data: pending });

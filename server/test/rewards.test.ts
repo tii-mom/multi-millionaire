@@ -246,7 +246,7 @@ describe('Reward API and generation', () => {
       beneficiary_user_id: inviteeUserId,
       batch_status: 'active',
       merkle_root: '0xroot',
-      proof: ['0xproof'],
+      proof: ['right:0x0000000000000000000000000000000000000000000000000000000000000001'],
     });
 
     const res = await request(app)

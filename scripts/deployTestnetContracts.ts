@@ -13,6 +13,16 @@ function required(name: string): string {
   return value;
 }
 
+function requiredAddress(...names: string[]): Address {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) {
+      return Address.parse(value);
+    }
+  }
+  throw new Error(`${names.join(' or ')} is required for testnet deployment`);
+}
+
 function optionalApiKey(): string | undefined {
   return process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
 }
@@ -79,9 +89,11 @@ async function main() {
   const seqno = await withToncenterRetry('get wallet seqno', () => openedWallet.getSeqno());
   const owner = wallet.address;
   const tokenAddress = Address.parse(process.env.TOKEN_ADDRESS_TESTNET || process.env.CHAIN_ADMIN_ADDRESS_TESTNET || owner.toString({ testOnly: true }));
+  const vaultJettonWallet = requiredAddress('LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET', 'VAULT_JETTON_WALLET_ADDRESS_TESTNET');
+  const rewardJettonWallet = requiredAddress('REWARD_JETTON_WALLET_ADDRESS_TESTNET');
 
-  const lockVault = LockVault.fromInit(owner, tokenAddress);
-  const merkleClaim = MerkleClaim.fromInit(owner, tokenAddress);
+  const lockVault = LockVault.fromInit(owner, tokenAddress, vaultJettonWallet);
+  const merkleClaim = MerkleClaim.fromInit(owner, tokenAddress, rewardJettonWallet);
   const openedLockVault = client.open(await lockVault);
   const openedMerkleClaim = client.open(await merkleClaim);
 
@@ -89,6 +101,9 @@ async function main() {
     network: 'ton-testnet',
     endpoint,
     wallet: owner.toString({ testOnly: true }),
+    tokenAddress: tokenAddress.toString({ testOnly: true }),
+    vaultJettonWallet: vaultJettonWallet.toString({ testOnly: true }),
+    rewardJettonWallet: rewardJettonWallet.toString({ testOnly: true }),
     seqno,
     lockVault: openedLockVault.address.toString({ testOnly: true }),
     merkleClaim: openedMerkleClaim.address.toString({ testOnly: true }),

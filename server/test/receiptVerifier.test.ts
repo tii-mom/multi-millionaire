@@ -1,7 +1,44 @@
+import { Address, beginCell } from '@ton/core';
 import { ReceiptVerificationError, getReceiptVerifierDiagnostics, verifyDepositReceipt } from '../src/services/receiptVerifier';
+import { LOCK_VAULT_DEPOSIT_OPCODE } from '../src/services/tonMessages';
 
 describe('chain receipt verifier selection', () => {
   const originalEnv = { ...process.env };
+  const lockVaultAddress = 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt';
+  const senderAddress = 'kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl';
+  const otherAddress = 'kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg';
+
+  function buildDepositBody(input: { waveId?: number; amountRaw?: string; positionId?: string; sender?: string } = {}): string {
+    return beginCell()
+      .storeUint(LOCK_VAULT_DEPOSIT_OPCODE, 32)
+      .storeUint(BigInt('1'), 64)
+      .storeCoins(BigInt(input.amountRaw || '1000'))
+      .storeAddress(Address.parse(input.sender || senderAddress))
+      .storeBit(false)
+      .storeUint(input.waveId ?? 7, 32)
+      .storeUint(BigInt(input.positionId || '42'), 64)
+      .endCell()
+      .toBoc()
+      .toString('base64');
+  }
+
+  function mockTonDepositTransaction(input: { destination?: string; body?: string } = {}) {
+    return jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        result: [{
+          transaction_id: { lt: '123', hash: 'tx-hash' },
+          utime: 1777027651,
+          in_msg: {
+            source: otherAddress,
+            destination: input.destination || lockVaultAddress,
+            body: input.body || buildDepositBody(),
+          },
+        }],
+      }),
+    } as any);
+  }
 
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -105,44 +142,88 @@ describe('chain receipt verifier selection', () => {
     process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
     process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
-    process.env.LOCK_VAULT_ADDRESS = 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt';
-    const body = (await import('@ton/core')).beginCell()
-      .storeUint(0x4c4f434b, 32)
-      .storeUint(BigInt('1'), 64)
-      .storeUint(7, 32)
-      .storeUint(BigInt('1000'), 128)
-      .storeUint(BigInt('42'), 64)
-      .endCell()
-      .toBoc()
-      .toString('base64');
-    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        result: [{
-          transaction_id: { lt: '123', hash: 'tx-hash' },
-          utime: 1777027651,
-          in_msg: {
-            source: 'kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl',
-            destination: 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt',
-            body,
-          },
-        }],
-      }),
-    } as any);
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    const fetchMock = mockTonDepositTransaction();
 
     const receipt = await verifyDepositReceipt({
       txHash: 'tx-hash',
       waveId: 7,
       amountRaw: '1000',
+      walletAddress: senderAddress,
     });
 
     expect(receipt).toMatchObject({
       chainId: 'ton-testnet',
       txHash: 'tx-hash',
+      walletAddress: Address.parse(senderAddress).toRawString().toLowerCase(),
       amountRaw: '1000',
       positionId: '42',
       finalized: true,
+    });
+    fetchMock.mockRestore();
+  });
+
+  it('rejects TON deposit receipts for the wrong LockVault contract', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    const fetchMock = mockTonDepositTransaction({ destination: otherAddress });
+
+    await expect(verifyDepositReceipt({ txHash: 'tx-hash' })).rejects.toMatchObject({
+      status: 404,
+      code: 'RECEIPT_NOT_FOUND',
+    });
+    fetchMock.mockRestore();
+  });
+
+  it('rejects TON deposit receipts for the wrong sender wallet', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    const fetchMock = mockTonDepositTransaction();
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      walletAddress: otherAddress,
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'WALLET_MISMATCH',
+    });
+    fetchMock.mockRestore();
+  });
+
+  it('rejects TON deposit receipts for the wrong amount', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    const fetchMock = mockTonDepositTransaction();
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      amountRaw: '999',
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'AMOUNT_MISMATCH',
+    });
+    fetchMock.mockRestore();
+  });
+
+  it('rejects TON deposit receipts for the wrong wave', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    const fetchMock = mockTonDepositTransaction();
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      waveId: 8,
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'WAVE_MISMATCH',
     });
     fetchMock.mockRestore();
   });

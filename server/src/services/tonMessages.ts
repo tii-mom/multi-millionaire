@@ -1,6 +1,7 @@
-import { Address, Cell } from '@ton/core';
+import { Address, Cell, Slice } from '@ton/core';
 
-export const LOCK_VAULT_DEPOSIT_OPCODE = 0x4c4f434b;
+export const JETTON_TRANSFER_NOTIFICATION_OPCODE = 0x7362d09c;
+export const LOCK_VAULT_DEPOSIT_OPCODE = JETTON_TRANSFER_NOTIFICATION_OPCODE;
 export const MERKLE_CLAIM_OPCODE = 0x434c414d;
 
 export interface ParsedLockVaultDeposit {
@@ -9,6 +10,7 @@ export interface ParsedLockVaultDeposit {
   waveId: number;
   amountRaw: string;
   positionId: string;
+  senderAddress: string;
 }
 
 export interface ParsedMerkleClaim {
@@ -16,8 +18,8 @@ export interface ParsedMerkleClaim {
   queryId: string;
   batchId: string;
   ledgerIdHash: string;
+  recipient: string;
   amountRaw: string;
-  leafHash: string;
 }
 
 export interface TonTransactionMessage {
@@ -33,6 +35,17 @@ export interface TonTransactionLike {
   };
   utime?: number;
   in_msg?: TonTransactionMessage;
+  description?: {
+    aborted?: boolean;
+    compute_ph?: {
+      success?: boolean;
+      exit_code?: number;
+    };
+    action?: {
+      success?: boolean;
+      result_code?: number;
+    };
+  };
 }
 
 export class TonMessageParseError extends Error {
@@ -57,18 +70,65 @@ export function normalizeTonAddress(value: string): string {
   return Address.parse(value).toRawString().toLowerCase();
 }
 
+function addressToComparableString(address: Address): string {
+  return address.toRawString().toLowerCase();
+}
+
+function loadDepositForwardPayload(slice: Slice): Slice {
+  if (slice.remainingBits === 96) {
+    return slice;
+  }
+  if (slice.remainingBits >= 1) {
+    const payloadInRef = slice.loadBit();
+    if (payloadInRef) {
+      if (slice.remainingRefs < 1) {
+        throw new TonMessageParseError('INVALID_TON_BODY', 'Jetton deposit notification is missing forward payload ref');
+      }
+      return slice.loadRef().beginParse();
+    }
+    return slice;
+  }
+  if (slice.remainingRefs > 0) {
+    return slice.loadRef().beginParse();
+  }
+  throw new TonMessageParseError('INVALID_TON_BODY', 'Jetton deposit notification is missing forward payload metadata');
+}
+
+function transactionSucceeded(transaction: TonTransactionLike): boolean {
+  const description = transaction.description;
+  if (!description) {
+    return true;
+  }
+  if (description.aborted === true) {
+    return false;
+  }
+  if (description.compute_ph?.success === false) {
+    return false;
+  }
+  if (description.action?.success === false) {
+    return false;
+  }
+  return true;
+}
+
 export function parseLockVaultDepositBody(bodyBase64: string): ParsedLockVaultDeposit {
   const slice = readBodyCell(bodyBase64).beginParse();
   const opcode = slice.loadUint(32);
-  if (opcode !== LOCK_VAULT_DEPOSIT_OPCODE) {
-    throw new TonMessageParseError('UNEXPECTED_TON_OPCODE', 'Message body is not a LockVault Deposit message');
+  if (opcode !== JETTON_TRANSFER_NOTIFICATION_OPCODE) {
+    throw new TonMessageParseError('UNEXPECTED_TON_OPCODE', 'Message body is not a Jetton transfer_notification message');
   }
+  const queryId = slice.loadUintBig(64).toString();
+  const amountRaw = slice.loadCoins().toString();
+  const senderAddress = addressToComparableString(slice.loadAddress());
+  const forwardPayload = loadDepositForwardPayload(slice);
+
   return {
     opcode,
-    queryId: slice.loadUintBig(64).toString(),
-    waveId: Number(slice.loadUint(32)),
-    amountRaw: slice.loadUintBig(128).toString(),
-    positionId: slice.loadUintBig(64).toString(),
+    queryId,
+    waveId: Number(forwardPayload.loadUint(32)),
+    amountRaw,
+    positionId: forwardPayload.loadUintBig(64).toString(),
+    senderAddress,
   };
 }
 
@@ -78,13 +138,22 @@ export function parseMerkleClaimBody(bodyBase64: string): ParsedMerkleClaim {
   if (opcode !== MERKLE_CLAIM_OPCODE) {
     throw new TonMessageParseError('UNEXPECTED_TON_OPCODE', 'Message body is not a Merkle ClaimReward message');
   }
+  const queryId = slice.loadUintBig(64).toString();
+  const batchId = slice.loadUintBig(64).toString();
+  const ledgerIdHash = slice.loadUintBig(256).toString();
+  const recipient = addressToComparableString(slice.loadAddress());
+  const amountRaw = slice.loadCoins().toString();
+  if (slice.remainingBits === 0 && slice.remainingRefs === 0) {
+    throw new TonMessageParseError('INVALID_TON_BODY', 'Merkle ClaimReward message is missing proof payload');
+  }
+
   return {
     opcode,
-    queryId: slice.loadUintBig(64).toString(),
-    batchId: slice.loadUintBig(64).toString(),
-    ledgerIdHash: slice.loadUintBig(256).toString(),
-    amountRaw: slice.loadUintBig(128).toString(),
-    leafHash: slice.loadUintBig(256).toString(),
+    queryId,
+    batchId,
+    ledgerIdHash,
+    recipient,
+    amountRaw,
   };
 }
 
@@ -101,6 +170,9 @@ export function findDepositTransaction(input: {
       continue;
     }
     if (normalizeTonAddress(message.destination) !== expectedDestination) {
+      continue;
+    }
+    if (!transactionSucceeded(transaction)) {
       continue;
     }
     const deposit = parseLockVaultDepositBody(message.body);
@@ -122,6 +194,9 @@ export function findMerkleClaimTransaction(input: {
       continue;
     }
     if (normalizeTonAddress(message.destination) !== expectedDestination) {
+      continue;
+    }
+    if (!transactionSucceeded(transaction)) {
       continue;
     }
     const claim = parseMerkleClaimBody(message.body);

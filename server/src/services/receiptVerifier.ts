@@ -1,5 +1,5 @@
 import { loadContractIntegrationConfig } from './contracts/config';
-import { findDepositTransaction, TonMessageParseError, TonTransactionLike } from './tonMessages';
+import { findDepositTransaction, normalizeTonAddress, TonMessageParseError, TonTransactionLike } from './tonMessages';
 
 export type ChainReceiptVerifierStatus = 'disabled' | 'test' | 'ton_rpc' | 'not_configured';
 
@@ -200,6 +200,9 @@ class TonRpcReceiptVerifier implements ChainReceiptVerifier {
     if (input.waveId !== undefined && match.deposit.waveId !== input.waveId) {
       throw new ReceiptVerificationError(409, 'WAVE_MISMATCH', 'Receipt wave does not match requested wave');
     }
+    if (input.walletAddress && normalizeTonAddress(input.walletAddress) !== match.deposit.senderAddress) {
+      throw new ReceiptVerificationError(409, 'WALLET_MISMATCH', 'Receipt wallet does not match submitted wallet');
+    }
     if (input.amountRaw && input.amountRaw !== match.deposit.amountRaw) {
       throw new ReceiptVerificationError(409, 'AMOUNT_MISMATCH', 'Receipt amount does not match submitted amount');
     }
@@ -208,7 +211,7 @@ class TonRpcReceiptVerifier implements ChainReceiptVerifier {
       chainId: config.chainId,
       txHash,
       logIndex: 0,
-      walletAddress: match.message.source,
+      walletAddress: match.deposit.senderAddress,
       contractAddress: match.message.destination,
       amountRaw: match.deposit.amountRaw,
       positionId: match.deposit.positionId,

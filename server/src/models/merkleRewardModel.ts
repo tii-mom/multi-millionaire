@@ -37,6 +37,7 @@ export interface MerkleRewardProofWithBatch extends MerkleRewardProof {
   chain_id: string;
   token_address: string;
   merkle_root: string;
+  batch_metadata: Record<string, unknown>;
   batch_status: MerkleRewardBatchStatus;
   published_tx_hash: string | null;
 }
@@ -164,6 +165,7 @@ export async function getMerkleProofForLedger(ledgerId: string, userId: string):
        mrp.claim_status, mrp.claim_tx_hash, mrp.claim_chain_event_id,
        mrp.created_at, mrp.updated_at,
        mrb.chain_id, mrb.token_address, mrb.merkle_root,
+       mrb.metadata AS batch_metadata,
        mrb.status AS batch_status, mrb.published_tx_hash
      FROM merkle_reward_proofs mrp
      JOIN merkle_reward_batches mrb ON mrb.id = mrp.batch_id
