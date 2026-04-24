@@ -23,18 +23,23 @@ contains the Cloudflare backend staging host, not a Vercel/Neon endpoint.
   - Hyperdrive caching: `disabled`
 - Backend staging health checks:
   - `GET /health`: `200`
-  - `GET /ready`: `200`
-  - readiness payload: `{"status":"ready","database":"ok"}`
-- Real Cloudflare smoke result:
+  - `GET /ready`: `503`
+  - readiness payload: `{"status":"not_ready","database":"error"}`
+- Frontend staging URL:
+  - `GET /`: `200`
+- Historical Cloudflare smoke result:
   - run id: `cf-20260424-rc1-final`
   - status: `pass`
+- Current Cloudflare smoke result:
+  - status: `not run`
+  - reason: backend readiness fails before the complete smoke can proceed
 - Functional assessment:
-  - internal RC1 candidate validation: `pass`
+  - internal RC1 candidate validation: `blocked`
   - sustainable RC1 environment: `blocked`
 
-## Working Database Route
+## Configured Database Route
 
-The final working Cloudflare-first route is:
+The configured Cloudflare-first route is:
 
 `Cloudflare Worker -> Hyperdrive -> Workers VPC Service -> Cloudflare Tunnel -> existing Postgres`
 
@@ -60,6 +65,8 @@ Operational note:
 
 - this staging path remains dependent on the local PostgreSQL process and the
   running local `cloudflared` tunnel session staying up on this machine
+- current Cloudflare API state shows tunnel `mm-pg-staging` as `down` with no
+  active connections, so this configured route is not currently healthy
 - Earlier exploratory VPC Service:
   - service id: `019dbb2e-01d8-7ef3-9d24-1d58ba219294`
   - name: `mm-pg-staging-tcp`
@@ -84,15 +91,18 @@ had already been inserted into Postgres.
 
 ## Migration And Seed State
 
-The prepared origin database remains on the existing Postgres route and was not
-migrated to D1.
+The prepared origin database remains on the existing local Postgres route and
+was not migrated to D1.
 
-- migrations `001 -> 004`: pass
-- `seed:dev`: pass
+- historical local-origin migrations `001 -> 004`: pass
+- historical local-origin `seed:dev`: pass
 - seeded users:
   - `admin@example.com`
   - `member@example.com`
   - `risk@example.com`
+- managed Postgres migrations: not run
+- managed Postgres `seed:dev`: not run
+- managed Postgres validation data: not available
 
 ## Sustainability Assessment
 
@@ -100,6 +110,8 @@ migrated to D1.
   `No managed Postgres instance and connection string are provisioned for
   staging, so Hyperdrive cannot be repointed and migrations/seed cannot be
   rerun on a persistent origin.`
+- Current Worker bindings do not include a direct `DATABASE_URL`; staging uses
+  only the `HYPERDRIVE` binding for database access.
 - The persistent cutover plan and fallback operating notes are tracked in
   `docs/cloudflare/persistent-db-plan.md`.
 
@@ -159,9 +171,12 @@ npm run smoke
 ## RC1 State
 
 - Current blocker count: `1`
-- Current status: Cloudflare staging is usable for internal RC1 candidate
-  validation
+- Current status: Cloudflare staging is not usable for current RC1 validation
+  because `/ready` returns `503`
+- Historical smoke `cf-20260424-rc1-final` passed, but the live environment is
+  currently unhealthy
 - Sustainable RC1 status: not yet achieved
 - Stub boundary: deposit and reward claim remain off-chain stubs
-- RC1 recommendation: acceptable as an internal RC1 candidate, not yet a
-  sustainable RC1 environment
+- RC1 recommendation: do not cut RC1 until a managed Postgres origin is
+  provisioned, Hyperdrive is repointed, migrations/seed are run there, `/ready`
+  returns `200`, and the complete Cloudflare smoke passes again

@@ -7,23 +7,28 @@ replace a real Cloudflare staging smoke run against the deployed backend URL.
 
 ## Current Cloudflare Status
 
-As of `2026-04-24`, the Cloudflare staging line satisfies the functional RC1
-candidate gate:
+As of `2026-04-24`, the Cloudflare staging line does not satisfy the current
+RC1 gate:
 
 - backend staging URL is live:
   `https://multi-millionaire-api-staging.348421501.workers.dev`
 - frontend staging URL is live:
   `https://staging.multi-millionaire-staging.pages.dev`
 - backend `GET /health`: `200`
-- backend `GET /ready`: `200`
-- readiness database status: `ok`
-- Hyperdrive binding is live and backed by existing Postgres
+- backend `GET /ready`: `503`
+- readiness database status: `error`
+- Hyperdrive binding is configured for existing Postgres
 - Hyperdrive origin is still the local tunnel-backed Postgres route:
   `Hyperdrive -> VPC Service -> Tunnel -> this machine`
-- real Cloudflare smoke run `cf-20260424-rc1-final`: `pass`
+- Cloudflare tunnel `mm-pg-staging` is currently down with no active
+  connections
+- historical Cloudflare smoke run `cf-20260424-rc1-final`: `pass`
+- current complete Cloudflare smoke: not rerun because readiness fails before
+  the smoke can proceed
 
-This is enough for current internal RC1 candidate validation. It is not yet
-enough to call staging a sustainable RC1 environment.
+The historical smoke remains useful evidence for the deployed code path, but it
+does not make the current live environment an RC1 candidate while `/ready`
+returns `503`.
 
 ## Sustainability Gate
 
@@ -115,6 +120,8 @@ Keep these with the RC1 record:
 
 ## Current Decision
 
-Current result: Cloudflare internal RC1 candidate gate passes, but the
-sustainable RC1 environment gate remains blocked by the missing managed
-Postgres origin.
+Current result: Cloudflare RC1 is blocked. The only product/environment blocker
+is the missing managed Postgres `DATABASE_URL`; without it, Hyperdrive cannot be
+repointed away from the local tunnel-backed origin, migrations/seed cannot be
+run on a persistent origin, `/ready` remains `503`, and a current complete
+Cloudflare smoke cannot pass.

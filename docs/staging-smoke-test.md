@@ -1,6 +1,6 @@
 # Staging Smoke Test
 
-## Cloudflare RC1 Evidence
+## Historical Cloudflare RC1 Evidence
 
 - Repository: `tii-mom/multi-millionaire`
 - Date: `2026-04-24`
@@ -14,10 +14,26 @@
 
 This document separates:
 
-1. Real Cloudflare smoke evidence against the deployed Cloudflare backend URL
+1. Historical Cloudflare smoke evidence against the deployed Cloudflare backend URL
 2. Earlier local rehearsal evidence against the prepared origin database
+3. Current live readiness, which supersedes the historical pass for RC1 gating
 
-Only the first one counts as Cloudflare RC1 evidence.
+The historical Cloudflare smoke remains useful evidence for the code path, but
+current RC1 gating requires the live environment to be healthy and smokeable.
+
+## Current Live Smoke Status
+
+As of `2026-04-24`, the current live backend is not smokeable:
+
+- `GET /health`: `200`
+- `GET /ready`: `503`
+- readiness database status: `error`
+- Hyperdrive origin: still the local tunnel-backed Postgres route
+- Cloudflare tunnel `mm-pg-staging`: `down`, with no active connections
+- current complete Cloudflare smoke: not run because readiness fails
+
+The historical `cf-20260424-rc1-final` pass is retained below, but it no longer
+qualifies the current live environment for RC1.
 
 ## Real Cloudflare Smoke Result
 
@@ -102,9 +118,9 @@ Cloudflare smoke run:
 
 ## RC1 Classification
 
-- Internal RC1 candidate: `yes`
-  - reason: real Cloudflare smoke `cf-20260424-rc1-final` passed against the
-    deployed Cloudflare backend URL
+- Internal RC1 candidate: `no`
+  - reason: the live backend currently returns `/ready=503`, so there is no
+    current complete Cloudflare smoke pass
 - Sustainable RC1 environment: `no`
   - reason: the staging database origin still depends on the local PostgreSQL
     process plus the local Cloudflare Tunnel on this machine
