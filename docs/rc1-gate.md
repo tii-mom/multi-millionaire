@@ -7,42 +7,49 @@ replace a real Cloudflare staging smoke run against the deployed backend URL.
 
 ## Current Cloudflare Status
 
-As of `2026-04-24`, the Cloudflare staging line does not satisfy the current
-RC1 gate:
+As of `2026-04-24`, the Cloudflare staging line satisfies the current RC1 gate:
 
 - backend staging URL is live:
   `https://multi-millionaire-api-staging.348421501.workers.dev`
 - frontend staging URL is live:
   `https://staging.multi-millionaire-staging.pages.dev`
 - backend `GET /health`: `200`
-- backend `GET /ready`: `503`
-- readiness database status: `error`
-- Hyperdrive binding is configured for existing Postgres
-- Hyperdrive origin is still the local tunnel-backed Postgres route:
-  `Hyperdrive -> VPC Service -> Tunnel -> this machine`
-- Cloudflare tunnel `mm-pg-staging` is currently down with no active
-  connections
-- Neon Postgres origin is provisioned and initialized:
+- backend `GET /ready`: `200`
+- readiness database status: `ok`
+- Hyperdrive binding is configured for managed Postgres
+- Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
+- Hyperdrive name: `rc1-staging-postgres`
+- Hyperdrive origin: Neon direct/unpooled Postgres,
   `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
-- Hyperdrive cutover to Neon is blocked by invalid Cloudflare management
-  authentication
-- historical Cloudflare smoke run `cf-20260424-rc1-final`: `pass`
-- current complete Cloudflare smoke: not rerun because readiness fails before
-  the smoke can proceed
+- Hyperdrive origin service id: none
+- Hyperdrive SSL mode: `require`
+- Hyperdrive caching: `disabled`
+- local Postgres plus Cloudflare Tunnel dependency: none
+- Neon Postgres origin is provisioned, migrated, seeded, and live
+- current Cloudflare smoke run `cf-20260424-neon-rc1`: `pass`
 
-The historical smoke remains useful evidence for the deployed code path, but it
-does not make the current live environment an RC1 candidate while `/ready`
-returns `503`.
+The earlier historical smoke `cf-20260424-rc1-final` remains useful code-path
+evidence, but the current RC1 gate is based on the Neon-backed live smoke above.
 
 ## Sustainability Gate
 
 For the environment to be called a sustainable RC1 environment, staging must
-move from the current local-origin route to `Hyperdrive + Neon Postgres`.
+run through `Hyperdrive + Neon Postgres`.
 
-- Single blocker:
-  `Cloudflare management authentication is invalid, so Hyperdrive cannot be
-  repointed from the VPC Service / Tunnel origin to the prepared Neon origin.`
-- Tracking doc: `docs/cloudflare/persistent-db-plan.md`
+Current result:
+
+- Hyperdrive points at Neon direct/unpooled Postgres with `sslmode=require`
+- Hyperdrive no longer points at Workers VPC Service / Tunnel / local Postgres
+- migrations `001_init.sql` through `004_risk.sql` are applied on Neon
+- `npm run seed:dev` completed on Neon
+- required seed users exist
+- active wave exists
+- confirmed price round exists
+- live `/health` and `/ready` return `200`
+- `/ready` reports `database=ok`
+- complete Cloudflare smoke passed
+
+Tracking doc: `docs/cloudflare/persistent-db-plan.md`
 
 ## Entry Criteria
 
@@ -76,7 +83,7 @@ Before API promotion:
 1. Confirm database snapshot or restore point.
 2. Apply migrations with `NODE_ENV=staging npm run migrate:up`.
 3. Run staging seed with `NODE_ENV=staging npm run seed:dev`.
-4. Deploy the API.
+4. Deploy or confirm the API is using the intended Hyperdrive binding.
 5. Confirm the API is running on the Cloudflare staging backend URL.
 6. Confirm `/health` and `/ready` on the Cloudflare staging backend URL.
 7. Run `API_BASE_URL="$API_BASE_URL" npm run smoke` against the Cloudflare staging backend URL.
@@ -89,7 +96,7 @@ register -> immediate login read-after-write behavior remains correct.
 ## No-Go Conditions
 
 - `/ready` returns non-200 or `database` is not `ok`.
-- Cloudflare staging does not have a live `Hyperdrive -> VPC Service -> Tunnel -> Postgres` path.
+- Cloudflare staging falls back to local Postgres plus Cloudflare Tunnel.
 - Hyperdrive caching is re-enabled and auth-critical read-after-write behavior starts returning stale empty results.
 - Environment check has missing or invalid required variables.
 - Any smoke step fails.
@@ -123,8 +130,15 @@ Keep these with the RC1 record:
 
 ## Current Decision
 
-Current result: Cloudflare RC1 is blocked. Neon Postgres is provisioned,
-migrated, seeded, and validated, but Hyperdrive still points at the local
-tunnel-backed origin because current Cloudflare management credentials are
-invalid. Until Hyperdrive is repointed to Neon, `/ready` remains `503` and a
-current complete Cloudflare smoke cannot pass.
+Current result: Cloudflare RC1 is unblocked. Neon Postgres is provisioned,
+migrated, seeded, validated, and live through Hyperdrive. `/health` and
+`/ready` return `200`, `/ready` reports `database=ok`, and the complete
+Cloudflare smoke `cf-20260424-neon-rc1` passed against the deployed staging
+backend.
+
+- Internal RC1 candidate: `yes`
+- Sustainable RC1 environment: `yes`
+
+Cloudflare API tokens and the Neon `DATABASE_URL` were not written to
+repository files, documentation, or commits. Deposit and reward claim remain
+off-chain stubs.

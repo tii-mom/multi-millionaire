@@ -4,34 +4,41 @@ Date: 2026-04-24
 
 ## Current Result
 
-Neon Postgres has been provisioned and initialized for RC1 staging, but
-sustainable RC1 is still blocked by Cloudflare management authentication.
+Cloudflare RC1 staging now uses a persistent managed Postgres origin:
+
+`Cloudflare Worker -> Hyperdrive -> Neon Postgres`
+
+The staging data plane no longer depends on local Postgres, Workers VPC Service,
+or a local Cloudflare Tunnel.
 
 Current facts:
 
+- backend URL:
+  `https://multi-millionaire-api-staging.348421501.workers.dev`
+- frontend URL:
+  `https://staging.multi-millionaire-staging.pages.dev`
 - live backend `GET /health`: `200`
-- live backend `GET /ready`: `503`
-- readiness database status: `error`
+- live backend `GET /ready`: `200`
+- readiness database status: `ok`
 - Worker database binding: `HYPERDRIVE=88b8cd7fd84e4064ad29b43a16c579f2`
-- Hyperdrive origin: Workers VPC Service
-  `019dbb34-5edb-7101-804f-1a62f6a9c105`
-- Cloudflare tunnel: `mm-pg-staging`
-  `7ae7d04e-ca98-40d9-9f5d-fd52aa100b32`
-- tunnel status: `down`, with no active connections
-- current Worker bindings do not include `DATABASE_URL`
+- Hyperdrive name: `rc1-staging-postgres`
+- Hyperdrive origin host:
+  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- Hyperdrive origin database: `neondb`
+- Hyperdrive origin user: `neondb_owner`
+- Hyperdrive origin service id: none
+- Hyperdrive SSL mode: `require`
+- Hyperdrive caching: `disabled`
+- Hyperdrive origin connection limit: `20`
 - Neon project: `dry-art-24207577`
 - Neon branch: `br-curly-mud-an2nh595`
-- Neon database: `neondb`
-- Neon role: `neondb_owner`
-- Neon direct host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
-- Neon connection mode: direct/unpooled, `sslmode=require`
+- Neon connection mode: direct/unpooled
 - Neon `DATABASE_URL`: not stored in git, docs, or Worker vars
 
-The Neon origin is ready, but the live Cloudflare data plane still depends on a
-local PostgreSQL process plus a local Cloudflare Tunnel because Hyperdrive could
-not be updated with the current Cloudflare credentials.
+The previous local-origin route through Workers VPC Service and Cloudflare
+Tunnel is no longer part of the live RC1 staging data plane.
 
-## Completed Neon Initialization
+## Neon Initialization
 
 - migrations `001_init.sql`, `002_squads.sql`, `003_rewards.sql`, and
   `004_risk.sql`: applied on Neon
@@ -44,44 +51,46 @@ not be updated with the current Cloudflare credentials.
 - verified active wave count: `1`
 - verified confirmed price round count: `1`
 
-## Current Blocker
+## Cloudflare Cutover
 
-The remaining blocker is:
+The existing Hyperdrive config was patched in place instead of creating a new
+Worker binding:
 
-`Cloudflare management authentication is invalid, so Hyperdrive cannot be
-patched from the VPC Service / Tunnel origin to the Neon direct origin.`
+- Hyperdrive id remained `88b8cd7fd84e4064ad29b43a16c579f2`
+- Worker binding remained `HYPERDRIVE`
+- Hyperdrive name was updated to `rc1-staging-postgres`
+- origin was changed from the VPC Service / Tunnel route to the Neon direct
+  Postgres host
+- caching stayed disabled to preserve auth-critical read-after-write behavior
 
-Observed failures:
+Cloudflare management credentials and the Neon connection string were not added
+to repository files, documentation, or commits.
 
-- `wrangler whoami`: `Invalid access token [code: 9109]`
-- `wrangler hyperdrive get`: Cloudflare API authentication failure
-- Cloudflare API MCP GET/PATCH calls: `Authentication error [code: 10000]`
+## Live Validation
 
-## Remaining Cutover Steps After Cloudflare Auth Is Fixed
+Cloudflare live checks after the cutover:
 
-1. Create or update a staging Hyperdrive config whose origin points at the
-   Neon direct host, database, user, password, and SSL settings.
-2. Update `server/wrangler.jsonc` staging `HYPERDRIVE` binding only if the
-   cutover creates a new Hyperdrive id.
-3. Deploy the staging Worker.
-4. Confirm live Cloudflare health:
+- backend `GET /health`: `200`
+- backend `GET /ready`: `200`
+- readiness payload: `status=ready`, `database=ok`
+- frontend `GET /`: `200`
 
-- `GET /health`: `200`
-- `GET /ready`: `200`
-- readiness database status: `ok`
+Full Cloudflare smoke:
 
-5. Run the complete Cloudflare smoke against the deployed backend:
+- run id: `cf-20260424-neon-rc1`
+- status: `pass`
+- started at: `2026-04-24T02:27:44.918Z`
+- finished at: `2026-04-24T02:27:59.983Z`
+- duration: `15065ms`
 
-```bash
-cd server
-API_BASE_URL=https://multi-millionaire-api-staging.348421501.workers.dev \
-SMOKE_RUN_ID=<new-run-id> \
-npm run smoke
-```
+The smoke covered register, login, claim pass, create squad, join squad,
+deposit precheck, deposit, squad activation, referral reward generation, reward
+summary/list, reward claim, risk trigger, risk block, risk resolve, and claim
+retry after risk resolve.
 
 ## Completion Criteria
 
-Sustainable RC1 is achieved only when:
+Sustainable RC1 criteria are now satisfied:
 
 - Hyperdrive origin is Neon direct Postgres and no longer depends on VPC Service
   / Tunnel / local Postgres
@@ -89,7 +98,7 @@ Sustainable RC1 is achieved only when:
   origin
 - `npm run seed:dev` has run on the managed origin
 - live `/health` and `/ready` return `200`
-- `/ready` reports `database=ok` or equivalent success state
+- `/ready` reports `database=ok`
 - the complete Cloudflare smoke passes against the live staging backend
 
 Deposit and reward claim remain off-chain stubs for RC1. This plan does not

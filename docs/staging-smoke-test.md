@@ -1,59 +1,57 @@
 # Staging Smoke Test
 
-## Historical Cloudflare RC1 Evidence
+## Current Cloudflare RC1 Evidence
 
 - Repository: `tii-mom/multi-millionaire`
 - Date: `2026-04-24`
 - Backend staging URL: `https://multi-millionaire-api-staging.348421501.workers.dev`
 - Frontend staging URL: `https://staging.multi-millionaire-staging.pages.dev`
-- Database route: `Hyperdrive -> VPC Service -> Tunnel -> existing local Postgres`
-- Smoke run id: `cf-20260424-rc1-final`
+- Database route: `Hyperdrive -> Neon Postgres`
+- Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
+- Hyperdrive name: `rc1-staging-postgres`
+- Hyperdrive origin host:
+  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
+- Hyperdrive caching: `disabled`
+- Smoke run id: `cf-20260424-neon-rc1`
 - Smoke status: `pass`
 - Runtime: `NODE_ENV=staging`
 - High-risk threshold used in smoke: `1000000`
 
-This document separates:
-
-1. Historical Cloudflare smoke evidence against the deployed Cloudflare backend URL
-2. Earlier local rehearsal evidence against the prepared origin database
-3. Current live readiness, which supersedes the historical pass for RC1 gating
-
-The historical Cloudflare smoke remains useful evidence for the code path, but
-current RC1 gating requires the live environment to be healthy and smokeable.
+The current smoke supersedes the earlier historical
+`cf-20260424-rc1-final` smoke because it ran after the live data plane moved
+from the local tunnel-backed origin to Neon Postgres.
 
 ## Current Live Smoke Status
 
-As of `2026-04-24`, the current live backend is not smokeable:
+As of `2026-04-24`, the current live backend is smokeable and healthy:
 
 - `GET /health`: `200`
-- `GET /ready`: `503`
-- readiness database status: `error`
-- Hyperdrive origin: still the local tunnel-backed Postgres route
-- Cloudflare tunnel `mm-pg-staging`: `down`, with no active connections
-- Neon Postgres origin: provisioned and initialized, but not yet bound to the
-  Worker because Cloudflare management authentication is invalid
-- current complete Cloudflare smoke: not run because readiness fails
+- `GET /ready`: `200`
+- readiness database status: `ok`
+- frontend `GET /`: `200`
+- Hyperdrive origin: Neon direct/unpooled Postgres, `sslmode=require`
+- local Postgres plus Cloudflare Tunnel dependency: none
+- current complete Cloudflare smoke: pass
 
-The historical `cf-20260424-rc1-final` pass is retained below, but it no longer
-qualifies the current live environment for RC1.
+Cloudflare API tokens and the Neon `DATABASE_URL` were not written to
+repository files, documentation, or commits.
 
 ## Real Cloudflare Smoke Result
 
 Command used:
 
 ```bash
-cd server
 API_BASE_URL=https://multi-millionaire-api-staging.348421501.workers.dev \
-SMOKE_RUN_ID=cf-20260424-rc1-final \
+SMOKE_RUN_ID=cf-20260424-neon-rc1 \
 npm run smoke
 ```
 
 Top-level result:
 
 - `status: pass`
-- `started_at: 2026-04-23T16:47:57.134Z`
-- `finished_at: 2026-04-23T16:48:16.492Z`
-- `duration_ms: 19358`
+- `started_at: 2026-04-24T02:27:44.918Z`
+- `finished_at: 2026-04-24T02:27:59.983Z`
+- `duration_ms: 15065`
 
 ## Real Cloudflare Smoke Steps
 
@@ -61,36 +59,35 @@ Top-level result:
 | --- | --- | --- |
 | Health check | `GET /health` returned `200`, `status=ok` | Pass |
 | Readiness check | `GET /ready` returned `200`, `status=ready`, `database=ok` | Pass |
-| Register | Captain/member/risk users registered with `201` | Pass |
+| Register | Captain/member/risk users registered | Pass |
 | Login | Captain and admin login returned `200` | Pass |
 | Claim pass | Captain claimed wave `1` pass | Pass |
-| Create squad | `201`, `squad_id=2`, initial squad status `open` | Pass |
-| Join squad | Member joined squad `2` as `joined_pending` | Pass |
+| Create squad | `201`, `squad_id=1`, initial squad status `open` | Pass |
+| Join squad | Member joined squad as `joined_pending` | Pass |
 | Confirm referral | Member referral saved as `pending` | Pass |
 | Deposit precheck | `200`, `ok=true`, wave status `live` | Pass |
-| Deposit | `201`, qualifying position `2417b2a7-8e9a-4422-b95c-a62e47582bee` created | Pass |
-| Squad activation | Verified indirectly through the qualifying deposit path completing and the downstream reward path becoming available | Pass |
-| Referral reward generate | Verified by approved reward `e10a63d3-11c7-47a5-a8b6-c2b2c31ce477` appearing after the qualifying deposit | Pass |
+| Deposit | `201`, qualifying position `2c9ac27b-c64a-4c74-97d6-df9a0b6e823d` created | Pass |
+| Squad activation | Verified through the qualifying deposit path and downstream reward availability | Pass |
+| Referral reward generate | Verified by approved reward ledger `26d65278-c9d0-413f-9655-0a45869b6e48` | Pass |
 | Reward summary/list | Summary returned `approved_amount=10`; approved reward list contained the new ledger | Pass |
 | Reward claim | First reward claim returned `200`, status became `claimed` | Pass |
-| Risk trigger | High-value deposit `2000000` created risk position `f0df2d35-e92a-43e0-887c-0b354dff8716` | Pass |
+| Risk trigger | High-value deposit `2000000` created risk position `eb1281d5-ca40-4a38-abc3-a05278fa6eac` | Pass |
 | Risk block | Claim returned `409` with `RISK_REVIEW_REQUIRED` while flag was open | Pass |
-| Risk resolve | Admin resolved risk flag `ded87b81-298b-4d8c-9f4c-e8da207a8730` | Pass |
+| Risk resolve | Admin resolved risk flag `77e56da8-7cad-42ff-8720-fd1d5b78c70b` | Pass |
 | Claim retry after risk resolve | Previously blocked reward claim returned `200`, status became `claimed` | Pass |
 
 ## Real Cloudflare Smoke IDs
 
 - Wave: `1`
-- Pass: `a8960ae2-80b9-4c17-bef9-d232acbdb655`
-- Squad: `2`
-- Standard reward ledger: `e10a63d3-11c7-47a5-a8b6-c2b2c31ce477`
-- Risk position: `f0df2d35-e92a-43e0-887c-0b354dff8716`
-- Risk flag: `ded87b81-298b-4d8c-9f4c-e8da207a8730`
-- Risk-blocked reward ledger: `6304f74c-2c28-4ab8-8aeb-944fcee523ee`
+- Squad: `1`
+- Standard reward ledger: `26d65278-c9d0-413f-9655-0a45869b6e48`
+- Risk position: `eb1281d5-ca40-4a38-abc3-a05278fa6eac`
+- Risk flag: `77e56da8-7cad-42ff-8720-fd1d5b78c70b`
+- Risk-blocked reward ledger: `43bd5b45-4fc4-4d56-b68a-bba2e693c36d`
 
-## Root Cause Fixed During This Thread
+## Root Cause Fixed Before This Smoke
 
-The first Cloudflare smoke attempt failed after registration:
+The earlier tunnel-backed Cloudflare smoke uncovered a read-after-write issue:
 
 - `register`: pass
 - immediate `login`: fail with `401 INVALID_CREDENTIALS`
@@ -101,35 +98,23 @@ Root cause:
 - register path first queried `findByEmail(email)` and cached the empty result
 - immediate login queried the same email and hit that stale empty lookup
 
-Fix:
+Fix retained for the Neon cutover:
 
-- staging Hyperdrive caching was changed to `disabled`
-
-After that update, login and the rest of the real Cloudflare smoke passed.
-
-## Local Rehearsal Evidence
-
-Before the final Hyperdrive binding, the prepared Postgres origin was also
-verified locally. This remains useful evidence but is not counted as the
-Cloudflare smoke run:
-
-- local backend URL: `http://127.0.0.1:4100`
-- migrations `001 -> 004`: pass
-- `seed:dev`: pass
-- local smoke result: pass
+- staging Hyperdrive caching remains `disabled`
 
 ## RC1 Classification
 
-- Internal RC1 candidate: `no`
-  - reason: the live backend currently returns `/ready=503`, so there is no
-    current complete Cloudflare smoke pass
-- Sustainable RC1 environment: `no`
-  - reason: the prepared Neon origin is not yet the live Hyperdrive origin, so
-    the Worker still depends on the local PostgreSQL plus Cloudflare Tunnel path
+- Internal RC1 candidate: `yes`
+  - reason: the current live backend is healthy and a complete Cloudflare smoke
+    passed against the deployed staging backend
+- Sustainable RC1 environment: `yes`
+  - reason: the current live Hyperdrive origin is Neon Postgres, not local
+    Postgres plus Cloudflare Tunnel
 
 ## Boundary Notes
 
 - No real chain lock occurred in this smoke.
 - `POST /v1/waves/:waveId/deposit` remains an off-chain recorded deposit stub.
 - `POST /v1/rewards/:ledgerId/claim` remains an off-chain status update stub.
-- Risk blocking and release are verified through `risk_flags` state, not on-chain settlement.
+- Risk blocking and release are verified through `risk_flags` state, not
+  on-chain settlement.
