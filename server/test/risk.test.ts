@@ -8,9 +8,13 @@ import { getReferral, lockReferral } from '../src/models/referralModel';
 import { findByEmail } from '../src/models/userModel';
 import { createRiskFlag, hasBlockingRiskForRewardClaim, updateRiskFlag } from '../src/models/riskModel';
 
-jest.mock('../src/db', () => ({
-  query: jest.fn(),
-}));
+jest.mock('../src/db', () => {
+  const query = jest.fn();
+  return {
+    query,
+    withTransaction: jest.fn(async (fn: any) => fn({ query })),
+  };
+});
 
 jest.mock('../src/models/userModel', () => ({
   findByEmail: jest.fn(),
@@ -165,7 +169,7 @@ describe('Risk flow', () => {
       entityId: userId,
       flagType: 'rapid_deposit_burst',
       severity: 'medium',
-    }));
+    }), expect.objectContaining({ query: expect.any(Function) }));
     expect(lockReferralMock).not.toHaveBeenCalled();
   });
 

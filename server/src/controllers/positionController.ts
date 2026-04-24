@@ -1,30 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { getLatestConfirmedPrice } from '../models/priceModel';
 import { getCurrentWave, getWaveById } from '../models/waveModel';
-import { createPosition } from '../models/positionModel';
-import { getReferral, lockReferral } from '../models/referralModel';
-import { createRewardLedger } from '../models/rewardModel';
-import { createRiskFlag } from '../models/riskModel';
-import { activateSquadMember } from '../models/squadModel';
-import { query } from '../db';
+import { withTransaction } from '../db';
+import { applyDeposit } from '../services/depositApplyService';
 import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
-
-function calculateDirectReward(amountRaw: string, rewardRateBps: number, perInviteCapRaw: string): { grossAmount: string; finalAmount: string } {
-  const grossAmount = (BigInt(amountRaw) * BigInt(rewardRateBps)) / BigInt(10000);
-  const cap = BigInt(perInviteCapRaw || '0');
-  const finalAmount = cap > BigInt(0) && grossAmount > cap ? cap : grossAmount;
-  return { grossAmount: grossAmount.toString(), finalAmount: finalAmount.toString() };
-}
-
-function getHighRiskDepositThreshold(): bigint | null {
-  const raw = process.env.HIGH_RISK_DEPOSIT_THRESHOLD;
-  if (!raw) return null;
-  try {
-    return BigInt(raw);
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Deposit precheck endpoint.
@@ -116,77 +95,18 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
     if (!wave || wave.status !== 'live' || wave.deposits_disabled) {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WAVE', message: 'Wave is not live' } });
     }
-    // Determine if deposit qualifies for activation
-    const qualifies = amountRaw >= BigInt(wave.min_lock_amount);
-    // Determine if this is user's first qualifying deposit for this wave. Count positions qualifying for activation.
-    const existing = await query<{ count: string }>(
-      `SELECT COUNT(*) FROM positions WHERE user_id = $1 AND qualifies_for_activation = TRUE`,
-      [user.id]
-    );
-    const isFirst = qualifies && existing.rows[0].count === '0';
     // Generate a fake on-chain position ID. In a real implementation this would come from the transaction receipt.
     const onchainPositionId = (Date.now() + Math.floor(Math.random() * 1000)).toString();
-    // For demonstration, we treat latest confirmed price as entry price.
-    const price = await getLatestConfirmedPrice();
-    const entryPrice = price ? price.price : '0';
-    const unlockMultiplierBps = 15000;
-    const position = await createPosition(
-      user.id,
-      waveId,
-      amount,
+    const { position } = await withTransaction(async (tx) => applyDeposit({
+      userId: user.id,
+      wave,
+      amountRaw: amount,
       onchainPositionId,
-      entryPrice,
-      unlockMultiplierBps,
-      qualifies,
-      isFirst
-    );
-    if (qualifies && isFirst && !(await isControlEnabled('pause_referral_rewards'))) {
-      const referral = await getReferral(user.id);
-      if (referral?.inviter_user_id && referral.inviter_user_id !== user.id) {
-        const rewardAmounts = calculateDirectReward(amount, wave.direct_reward_rate_bps, wave.per_invite_cap);
-        await createRewardLedger({
-          beneficiaryUserId: referral.inviter_user_id,
-          sourceUserId: user.id,
-          sourcePositionId: position.id,
-          waveId,
-          grossAmount: rewardAmounts.grossAmount,
-          finalAmount: rewardAmounts.finalAmount,
-          status: 'approved',
-        });
-      }
-    }
-    // If first qualifying deposit, lock referral
-    if (isFirst) {
-      await lockReferral(user.id);
-    }
-    if (qualifies) {
-      await activateSquadMember(waveId, user.id);
-    }
-    const recentDeposits = await query<{ count: string }>(
-      `SELECT COUNT(*)
-       FROM positions
-       WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '10 minutes'`,
-      [user.id]
-    );
-    if (Number(recentDeposits.rows[0]?.count || 0) >= 3) {
-      await createRiskFlag({
-        entityType: 'user',
-        entityId: user.id,
-        flagType: 'rapid_deposit_burst',
-        severity: 'medium',
-        note: 'User reached at least 3 deposits in 10 minutes',
-      });
-    }
-    const highRiskThreshold = getHighRiskDepositThreshold();
-    if (qualifies && isFirst && highRiskThreshold !== null && amountRaw > highRiskThreshold) {
-      await createRiskFlag({
-        entityType: 'position',
-        entityId: position.id,
-        flagType: 'high_value_first_lock',
-        severity: 'medium',
-        note: `First qualifying lock exceeded configured threshold ${highRiskThreshold.toString()}`,
-      });
-    }
+      unlockMultiplierBps: 15000,
+      source: 'offchain_stub',
+      trackRapidDepositBurst: true,
+      executor: tx,
+    }));
     return res.status(201).json({ request_id: req.id || '', data: position });
   } catch (err) {
     return next(err);

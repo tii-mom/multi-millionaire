@@ -57,6 +57,11 @@ Use `npm run migrate:up` for normal rollout. Use `npm run migrate:reset` only in
 - `GET /v1/risk/flags`
 - `POST /v1/risk/flags`
 - `PATCH /v1/risk/flags/:flagId`
+- `GET /v1/admin/controls`
+- `PATCH /v1/admin/controls/:key`
+- `GET /v1/admin/audit-logs`
+- `GET /v1/admin/chain-events?apply_status=applied`
+- `GET /v1/admin/ops`
 
 Expected staging outcome:
 
@@ -64,6 +69,13 @@ Expected staging outcome:
 - reward claims remain off-chain status updates,
 - risk flags can block or release reward claims,
 - squad activation still follows qualifying deposits.
+- emergency controls can be toggled and restored by an admin operator,
+- control changes create admin audit log entries,
+- chain event and receipt verifier diagnostics are visible to admins.
+
+Production smoke must stay non-mutating by default. Do not run the staging
+mutating smoke or admin control toggles against production unless a named
+operator, canary account, amount, and rollback window have been approved.
 
 ## Rollback Plan
 
@@ -81,7 +93,21 @@ Expected staging outcome:
 - Auth requests stay within rate limits.
 - Deposit requests stay within rate limits.
 - Admin risk endpoints stay within rate limits.
+- Admin control, audit-log, chain-event, and ops diagnostic endpoints are
+  reachable by admins and rejected for non-admins.
 - Squad activation, reward generation, and claim blocking still work as expected.
+
+## Required Operator Evidence
+
+For the next staging release record, capture:
+
+- smoke run id and commit SHA
+- control key toggled and restored state
+- audit log id/action for the control update
+- chain-events query result count and `apply_status` filter used
+- `/v1/admin/ops` receipt verifier `mode`, `status`, and `configured`
+- confirmation that production smoke remained GET-only unless a separate
+  mutating canary approval was recorded
 
 ## Sprint 1 / Sprint 2 Boundary
 

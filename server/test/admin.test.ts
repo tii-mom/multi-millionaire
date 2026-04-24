@@ -2,6 +2,8 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import app from '../src/app';
 import { getAdminDashboard, listAdminRewards } from '../src/models/adminReadModel';
+import { createAdminAuditLog, listAdminAuditLogs, listAppControls, setAppControl } from '../src/models/opsModel';
+import { listChainEvents } from '../src/models/chainEventModel';
 
 jest.mock('../src/models/adminReadModel', () => ({
   getAdminDashboard: jest.fn(),
@@ -11,8 +13,24 @@ jest.mock('../src/models/adminReadModel', () => ({
   listAdminSquads: jest.fn(),
 }));
 
+jest.mock('../src/models/opsModel', () => ({
+  createAdminAuditLog: jest.fn(),
+  listAdminAuditLogs: jest.fn(),
+  listAppControls: jest.fn(),
+  setAppControl: jest.fn(),
+}));
+
+jest.mock('../src/models/chainEventModel', () => ({
+  listChainEvents: jest.fn(),
+}));
+
 const getAdminDashboardMock = getAdminDashboard as jest.Mock;
 const listAdminRewardsMock = listAdminRewards as jest.Mock;
+const createAdminAuditLogMock = createAdminAuditLog as jest.Mock;
+const listAdminAuditLogsMock = listAdminAuditLogs as jest.Mock;
+const listAppControlsMock = listAppControls as jest.Mock;
+const setAppControlMock = setAppControl as jest.Mock;
+const listChainEventsMock = listChainEvents as jest.Mock;
 
 const adminToken = jwt.sign({ userId: 'admin-user', email: 'admin@example.com' }, 'secret');
 const userToken = jwt.sign({ userId: 'normal-user', email: 'user@example.com' }, 'secret');
@@ -24,6 +42,11 @@ describe('Admin read API', () => {
     delete process.env.CHAIN_RECEIPT_VERIFIER;
     getAdminDashboardMock.mockReset();
     listAdminRewardsMock.mockReset();
+    createAdminAuditLogMock.mockReset();
+    listAdminAuditLogsMock.mockReset();
+    listAppControlsMock.mockReset();
+    setAppControlMock.mockReset();
+    listChainEventsMock.mockReset();
   });
 
   it('requires admin access for dashboard reads', async () => {
@@ -95,6 +118,104 @@ describe('Admin read API', () => {
       configured: false,
       status: 'disabled',
       mode: 'disabled',
+    });
+  });
+
+  it('requires admin access for operations controls', async () => {
+    const res = await request(app)
+      .get('/v1/admin/controls')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ADMIN_REQUIRED');
+    expect(listAppControlsMock).not.toHaveBeenCalled();
+  });
+
+  it('lists operations controls for admins', async () => {
+    listAppControlsMock.mockResolvedValue([
+      { key: 'pause_deposits', enabled: false, reason: null, updated_by: null, updated_at: new Date() },
+    ]);
+
+    const res = await request(app)
+      .get('/v1/admin/controls')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].key).toBe('pause_deposits');
+  });
+
+  it('updates operations controls and writes an audit log', async () => {
+    setAppControlMock.mockResolvedValue({
+      key: 'pause_deposits',
+      enabled: true,
+      reason: 'canary rollback',
+      updated_by: 'admin-user',
+      updated_at: new Date(),
+    });
+    createAdminAuditLogMock.mockResolvedValue({ id: 'audit-1' });
+
+    const res = await request(app)
+      .patch('/v1/admin/controls/pause_deposits')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ enabled: true, reason: 'canary rollback' });
+
+    expect(res.status).toBe(200);
+    expect(setAppControlMock).toHaveBeenCalledWith({
+      key: 'pause_deposits',
+      enabled: true,
+      reason: 'canary rollback',
+      actorUserId: 'admin-user',
+    });
+    expect(createAdminAuditLogMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 'admin-user',
+      actorEmail: 'admin@example.com',
+      action: 'app_control.update',
+      entityType: 'app_control',
+      entityId: 'pause_deposits',
+      metadata: { enabled: true, reason: 'canary rollback' },
+    }));
+  });
+
+  it('rejects invalid operations control updates', async () => {
+    const res = await request(app)
+      .patch('/v1/admin/controls/pause_deposits')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ enabled: 'true' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_INPUT');
+    expect(setAppControlMock).not.toHaveBeenCalled();
+  });
+
+  it('lists audit logs for admins', async () => {
+    listAdminAuditLogsMock.mockResolvedValue([
+      { id: 'audit-1', action: 'app_control.update', entity_type: 'app_control' },
+    ]);
+
+    const res = await request(app)
+      .get('/v1/admin/audit-logs?limit=10')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].id).toBe('audit-1');
+    expect(listAdminAuditLogsMock).toHaveBeenCalledWith(10);
+  });
+
+  it('passes chain event status filters through for admins', async () => {
+    listChainEventsMock.mockResolvedValue([
+      { id: 'event-1', apply_status: 'applied' },
+    ]);
+
+    const res = await request(app)
+      .get('/v1/admin/chain-events?apply_status=applied')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].id).toBe('event-1');
+    expect(listChainEventsMock).toHaveBeenCalledWith({
+      applyStatus: 'applied',
+      limit: 50,
     });
   });
 });

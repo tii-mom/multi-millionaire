@@ -6,9 +6,13 @@ import { createPosition } from '../src/models/positionModel';
 import { getReferral, lockReferral } from '../src/models/referralModel';
 import { createRewardLedger, getRewardLedgerById, markRewardClaimed } from '../src/models/rewardModel';
 
-jest.mock('../src/db', () => ({
-  query: jest.fn(),
-}));
+jest.mock('../src/db', () => {
+  const query = jest.fn();
+  return {
+    query,
+    withTransaction: jest.fn(async (fn: any) => fn({ query })),
+  };
+});
 
 jest.mock('../src/models/priceModel', () => ({
   getLatestConfirmedPrice: jest.fn().mockResolvedValue({
@@ -132,8 +136,8 @@ describe('Reward API and generation', () => {
       grossAmount: '100',
       finalAmount: '80',
       status: 'approved',
-    }));
-    expect(lockReferralMock).toHaveBeenCalledWith(inviteeUserId);
+    }), expect.objectContaining({ query: expect.any(Function) }));
+    expect(lockReferralMock).toHaveBeenCalledWith(inviteeUserId, expect.objectContaining({ query: expect.any(Function) }));
   });
 
   it('does not duplicate rewards on later qualifying deposits', async () => {

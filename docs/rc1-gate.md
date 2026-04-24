@@ -93,6 +93,9 @@ register -> immediate login read-after-write behavior remains correct.
 - High-value risk flag is not created for the risk smoke deposit.
 - Reward claim is not blocked while the risk flag is open.
 - Claim retry does not succeed after admin risk resolution.
+- Admin emergency controls cannot be read, toggled, restored, or audited on
+  staging.
+- Admin chain event visibility or receipt verifier diagnostics are unavailable.
 - Any unexpected deposit or reward behavior requires a code change in deposit/reward logic.
 
 ## Stub Boundary Acceptance
@@ -115,6 +118,8 @@ Keep these with the RC1 record:
 - seed command result
 - health/readiness responses
 - full Cloudflare smoke JSON output
+- admin control toggle/restore evidence, audit log id/action, chain event query
+  result, and `/v1/admin/ops` receipt verifier diagnostics
 - any local rehearsal smoke JSON output, clearly labeled as local evidence only
 - rollback decision notes if any gate item failed
 

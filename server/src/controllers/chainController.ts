@@ -1,33 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { getLatestConfirmedPrice } from '../models/priceModel';
-import { createPosition } from '../models/positionModel';
-import { getReferral, lockReferral } from '../models/referralModel';
-import { createRewardLedger } from '../models/rewardModel';
-import { createRiskFlag } from '../models/riskModel';
-import { activateSquadMember } from '../models/squadModel';
 import { getWaveById } from '../models/waveModel';
 import { withTransaction } from '../db';
 import { insertChainEvent } from '../models/chainEventModel';
 import { findVerifiedWalletBinding } from '../models/walletBindingModel';
 import { isControlEnabled } from '../services/productionGuards';
+import { applyDeposit } from '../services/depositApplyService';
 import { ReceiptVerificationError, verifyDepositReceipt } from '../services/receiptVerifier';
-
-function calculateDirectReward(amountRaw: string, rewardRateBps: number, perInviteCapRaw: string): { grossAmount: string; finalAmount: string } {
-  const grossAmount = (BigInt(amountRaw) * BigInt(rewardRateBps)) / BigInt(10000);
-  const cap = BigInt(perInviteCapRaw || '0');
-  const finalAmount = cap > BigInt(0) && grossAmount > cap ? cap : grossAmount;
-  return { grossAmount: grossAmount.toString(), finalAmount: finalAmount.toString() };
-}
-
-function getHighRiskDepositThreshold(): bigint | null {
-  const raw = process.env.HIGH_RISK_DEPOSIT_THRESHOLD;
-  if (!raw) return null;
-  try {
-    return BigInt(raw);
-  } catch {
-    return null;
-  }
-}
 
 function receiptPayload(receipt: Awaited<ReturnType<typeof verifyDepositReceipt>>): Record<string, unknown> {
   return {
@@ -88,12 +66,6 @@ export async function depositReceipt(req: Request, res: Response, next: NextFunc
       });
     }
 
-    const amountRaw = BigInt(receipt.amountRaw);
-    const qualifies = amountRaw >= BigInt(wave.min_lock_amount);
-    const price = await getLatestConfirmedPrice();
-    const highRiskThreshold = getHighRiskDepositThreshold();
-    const referralRewardsPaused = await isControlEnabled('pause_referral_rewards');
-
     const { eventResult, position } = await withTransaction(async (tx) => {
       const appliedEvent = await insertChainEvent({
         chainId: receipt.chainId,
@@ -113,56 +85,18 @@ export async function depositReceipt(req: Request, res: Response, next: NextFunc
         return { eventResult: appliedEvent, position: null };
       }
 
-      const existing = await tx.query<{ count: string }>(
-        `SELECT COUNT(*) FROM positions WHERE user_id = $1 AND qualifies_for_activation = TRUE`,
-        [user.id]
-      );
-      const isFirst = qualifies && existing.rows[0].count === '0';
-      const createdPosition = await createPosition(
-        user.id,
-        waveId,
-        receipt.amountRaw,
-        receipt.positionId,
-        price ? price.price : '0',
-        wave.unlock_multiplier_bps,
-        qualifies,
-        isFirst,
-        tx
-      );
+      const appliedDeposit = await applyDeposit({
+        userId: user.id,
+        wave,
+        amountRaw: receipt.amountRaw,
+        onchainPositionId: receipt.positionId,
+        unlockMultiplierBps: wave.unlock_multiplier_bps,
+        source: 'chain_receipt',
+        trackRapidDepositBurst: false,
+        executor: tx,
+      });
 
-      if (qualifies && isFirst && !referralRewardsPaused) {
-        const referral = await getReferral(user.id, tx);
-        if (referral?.inviter_user_id && referral.inviter_user_id !== user.id) {
-          const rewardAmounts = calculateDirectReward(receipt.amountRaw, wave.direct_reward_rate_bps, wave.per_invite_cap);
-          await createRewardLedger({
-            beneficiaryUserId: referral.inviter_user_id,
-            sourceUserId: user.id,
-            sourcePositionId: createdPosition.id,
-            waveId,
-            grossAmount: rewardAmounts.grossAmount,
-            finalAmount: rewardAmounts.finalAmount,
-            status: 'approved',
-          }, tx);
-        }
-      }
-      if (isFirst) {
-        await lockReferral(user.id, tx);
-      }
-      if (qualifies) {
-        await activateSquadMember(waveId, user.id, tx);
-      }
-
-      if (qualifies && isFirst && highRiskThreshold !== null && amountRaw > highRiskThreshold) {
-        await createRiskFlag({
-          entityType: 'position',
-          entityId: createdPosition.id,
-          flagType: 'high_value_first_lock',
-          severity: 'medium',
-          note: `First qualifying chain lock exceeded configured threshold ${highRiskThreshold.toString()}`,
-        }, tx);
-      }
-
-      return { eventResult: appliedEvent, position: createdPosition };
+      return { eventResult: appliedEvent, position: appliedDeposit.position };
     });
 
     if (!eventResult.inserted || !position) {
