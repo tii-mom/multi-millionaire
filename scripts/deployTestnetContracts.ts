@@ -13,14 +13,14 @@ function required(name: string): string {
   return value;
 }
 
-function requiredAddress(...names: string[]): Address {
+function optionalAddress(...names: string[]): Address | null {
   for (const name of names) {
     const value = process.env[name]?.trim();
     if (value) {
       return Address.parse(value);
     }
   }
-  throw new Error(`${names.join(' or ')} is required for testnet deployment`);
+  return null;
 }
 
 function optionalApiKey(): string | undefined {
@@ -89,11 +89,11 @@ async function main() {
   const seqno = await withToncenterRetry('get wallet seqno', () => openedWallet.getSeqno());
   const owner = wallet.address;
   const tokenAddress = Address.parse(process.env.TOKEN_ADDRESS_TESTNET || process.env.CHAIN_ADMIN_ADDRESS_TESTNET || owner.toString({ testOnly: true }));
-  const vaultJettonWallet = requiredAddress('LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET', 'VAULT_JETTON_WALLET_ADDRESS_TESTNET');
-  const rewardJettonWallet = requiredAddress('REWARD_JETTON_WALLET_ADDRESS_TESTNET');
+  const vaultJettonWallet = optionalAddress('LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET', 'VAULT_JETTON_WALLET_ADDRESS_TESTNET');
+  const rewardJettonWallet = optionalAddress('REWARD_JETTON_WALLET_ADDRESS_TESTNET');
 
-  const lockVault = LockVault.fromInit(owner, tokenAddress, vaultJettonWallet);
-  const merkleClaim = MerkleClaim.fromInit(owner, tokenAddress, rewardJettonWallet);
+  const lockVault = LockVault.fromInit(owner, tokenAddress);
+  const merkleClaim = MerkleClaim.fromInit(owner, tokenAddress);
   const openedLockVault = client.open(await lockVault);
   const openedMerkleClaim = client.open(await merkleClaim);
 
@@ -102,8 +102,8 @@ async function main() {
     endpoint,
     wallet: owner.toString({ testOnly: true }),
     tokenAddress: tokenAddress.toString({ testOnly: true }),
-    vaultJettonWallet: vaultJettonWallet.toString({ testOnly: true }),
-    rewardJettonWallet: rewardJettonWallet.toString({ testOnly: true }),
+    vaultJettonWallet: vaultJettonWallet ? vaultJettonWallet.toString({ testOnly: true }) : null,
+    rewardJettonWallet: rewardJettonWallet ? rewardJettonWallet.toString({ testOnly: true }) : null,
     seqno,
     lockVault: openedLockVault.address.toString({ testOnly: true }),
     merkleClaim: openedMerkleClaim.address.toString({ testOnly: true }),
@@ -114,12 +114,32 @@ async function main() {
   await withToncenterRetry('deploy MerkleClaim', () => openedMerkleClaim.send(sender, { value: toNano('0.05') }, null));
   await sleep(4000);
 
+  if (vaultJettonWallet) {
+    await withToncenterRetry('set LockVault Jetton wallet', () => openedLockVault.send(
+      sender,
+      { value: toNano('0.05') },
+      { $$type: 'SetVaultJettonWallet', queryId: BigInt(Date.now()), vaultJettonWallet },
+    ));
+    await sleep(4000);
+  }
+
+  if (rewardJettonWallet) {
+    await withToncenterRetry('set MerkleClaim reward Jetton wallet', () => openedMerkleClaim.send(
+      sender,
+      { value: toNano('0.05') },
+      { $$type: 'SetRewardJettonWallet', queryId: BigInt(Date.now()), rewardJettonWallet },
+    ));
+    await sleep(4000);
+  }
+
   const lockVaultState = await waitForDeploy(client, openedLockVault.address);
   const merkleClaimState = await waitForDeploy(client, openedMerkleClaim.address);
 
   const updates = {
     LOCK_VAULT_ADDRESS_TESTNET: openedLockVault.address.toString({ testOnly: true }),
     MERKLE_CLAIM_ADDRESS_TESTNET: openedMerkleClaim.address.toString({ testOnly: true }),
+    LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET: vaultJettonWallet ? vaultJettonWallet.toString({ testOnly: true }) : '',
+    REWARD_JETTON_WALLET_ADDRESS_TESTNET: rewardJettonWallet ? rewardJettonWallet.toString({ testOnly: true }) : '',
     LOCK_VAULT_DEPLOYMENT_LT_TESTNET: lockVaultState.lastTransaction?.lt.toString() || '',
     MERKLE_CLAIM_DEPLOYMENT_LT_TESTNET: merkleClaimState.lastTransaction?.lt.toString() || '',
   };

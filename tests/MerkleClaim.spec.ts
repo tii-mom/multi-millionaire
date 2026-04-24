@@ -52,11 +52,7 @@ describe('MerkleClaim', () => {
         rewardJettonWallet = await blockchain.treasury('rewardJettonWallet');
         tokenAddress = (await blockchain.treasury('token')).address;
 
-        merkleClaim = blockchain.openContract(await MerkleClaim.fromInit(
-            deployer.address,
-            tokenAddress,
-            rewardJettonWallet.address,
-        ));
+        merkleClaim = blockchain.openContract(await MerkleClaim.fromInit(deployer.address, tokenAddress));
 
         const deployResult = await merkleClaim.send(
             deployer.getSender(),
@@ -70,6 +66,12 @@ describe('MerkleClaim', () => {
             deploy: true,
             success: true,
         });
+
+        await merkleClaim.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'SetRewardJettonWallet', queryId: 1n, rewardJettonWallet: rewardJettonWallet.address },
+        );
     });
 
     it('verifies a Merkle proof and sends reward Jettons to the claimant', async () => {
@@ -115,7 +117,7 @@ describe('MerkleClaim', () => {
         const state = await merkleClaim.getClaimState();
         expect(state.owner.equals(deployer.address)).toBe(true);
         expect(state.tokenAddress.equals(tokenAddress)).toBe(true);
-        expect(state.rewardJettonWallet.equals(rewardJettonWallet.address)).toBe(true);
+        expect(state.rewardJettonWallet?.equals(rewardJettonWallet.address)).toBe(true);
         expect(state.activeBatchId).toBe(batchId);
         expect(state.merkleRoot).toBe(root);
         expect(state.totalClaimedRaw).toBe(amountRaw);

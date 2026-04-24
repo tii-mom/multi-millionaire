@@ -32,11 +32,7 @@ describe('LockVault', () => {
         vaultJettonWallet = await blockchain.treasury('vaultJettonWallet');
         tokenAddress = (await blockchain.treasury('token')).address;
 
-        lockVault = blockchain.openContract(await LockVault.fromInit(
-            deployer.address,
-            tokenAddress,
-            vaultJettonWallet.address,
-        ));
+        lockVault = blockchain.openContract(await LockVault.fromInit(deployer.address, tokenAddress));
 
         const deployResult = await lockVault.send(
             deployer.getSender(),
@@ -50,6 +46,12 @@ describe('LockVault', () => {
             deploy: true,
             success: true,
         });
+
+        await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'SetVaultJettonWallet', queryId: 1n, vaultJettonWallet: vaultJettonWallet.address },
+        );
     });
 
     it('records deposits only from the configured vault Jetton wallet', async () => {
@@ -74,7 +76,7 @@ describe('LockVault', () => {
         const state = await lockVault.getVaultState();
         expect(state.owner.equals(deployer.address)).toBe(true);
         expect(state.tokenAddress.equals(tokenAddress)).toBe(true);
-        expect(state.vaultJettonWallet.equals(vaultJettonWallet.address)).toBe(true);
+        expect(state.vaultJettonWallet?.equals(vaultJettonWallet.address)).toBe(true);
         expect(state.totalDepositedRaw).toBe(1000n);
         expect(state.totalActiveRaw).toBe(1000n);
         expect(state.depositCount).toBe(1n);

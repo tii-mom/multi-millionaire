@@ -31,6 +31,11 @@ message(0x50524943) SetPrice {
     priceUsdE6: Int as uint64;
 }
 
+message(0x4a57544c) SetVaultJettonWallet {
+    queryId: Int as uint64;
+    vaultJettonWallet: Address;
+}
+
 message(0x55545247) SetUserTarget {
     queryId: Int as uint64;
     targetUsdE6: Int as uint64;
@@ -57,7 +62,7 @@ struct Position {
 contract LockVault with Ownable {
     owner: Address;
     tokenAddress: Address;
-    vaultJettonWallet: Address;
+    vaultJettonWallet: Address?;
     paused: Bool;
     priceUsdE6: Int as uint64;
     lockSeconds: Int as uint64;
@@ -77,10 +82,10 @@ contract LockVault with Ownable {
     lastAmountRaw: Int as coins;
     lastPositionId: Int as uint64;
 
-    init(owner: Address, tokenAddress: Address, vaultJettonWallet: Address) {
+    init(owner: Address, tokenAddress: Address) {
         self.owner = owner;
         self.tokenAddress = tokenAddress;
-        self.vaultJettonWallet = vaultJettonWallet;
+        self.vaultJettonWallet = null;
         self.paused = false;
         self.priceUsdE6 = 0;
         self.lockSeconds = DEFAULT_LOCK_SECONDS;
@@ -113,6 +118,12 @@ contract LockVault with Ownable {
         self.priceUsdE6 = msg.priceUsdE6;
     }
 
+    receive(msg: SetVaultJettonWallet) {
+        self.requireOwner();
+        throwUnless(1007, self.depositCount == 0);
+        self.vaultJettonWallet = msg.vaultJettonWallet;
+    }
+
     receive(msg: SetUserTarget) {
         throwUnless(1010, msg.targetUsdE6 > 0);
 
@@ -128,7 +139,7 @@ contract LockVault with Ownable {
     receive(msg: JettonTransferNotification) {
         throwIf(1001, self.paused);
         throwUnless(1002, msg.amount > 0);
-        throwUnless(1003, sender() == self.vaultJettonWallet);
+        throwUnless(1003, self.vaultJettonWallet != null && sender() == self.vaultJettonWallet!!);
         throwUnless(1004, !msg.forwardPayload.empty());
 
         let payload: DepositPayload = self.parseDepositPayload(msg.forwardPayload);
@@ -187,8 +198,11 @@ contract LockVault with Ownable {
         self.withdrawCount += 1;
         self.activeRawByUser.set(position.owner, activeRaw - position.amountRaw);
 
+        let jettonWallet: Address? = self.vaultJettonWallet;
+        throwUnless(1024, jettonWallet != null);
+
         send(SendParameters {
-            to: self.vaultJettonWallet,
+            to: jettonWallet!!,
             value: JETTON_TRANSFER_TON_FEE,
             bounce: true,
             body: JettonTransfer {
@@ -294,7 +308,7 @@ contract LockVault with Ownable {
 struct VaultState {
     owner: Address;
     tokenAddress: Address;
-    vaultJettonWallet: Address;
+    vaultJettonWallet: Address?;
     paused: Bool;
     priceUsdE6: Int as uint64;
     lockSeconds: Int as uint64;

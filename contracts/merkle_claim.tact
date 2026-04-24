@@ -7,6 +7,11 @@ message(0x524f4f54) SetMerkleRoot {
     merkleRoot: Int as uint256;
 }
 
+message(0x524a574c) SetRewardJettonWallet {
+    queryId: Int as uint64;
+    rewardJettonWallet: Address;
+}
+
 message(0x434c414d) ClaimReward {
     queryId: Int as uint64;
     batchId: Int as uint64;
@@ -33,7 +38,7 @@ message(0x50415553) SetPaused {
 contract MerkleClaim with Ownable {
     owner: Address;
     tokenAddress: Address;
-    rewardJettonWallet: Address;
+    rewardJettonWallet: Address?;
     paused: Bool;
     activeBatchId: Int as uint64;
     merkleRoot: Int as uint256;
@@ -45,10 +50,10 @@ contract MerkleClaim with Ownable {
     lastAmountRaw: Int as coins;
     lastLeafHash: Int as uint256;
 
-    init(owner: Address, tokenAddress: Address, rewardJettonWallet: Address) {
+    init(owner: Address, tokenAddress: Address) {
         self.owner = owner;
         self.tokenAddress = tokenAddress;
-        self.rewardJettonWallet = rewardJettonWallet;
+        self.rewardJettonWallet = null;
         self.paused = false;
         self.activeBatchId = 0;
         self.merkleRoot = 0;
@@ -77,6 +82,12 @@ contract MerkleClaim with Ownable {
         self.merkleRoot = msg.merkleRoot;
     }
 
+    receive(msg: SetRewardJettonWallet) {
+        self.requireOwner();
+        throwUnless(1103, self.claimCount == 0);
+        self.rewardJettonWallet = msg.rewardJettonWallet;
+    }
+
     receive(msg: ClaimReward) {
         throwIf(1201, self.paused);
         throwUnless(1202, self.activeBatchId == msg.batchId);
@@ -98,8 +109,11 @@ contract MerkleClaim with Ownable {
         self.lastAmountRaw = msg.amountRaw;
         self.lastLeafHash = leafHash;
 
+        let jettonWallet: Address? = self.rewardJettonWallet;
+        throwUnless(1209, jettonWallet != null);
+
         send(SendParameters {
-            to: self.rewardJettonWallet,
+            to: jettonWallet!!,
             value: REWARD_JETTON_TRANSFER_TON_FEE,
             bounce: true,
             body: JettonTransfer {
@@ -186,7 +200,7 @@ contract MerkleClaim with Ownable {
 struct ClaimState {
     owner: Address;
     tokenAddress: Address;
-    rewardJettonWallet: Address;
+    rewardJettonWallet: Address?;
     paused: Bool;
     activeBatchId: Int as uint64;
     merkleRoot: Int as uint256;
