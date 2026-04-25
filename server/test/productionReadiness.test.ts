@@ -118,6 +118,7 @@ const createPositionMock = createPosition as jest.Mock;
 
 const userId = '00000000-0000-0000-0000-000000000777';
 const token = jwt.sign({ userId, email: 'user@example.com' }, 'secret');
+const canaryWallet = '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41';
 
 describe('Production readiness gates', () => {
   const originalEnv = { ...process.env };
@@ -289,6 +290,61 @@ describe('Production readiness gates', () => {
     expect(insertChainEventMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed for production chain canary deposits without an allowlist', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    delete process.env.CHAIN_CANARY_ALLOWLIST;
+    verifyDepositReceiptMock.mockResolvedValue({
+      chainId: 'ton-mainnet',
+      txHash: '0xtx',
+      logIndex: 0,
+      walletAddress: canaryWallet,
+      contractAddress: 'lock-vault',
+      amountRaw: '1000',
+      positionId: 'chain-position-1',
+      blockNumber: 123,
+      blockTime: null,
+      finalized: true,
+    });
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: '0xtx', amount: '1000' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CHAIN_CANARY_WALLET_NOT_ALLOWED');
+    expect(findVerifiedWalletBindingMock).not.toHaveBeenCalled();
+    expect(insertChainEventMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects production chain canary deposits over the raw amount limit', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    process.env.CHAIN_CANARY_ALLOWLIST = canaryWallet;
+    process.env.CHAIN_CANARY_MAX_AMOUNT_RAW = '999';
+    verifyDepositReceiptMock.mockResolvedValue({
+      chainId: 'ton-mainnet',
+      txHash: '0xtx',
+      logIndex: 0,
+      walletAddress: canaryWallet,
+      contractAddress: 'lock-vault',
+      amountRaw: '1000',
+      positionId: 'chain-position-1',
+      blockNumber: 123,
+      blockTime: null,
+      finalized: true,
+    });
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: '0xtx', amount: '1000' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CHAIN_CANARY_AMOUNT_LIMIT_EXCEEDED');
+    expect(findVerifiedWalletBindingMock).not.toHaveBeenCalled();
+    expect(insertChainEventMock).not.toHaveBeenCalled();
+  });
+
   it('applies verified deposit receipts inside one transaction', async () => {
     verifyDepositReceiptMock.mockResolvedValue({
       chainId: 'ton-mainnet',
@@ -339,6 +395,50 @@ describe('Production readiness gates', () => {
       true,
       tx
     );
+  });
+
+  it('allows production chain canary deposits for allowlisted wallets within limits', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    process.env.CHAIN_CANARY_ALLOWLIST = canaryWallet;
+    process.env.CHAIN_CANARY_MAX_AMOUNT_RAW = '1000';
+    process.env.CHAIN_CANARY_WAVE_IDS = '1';
+    verifyDepositReceiptMock.mockResolvedValue({
+      chainId: 'ton-mainnet',
+      txHash: '0xtx',
+      logIndex: 0,
+      walletAddress: canaryWallet,
+      contractAddress: 'lock-vault',
+      amountRaw: '1000',
+      positionId: 'chain-position-1',
+      blockNumber: 123,
+      blockTime: null,
+      finalized: true,
+    });
+    findVerifiedWalletBindingMock.mockResolvedValue({
+      user_id: userId,
+      chain_id: 'ton-mainnet',
+      normalized_address: canaryWallet,
+    });
+    insertChainEventMock.mockResolvedValue({
+      inserted: true,
+      event: { id: 'event-1', tx_hash: '0xtx', log_index: 0, apply_status: 'applied' },
+    });
+    createPositionMock.mockResolvedValue({
+      id: 'position-1',
+      user_id: userId,
+      wave_id: 1,
+      amount_raw: '1000',
+      onchain_position_id: 'chain-position-1',
+    });
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: '0xtx', amount: '1000' });
+
+    expect(res.status).toBe(201);
+    expect(insertChainEventMock).toHaveBeenCalledWith(expect.objectContaining({ applyStatus: 'applied' }));
+    expect(createPositionMock).toHaveBeenCalled();
   });
 
   it('does not treat a failed receipt apply as permanently duplicated', async () => {

@@ -114,6 +114,7 @@ const verifyMerkleClaimReceiptMock = verifyMerkleClaimReceipt as jest.Mock;
 const inviteeUserId = '00000000-0000-0000-0000-000000000101';
 const inviterUserId = '00000000-0000-0000-0000-000000000202';
 const token = jwt.sign({ userId: inviteeUserId, email: 'invitee@example.com' }, 'secret');
+const canaryWallet = '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41';
 
 function mockDepositPosition(isFirst: boolean) {
   queryMock.mockResolvedValue({ rows: [{ count: isFirst ? '0' : '1' }] });
@@ -134,7 +135,10 @@ function mockDepositPosition(isFirst: boolean) {
 }
 
 describe('Reward API and generation', () => {
+  const originalEnv = { ...process.env };
+
   beforeEach(() => {
+    process.env = { ...originalEnv };
     queryMock.mockReset();
     createPositionMock.mockReset();
     getReferralMock.mockReset();
@@ -147,6 +151,10 @@ describe('Reward API and generation', () => {
     insertChainEventMock.mockReset();
     verifyMerkleClaimReceiptMock.mockReset();
     verifyMerkleClaimReceiptMock.mockImplementation(jest.requireActual('../src/services/merkleRewards').verifyMerkleClaimReceipt);
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
   });
 
   it('creates a reward for the first qualifying referred deposit', async () => {
@@ -320,7 +328,67 @@ describe('Reward API and generation', () => {
     expect(markMerkleClaimVerifiedMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed for production chain canary reward claims without an allowlist', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    delete process.env.CHAIN_CANARY_ALLOWLIST;
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      beneficiary_wallet: canaryWallet,
+      amount_raw: '100',
+      leaf_hash: '0x01',
+    });
+
+    const res = await request(app)
+      .post('/v1/rewards/ledger-1/claim-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: 'claim-hash' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CHAIN_CANARY_WALLET_NOT_ALLOWED');
+    expect(verifyMerkleClaimReceiptMock).not.toHaveBeenCalled();
+    expect(markMerkleClaimVerifiedMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects production chain canary reward claims over the raw amount limit', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    process.env.CHAIN_CANARY_ALLOWLIST = canaryWallet;
+    process.env.CHAIN_CANARY_MAX_AMOUNT_RAW = '99';
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      beneficiary_wallet: canaryWallet,
+      amount_raw: '100',
+      leaf_hash: '0x01',
+    });
+
+    const res = await request(app)
+      .post('/v1/rewards/ledger-1/claim-receipt')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ txHash: 'claim-hash' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CHAIN_CANARY_AMOUNT_LIMIT_EXCEEDED');
+    expect(verifyMerkleClaimReceiptMock).not.toHaveBeenCalled();
+    expect(markMerkleClaimVerifiedMock).not.toHaveBeenCalled();
+  });
+
   it('marks Merkle claim receipts claimed only after chain verification', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    process.env.CHAIN_CANARY_ALLOWLIST = canaryWallet;
+    process.env.CHAIN_CANARY_MAX_AMOUNT_RAW = '100';
     getRewardLedgerByIdMock.mockResolvedValue({
       id: 'ledger-1',
       beneficiary_user_id: inviteeUserId,
@@ -332,7 +400,7 @@ describe('Reward API and generation', () => {
       batch_status: 'active',
       batch_metadata: { contract_batch_id: '2' },
       chain_id: 'ton-testnet',
-      beneficiary_wallet: '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41',
+      beneficiary_wallet: canaryWallet,
       amount_raw: '100',
       leaf_hash: '0x01',
     });
@@ -340,8 +408,8 @@ describe('Reward API and generation', () => {
       txHash: 'claim-hash',
       logIndex: 0,
       contractAddress: 'merkle-claim',
-      beneficiaryWallet: '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41',
-      recipient: '0:b1274e7279ac155a5b0de527c9fa86da8e08769457df47e3bb79b1ffb3fc2a41',
+      beneficiaryWallet: canaryWallet,
+      recipient: canaryWallet,
       amountRaw: '100',
       ledgerIdHash: '1',
       batchId: '2',

@@ -5,6 +5,7 @@ import { withTransaction } from '../db';
 import { insertChainEvent } from '../models/chainEventModel';
 import { findVerifiedWalletBinding } from '../models/walletBindingModel';
 import { isControlEnabled } from '../services/productionGuards';
+import { assertChainCanaryMutationAllowed, ChainCanaryGuardError } from '../services/chainCanaryGuards';
 import { applyDeposit } from '../services/depositApplyService';
 import { ReceiptVerificationError, verifyDepositReceipt } from '../services/receiptVerifier';
 
@@ -79,6 +80,11 @@ export async function depositReceipt(req: Request, res: Response, next: NextFunc
     if (receipt.amountRaw !== String(req.body.amount || receipt.amountRaw)) {
       return res.status(409).json({ request_id: req.id || '', error: { code: 'AMOUNT_MISMATCH', message: 'Receipt amount does not match submitted amount' } });
     }
+    assertChainCanaryMutationAllowed({
+      walletAddress: receipt.walletAddress,
+      amountRaw: receipt.amountRaw,
+      waveId,
+    });
 
     const wallet = await findVerifiedWalletBinding(receipt.chainId, receipt.walletAddress);
     if (!wallet || wallet.user_id !== user.id) {
@@ -142,6 +148,9 @@ export async function depositReceipt(req: Request, res: Response, next: NextFunc
 
     return res.status(201).json({ request_id: req.id || '', data: { position, chain_event: eventResult.event } });
   } catch (err) {
+    if (err instanceof ChainCanaryGuardError) {
+      return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
+    }
     if (err instanceof ReceiptVerificationError) {
       return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
     }

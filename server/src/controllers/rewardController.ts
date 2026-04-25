@@ -8,6 +8,7 @@ import {
 } from '../models/rewardModel';
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
 import { isControlEnabled, productionChainRequired, riskReviewEnabled } from '../services/productionGuards';
+import { assertChainCanaryMutationAllowed, ChainCanaryGuardError } from '../services/chainCanaryGuards';
 import { getMerkleProofForLedger, markMerkleClaimVerified } from '../models/merkleRewardModel';
 import { encodeMerkleProofCell, hashLedgerId, MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
 import { withTransaction } from '../db';
@@ -157,6 +158,10 @@ export async function submitMerkleClaimReceipt(req: Request, res: Response, next
     if (!proof || proof.batch_status !== 'active') {
       return res.status(404).json({ request_id: req.id || '', error: { code: 'MERKLE_PROOF_NOT_AVAILABLE', message: 'Merkle proof is not available for this reward' } });
     }
+    assertChainCanaryMutationAllowed({
+      walletAddress: proof.beneficiary_wallet,
+      amountRaw: proof.amount_raw,
+    });
 
     const receipt = await verifyMerkleClaimReceipt({
       txHash,
@@ -207,6 +212,9 @@ export async function submitMerkleClaimReceipt(req: Request, res: Response, next
 
     return res.json({ request_id: req.id || '', data: { proof: result.proof, reward: result.ledger, chain_event: result.eventResult.event } });
   } catch (err) {
+    if (err instanceof ChainCanaryGuardError) {
+      return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
+    }
     if (err instanceof MerkleClaimVerificationError) {
       return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
     }

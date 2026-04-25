@@ -1,6 +1,6 @@
 # Cloudflare Operations Handoff
 
-Date: 2026-04-24
+Date: 2026-04-25
 
 ## Current State
 
@@ -26,9 +26,10 @@ Current RC1 judgment:
   smoke run
 - sustainable RC1 environment: `yes for staging`, because the data plane now
   uses Hyperdrive -> Neon Postgres
-- production environment: `not yet`, because production Neon, production
-  Hyperdrive, production secrets, and production smoke evidence are still
-  separate unfinished tasks
+- production environment: `infrastructure canary only`, because production
+  Worker, Pages, Hyperdrive, Neon migrations, and GET-only smoke evidence now
+  exist, but mainnet contracts, DNS/custom domains, and mutating canary evidence
+  are still unfinished
 
 ## Current Data Plane
 
@@ -72,18 +73,54 @@ Target route:
 `Cloudflare Worker -> Hyperdrive -> managed Postgres`
 
 The staging cutover has been completed. The production cutover remains blocked
-until an operator provides a production Neon Postgres connection string and
-credentials that can be used from `server/` for migrations, production
-Hyperdrive creation, and non-mutating production smoke.
+for real chain-backed use until mainnet contracts are deployed, DNS/custom
+domains are attached, and a small mainnet canary is recorded. Production Neon,
+Hyperdrive, Worker, Pages, and non-mutating smoke have been exercised.
 
 Do not put real secrets in this repository. Export them only in the operator
 shell that runs the cutover commands.
 
 Required operator inputs:
 
-- `DATABASE_URL`: managed production Postgres direct connection string
+- `DATABASE_URL`: managed production Postgres direct connection string. Already
+  used for the current production migration run; keep it out of git.
 - `CLOUDFLARE_API_TOKEN`: token with permission to update Hyperdrive and deploy
-  the production Worker
+  the production Worker. Current token can deploy Worker/Pages and list
+  Hyperdrive.
+- Cloudflare Zone permissions still missing for public domains:
+  - Zone DNS Edit for `72h.lol`
+  - Workers Routes Edit for `api.mm.72h.lol/*`
+  - Pages custom domain management for `mm.72h.lol`
+
+Current production resource evidence:
+
+- production Worker: `multi-millionaire-api-production`
+- production API URL:
+  `https://multi-millionaire-api-production.348421501.workers.dev`
+- latest production Worker version observed: `525cccfd-f5d7-4045-b9d2-5e6a322206b0`
+- production Pages project: `multi-millionaire-production`
+- latest Pages alias:
+  `https://production.multi-millionaire-production.pages.dev`
+- latest Pages deployment URL:
+  `https://c2c749a8.multi-millionaire-production.pages.dev`
+- production Hyperdrive:
+  `multi-millionaire-production-postgres`
+- production Hyperdrive id: `92267e746955420d80eb707f4cf23e17`
+- production GET-only smoke on 2026-04-25: `/health=200`, `/ready=200`,
+  `/v1/app/bootstrap=200`, `/v1/waves/current=200`
+
+Production chain configuration rule:
+
+- `CHAIN_ID`, `CHAIN_RPC_URL`, and `TOKEN_ADDRESS` must point at the same TON
+  network. Do not use a testnet RPC with the mainnet 72H token address.
+- The mainnet 72H token master
+  `EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8` is active and supports the
+  standard Jetton `get_wallet_address` path on mainnet.
+- Backend code reads `TOKEN_ADDRESS` for Jetton wallet derivation. Setting only
+  `TOKEN_ADDRESS_MAINNET` is not sufficient for production runtime.
+- Keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until LockVault and MerkleClaim are
+  deployed, DNS/custom domains are attached, canary limits are configured, and a
+  named canary window is approved.
 
 ## Cutover Checklist
 
@@ -93,7 +130,8 @@ For production, run from `server/` after exporting the required operator inputs:
 NODE_ENV=production DATABASE_URL="$DATABASE_URL" npm run migrate:up
 ```
 
-Then create a production Hyperdrive config. Do not reuse the staging config:
+The production Hyperdrive config already exists. If it must be recreated, do
+not reuse the staging config:
 
 ```bash
 npx wrangler hyperdrive create multi-millionaire-production-postgres \
@@ -111,7 +149,7 @@ Confirm the production Hyperdrive origin references the production Neon host:
 npx wrangler hyperdrive get <production-hyperdrive-id>
 ```
 
-Deploy and verify:
+Deploy and verify staging:
 
 ```bash
 npx wrangler deploy --config wrangler.jsonc --env staging
@@ -124,6 +162,18 @@ npm run smoke
 
 Only after those checks pass should the RC1 gate be updated to
 `sustainable RC1 environment: yes`.
+
+For production, use GET-only smoke by default:
+
+```bash
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/health
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/ready
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/v1/app/bootstrap
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/v1/waves/current
+```
+
+Do not run the staging mutating smoke against production unless a canary window,
+allowlisted wallet, amount, rollback owner, and stop conditions are documented.
 
 ## Smoke Coverage
 
