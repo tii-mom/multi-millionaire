@@ -1,7 +1,8 @@
 import 'dotenv/config';
-import { Address, toNano } from '@ton/core';
-import { LockVault } from '../build/LockVault/LockVault_LockVault';
-import { NetworkProvider } from '@ton/blueprint';
+import type { NetworkProvider } from '@ton/blueprint';
+
+const { Address, toNano } = require('@ton/core');
+const { LockVault } = require('../build/LockVault/LockVault_LockVault');
 
 export async function run(provider: NetworkProvider) {
     function optionalAddress(...names: string[]) {

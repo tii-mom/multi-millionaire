@@ -1,7 +1,8 @@
 import 'dotenv/config';
-import { Address, toNano } from '@ton/core';
-import { MerkleClaim } from '../build/MerkleClaim/MerkleClaim_MerkleClaim';
-import { NetworkProvider } from '@ton/blueprint';
+import type { NetworkProvider } from '@ton/blueprint';
+
+const { Address, toNano } = require('@ton/core');
+const { MerkleClaim } = require('../build/MerkleClaim/MerkleClaim_MerkleClaim');
 
 export async function run(provider: NetworkProvider) {
     function optionalAddress(name: string) {

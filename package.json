@@ -20,9 +20,10 @@
     "contract:deploy:testnet-jetton": "tsx scripts/deployTestnetJetton.ts",
     "contract:deploy:testnet": "tsx scripts/deployTestnetContracts.ts",
     "contract:jetton-wallets:testnet": "tsx scripts/deriveTestnetJettonWallets.ts",
+    "contract:derive:mainnet": "tsx scripts/deriveMainnetContracts.ts",
     "contract:configure:testnet": "tsx scripts/configureTestnetContracts.ts",
-    "contract:deploy:lock-vault:mainnet": "blueprint run deployLockVault --mainnet --tonconnect",
-    "contract:deploy:merkle-claim:mainnet": "blueprint run deployMerkleClaim --mainnet --tonconnect",
+    "contract:deploy:lock-vault:mainnet": "node -e \"require('fs').mkdirSync('build',{recursive:true});require('fs').writeFileSync('build/package.json','{\\\"type\\\":\\\"commonjs\\\"}\\n')\" && TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' blueprint run deployLockVault --mainnet --tonconnect",
+    "contract:deploy:merkle-claim:mainnet": "node -e \"require('fs').mkdirSync('build',{recursive:true});require('fs').writeFileSync('build/package.json','{\\\"type\\\":\\\"commonjs\\\"}\\n')\" && TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' blueprint run deployMerkleClaim --mainnet --tonconnect",
     "contract:canary:deposit:testnet": "tsx scripts/sendTestnetDeposit.ts"
   },
   "dependencies": {

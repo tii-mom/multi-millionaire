@@ -181,10 +181,27 @@ export TOKEN_ADDRESS="EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8"
 Deploy with Tonkeeper confirmation:
 
 ```bash
+export CHAIN_ID=ton-mainnet
+export CHAIN_ADMIN_ADDRESS=UQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQfRq
+export TOKEN_ADDRESS=EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8
 npm run contract:build
+npm run contract:derive:mainnet
 npm run contract:deploy:lock-vault:mainnet
 npm run contract:deploy:merkle-claim:mainnet
 ```
+
+Precomputed mainnet addresses from `contract:derive:mainnet` on 2026-04-25:
+
+- LockVault: `EQDrBbGqXv_LnY_kSzJXP9bB0n0dnMlCklkerG8WdKHGJX4z`
+- MerkleClaim: `EQCf97B3-PdVVndsi_nhVrmK-gFUzK_H2uCO5zk_umYQyLEd`
+- owner/admin wallet: `EQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQamv`
+- 72H token master: `EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8`
+
+The deploy command reaches the Tonkeeper QR/link step locally. Deployment is not
+complete until the admin wallet confirms each transaction and the scripts print
+successful deploy evidence. Jetton wallet derivation for the supplied 72H token
+returned TON get-method `exit_code=-13`; confirm the token's Jetton getter
+compatibility before enabling production deposits.
 
 After deployment:
 
