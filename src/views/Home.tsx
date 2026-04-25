@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useIsConnectionRestored, useTonAddress, useTonConnectModal, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
-import { buildDepositTransferBody, createTonQueryId } from "@/src/lib/tonTransactions";
+import { buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId } from "@/src/lib/tonTransactions";
 import {
   clearBackendAuthToken,
   clearTonWalletSession,
@@ -22,6 +22,28 @@ interface HomeProps {
   myDeposit: number;
   setMyDeposit: Dispatch<SetStateAction<number>>;
   targetValue: number;
+}
+
+type PendingDepositReceipt = {
+  amountRaw: string;
+  queryId: string;
+  waveId: number;
+  positionId: string;
+  ownerAddress: string;
+  vaultAddress: string;
+  jettonWalletAddress: string;
+};
+
+function normalizeTonConnectChainId(chain: unknown): string | null {
+  const value = String(chain || "").trim().toLowerCase();
+  if (!value) return null;
+  if (value === "-239" || value === "mainnet" || value === "ton-mainnet") return "ton-mainnet";
+  if (value === "-3" || value === "testnet" || value === "ton-testnet") return "ton-testnet";
+  return value;
+}
+
+function shortHash(value: string) {
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-8)}` : value;
 }
 
 export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue }: HomeProps) {
@@ -48,6 +70,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const [walletLoading, setWalletLoading] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [pendingDepositReceipt, setPendingDepositReceipt] = useState<PendingDepositReceipt | null>(null);
   const previousTonAddressRef = useRef<string | null>(tonSession?.address ?? null);
   const walletAuthInFlightRef = useRef(false);
 
@@ -61,6 +84,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const depositsPaused = !!bootstrap?.controls?.pause_deposits?.enabled;
   const maintenanceBanner = bootstrap?.controls?.maintenance_banner;
   const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;
+  const expectedChainId = bootstrap?.contracts?.chain_id || walletAuthIntent?.chain_id || "";
+  const tonAccount = (tonWallet as any)?.account;
+  const connectedChainId = normalizeTonConnectChainId(tonAccount?.chain);
+  const chainMismatch =
+    !!expectedChainId && !!connectedChainId && normalizeTonConnectChainId(expectedChainId) !== connectedChainId;
+  const missingWalletStateInit =
+    !!tonAccount?.address && !!tonAccount?.publicKey && !tonAccount?.walletStateInit;
   const localizedBootstrapError = bootstrapError
     ? formatError(new Error(bootstrapError), "error.network")
     : "";
@@ -69,6 +99,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     ? t("home.wallet.disabledBackend")
     : !tonSession
       ? t("home.wallet.disabledConnect")
+      : chainMismatch
+        ? t("home.ton.chainMismatch", { expected: expectedChainId, actual: connectedChainId })
+      : missingWalletStateInit
+        ? t("home.ton.stateInitMissing")
       : !authToken
         ? t("home.wallet.disabledBackendAuth")
       : depositsPaused
@@ -174,6 +208,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     setBindIntent(null);
     setWalletAuthIntent(null);
     setWalletSignature("");
+    setPendingDepositReceipt(null);
     setApiError(null);
     toast.message(t("home.ton.disconnected"));
   };
@@ -183,7 +218,20 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
     const account = (tonWallet as any).account;
     const tonProof = (tonWallet as any).connectItems?.tonProof;
-    if (!account?.address || !account?.publicKey || !tonProof || !("proof" in tonProof)) {
+    if (!account?.address || !account?.publicKey) {
+      setApiError(t("home.ton.backendAuthWaiting"));
+      return;
+    }
+    if (chainMismatch) {
+      setApiError(t("home.ton.chainMismatch", { expected: expectedChainId, actual: connectedChainId }));
+      return;
+    }
+    if (!account.walletStateInit) {
+      setApiError(t("home.ton.stateInitMissing"));
+      return;
+    }
+    if (!tonProof || !("proof" in tonProof)) {
+      setApiError(t("home.ton.backendAuthWaiting"));
       return;
     }
 
@@ -218,6 +266,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         }
         setWalletAuthIntent(null);
         tonConnectUI.setConnectRequestParameters(null);
+        setApiError(null);
         toast.success(t("home.ton.backendReady"));
       })
       .catch((error) => {
@@ -228,7 +277,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       .finally(() => {
         walletAuthInFlightRef.current = false;
       });
-  }, [authToken, connectionRestored, formatError, t, tonConnectUI, tonWallet, walletAuthIntent]);
+  }, [authToken, chainMismatch, connectedChainId, connectionRestored, expectedChainId, formatError, t, tonConnectUI, tonWallet, walletAuthIntent]);
 
   const handleDeposit = async () => {
     if (backendUnavailable) {
@@ -270,6 +319,18 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       return;
     }
     if (chainMainlineEnabled) {
+      if (chainMismatch) {
+        const message = t("home.ton.chainMismatch", { expected: expectedChainId, actual: connectedChainId });
+        setApiError(message);
+        toast.error(message);
+        return;
+      }
+      if (missingWalletStateInit) {
+        const message = t("home.ton.stateInitMissing");
+        setApiError(message);
+        toast.error(message);
+        return;
+      }
       const lockVaultAddress = bootstrap?.contracts?.vault;
       if (!lockVaultAddress) {
         setApiError(t("home.deposit.contractMissing"));
@@ -278,10 +339,12 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       }
       try {
         setIsConfirming(true);
+        setApiError(null);
         const amountRaw = val.toString();
         const ownerAddress = rawTonAddress || tonSession.rawAddress || tonSession.address;
         const derived = await api.deriveJettonWallet(ownerAddress, authToken);
         const queryId = createTonQueryId();
+        const positionId = deriveLockVaultPositionId({ walletAddress: ownerAddress, queryId });
         const body = buildDepositTransferBody({
           waveId,
           amountRaw,
@@ -297,7 +360,17 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             payload: body,
           }],
         });
+        setPendingDepositReceipt({
+          amountRaw,
+          queryId,
+          waveId,
+          positionId,
+          ownerAddress,
+          vaultAddress: lockVaultAddress,
+          jettonWalletAddress: derived.jetton_wallet,
+        });
         setTxHash("");
+        setInputValue("");
         toast.success(t("home.deposit.txSubmitted"));
         setApiError(t("home.deposit.txSubmittedFollowup"));
       } catch (error) {
@@ -339,7 +412,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     try {
       setWallets(await api.myWallets(authToken));
     } catch {
-      // Wallet binding is optional while staging/off-chain mode is active.
+      // Wallet binding stays optional when this environment only records display state.
     }
   };
 
@@ -442,6 +515,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       setApiError(t("home.deposit.noWave"));
       return;
     }
+    if (!pendingDepositReceipt) {
+      setApiError(t("home.receipt.pendingRequired"));
+      return;
+    }
     if (!txHash.trim()) {
       setApiError(t("home.receipt.txRequired"));
       return;
@@ -452,17 +529,18 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
     try {
       const result = await api.submitDepositReceipt(
-        waveId,
+        pendingDepositReceipt.waveId,
         {
           txHash: txHash.trim(),
-          amount: inputValue || undefined,
-          walletAddress: walletAddress.trim() || undefined,
+          amount: pendingDepositReceipt.amountRaw,
+          walletAddress: pendingDepositReceipt.ownerAddress,
         },
         authToken
       );
       setMyDeposit((p: number) => p + Number(result.position.amount_raw || 0));
       setTxHash("");
       setInputValue("");
+      setPendingDepositReceipt(null);
       toast.success(t("home.receipt.submitted"));
     } catch (error) {
       const message = formatError(error, "home.receipt.failed");
@@ -794,6 +872,18 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
             <div className="h-px bg-white/10" />
 
+            {pendingDepositReceipt && (
+              <div className="rounded-xl border border-[#DBFF00]/20 bg-[#DBFF00]/[0.06] p-3 font-mono text-[10px] leading-5 text-white/55">
+                <div className="mb-2 text-[9px] uppercase tracking-widest text-[#DBFF00]/75">{t("home.receipt.pendingTitle")}</div>
+                <div>{t("home.receipt.pendingAmount", { amount: pendingDepositReceipt.amountRaw })}</div>
+                <div>{t("home.receipt.pendingWave", { wave: pendingDepositReceipt.waveId })}</div>
+                <div>{t("home.receipt.pendingQuery", { query: pendingDepositReceipt.queryId })}</div>
+                <div>{t("home.receipt.pendingPosition", { position: shortHash(pendingDepositReceipt.positionId) })}</div>
+                <div>{t("home.receipt.pendingVault", { vault: shortWalletAddress(pendingDepositReceipt.vaultAddress) })}</div>
+                <div>{t("home.receipt.pendingDestination", { destination: shortWalletAddress(pendingDepositReceipt.jettonWalletAddress) })}</div>
+              </div>
+            )}
+
             <input
               type="text"
               value={txHash}
@@ -805,7 +895,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             <button
               type="button"
               onClick={submitReceipt}
-              disabled={chainActionDisabled || receiptLoading || !txHash.trim()}
+              disabled={chainActionDisabled || receiptLoading || !pendingDepositReceipt || !txHash.trim()}
               className="depth-button focus-ring rounded-xl border border-[#DBFF00]/20 bg-[#DBFF00]/10 py-3 text-[10px] font-bold uppercase tracking-widest text-[#DBFF00] hover:bg-[#DBFF00] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
             >
               {receiptLoading ? t("home.receipt.submitting") : t("home.receipt.submit")}
@@ -815,18 +905,18 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           <button
             type="button"
             onClick={handleDeposit}
-            disabled={isConfirming || backendUnavailable || chainMainlineEnabled || !inputValue || Number(inputValue) <= 0}
+            disabled={isConfirming || backendUnavailable || !inputValue || Number(inputValue) <= 0 || (chainMainlineEnabled && chainActionDisabled)}
             className="depth-button focus-ring group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-[18px] bg-[#DBFF00] py-4 font-bold tracking-wide text-black shadow-[0_0_22px_rgba(219,255,0,0.16)] hover:bg-[#d3f51c] disabled:cursor-not-allowed disabled:opacity-70"
           >
             <div className="absolute inset-0 h-full w-full -translate-x-[150%] skew-x-[30deg] bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shine_1s_ease-out]" />
             {isConfirming ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>{t("home.deposit.recording")}</span>
+                <span>{chainMainlineEnabled ? t("home.deposit.sendingChainTx") : t("home.deposit.recording")}</span>
               </>
             ) : (
               <>
-                <span>{backendUnavailable ? t("home.deposit.backendUnavailable") : chainMainlineEnabled ? t("home.deposit.useReceipt") : t("home.deposit.recordStaging")}</span>
+                <span>{backendUnavailable ? t("home.deposit.backendUnavailable") : chainMainlineEnabled ? t("home.deposit.sendChainTx") : t("home.deposit.recordStaging")}</span>
                 <ArrowRight className="h-5 w-5" />
               </>
             )}

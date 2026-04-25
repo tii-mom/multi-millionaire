@@ -134,7 +134,8 @@ Latest testnet evidence is recorded in
 - Contract getter evidence: `depositCount=1`, `totalDepositedRaw=1`,
   `totalActiveRaw=1`, position status `active`.
 - Backend direct deposit verifier: `passed` with Toncenter v3 transactions API.
-- Backend deposit database apply: pending rerun against an isolated test
+- Backend deposit database apply: pending. It is not launch evidence until
+  `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
   database.
 - Verified Merkle claim receipt tx:
   `XYvh+RnvK2zA1QkMKeyxUV2C7rkllE026yMQmm6XLec=`
@@ -142,7 +143,9 @@ Latest testnet evidence is recorded in
 - Contract getter evidence: `claimCount=1`, `totalClaimedRaw=1`,
   ledger status `claimed`.
 - Backend direct claim verifier: `passed` with Toncenter v3 transactions API.
-- Backend claim database apply: pending rerun against an isolated test database.
+- Backend claim database apply: pending. It is not launch evidence until
+  `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
+  database.
 
 This proves the audit-remediated testnet LockVault can receive a real Jetton
 deposit and expose the derived position by getter, and the audit-remediated
@@ -151,6 +154,22 @@ claim. It also proves the latest backend verifiers can parse those receipts
 when a transactions API returns execution descriptions. It does not yet prove
 database apply against an isolated test database, and it does not authorize
 production chain writes or mainnet launch.
+
+Optional database apply harness:
+
+```bash
+cd server
+NODE_ENV=test \
+RUN_RECEIPT_APPLY_INTEGRATION=true \
+DATABASE_URL="postgres://.../multi_millionaire_receipt_apply_test" \
+npm test -- receiptApply.integration.test.ts
+```
+
+The harness is skipped by default. When enabled, it refuses
+`NODE_ENV=production` and refuses database names that do not contain `test`,
+`integration`, `ci`, or `isolated`. It also refuses remote database hosts unless
+`ALLOW_REMOTE_RECEIPT_APPLY_INTEGRATION_DB=true` is set for a throwaway
+non-production database. Use only a migrated throwaway database.
 
 ## Canary SOP
 
@@ -218,6 +237,41 @@ complete until the admin wallet confirms each transaction and the scripts print
 successful deploy evidence. Jetton wallet derivation for the supplied 72H token
 returned TON get-method `exit_code=-13`; confirm the token's Jetton getter
 compatibility before enabling production deposits.
+
+### Mainnet Deployment Evidence Template
+
+Mainnet deployment is not complete until this template is filled with actual
+deployment output and linked evidence. Do not replace derived addresses with
+production config until each value is verified from chain/provider output.
+
+- Deployment timestamp:
+- Network/chain id: `ton-mainnet`
+- RPC/provider endpoint and account/project:
+- Deployer/admin wallet:
+- LockVault deployment tx hash:
+- LockVault deployment LT:
+- LockVault block time:
+- Actual LockVault address:
+- MerkleClaim deployment tx hash:
+- MerkleClaim deployment LT:
+- MerkleClaim block time:
+- Actual MerkleClaim address:
+- 72H token master address:
+- LockVault Jetton wallet derivation:
+- MerkleClaim Jetton wallet derivation:
+- Getter verification:
+  - LockVault owner:
+  - LockVault token address:
+  - LockVault Jetton wallet:
+  - MerkleClaim owner:
+  - MerkleClaim token address:
+  - MerkleClaim reward Jetton wallet:
+- Contract code/build hash:
+  - LockVault:
+  - MerkleClaim:
+- Build command and git commit:
+- Script output/evidence path:
+- Operator/reviewer signoff:
 
 After deployment:
 

@@ -172,7 +172,9 @@ and prints the claim receipt hash for backend
   - status: `0` (`active`)
 - Backend local receipt apply:
   - direct backend `ton_rpc` verifier: `passed`
-  - database apply: pending rerun against an isolated test database
+  - database apply: pending. Count as complete only after
+    `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
+    database.
 - Script-verified Merkle claim canary:
   - amount raw: `1`
   - backend reward ledger id placeholder: `testnet-canary-1777101812106`
@@ -190,11 +192,70 @@ and prints the claim receipt hash for backend
   - ledger status: `2` (`claimed`)
 - Backend local claim receipt apply:
   - direct backend `ton_rpc` verifier: `passed`
-  - database apply: pending rerun against an isolated test database
+  - database apply: pending. Count as complete only after
+    `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
+    database.
 
 The backend verifier now accepts TON RPC responses that place message bodies in
 `in_msg.msg_data.body`, which is the shape returned by the testnet JSON-RPC
 used for this canary.
+
+## Optional Receipt Apply Integration Harness
+
+The database apply portion remains pending by default. To produce evidence, run
+the skipped integration harness against a migrated throwaway PostgreSQL
+database whose database name clearly indicates `test`, `integration`, `ci`, or
+`isolated`:
+
+```bash
+cd server
+NODE_ENV=test \
+RUN_RECEIPT_APPLY_INTEGRATION=true \
+DATABASE_URL="postgres://.../multi_millionaire_receipt_apply_test" \
+npm test -- receiptApply.integration.test.ts
+```
+
+The harness refuses `NODE_ENV=production` and refuses non-test database names.
+It also refuses remote database hosts unless
+`ALLOW_REMOTE_RECEIPT_APPLY_INTEGRATION_DB=true` is set for a throwaway
+non-production database. It does not use production data. It seeds fixed test
+rows, applies one verified deposit receipt and one verified Merkle claim receipt
+through the real Express apply endpoints, verifies duplicate receipts do not
+create a second applied state, then removes the seeded rows.
+
+## Mainnet Deployment Evidence Template
+
+Mainnet deployment has not been performed. When it is approved, capture the
+following fields from the actual deploy scripts and RPC/provider output:
+
+- Deployment timestamp:
+- Network/chain id: `ton-mainnet`
+- RPC/provider endpoint and account/project:
+- Deployer/admin wallet:
+- LockVault deployment tx hash:
+- LockVault deployment LT:
+- LockVault block time:
+- Actual LockVault address:
+- MerkleClaim deployment tx hash:
+- MerkleClaim deployment LT:
+- MerkleClaim block time:
+- Actual MerkleClaim address:
+- 72H token master address:
+- LockVault Jetton wallet derivation:
+- MerkleClaim Jetton wallet derivation:
+- Getter verification:
+  - LockVault owner:
+  - LockVault token address:
+  - LockVault Jetton wallet:
+  - MerkleClaim owner:
+  - MerkleClaim token address:
+  - MerkleClaim reward Jetton wallet:
+- Contract code/build hash:
+  - LockVault:
+  - MerkleClaim:
+- Build command and git commit:
+- Script output/evidence path:
+- Operator/reviewer signoff:
 
 ## Mainnet Blockers
 

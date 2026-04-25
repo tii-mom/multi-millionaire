@@ -95,6 +95,36 @@ function validateUrl(value: string): string | null {
   }
 }
 
+function deriveToncenterV3TransactionsUrl(rpcUrl: string | undefined): string | null {
+  if (!rpcUrl?.trim()) {
+    return null;
+  }
+  try {
+    const url = new URL(rpcUrl.trim());
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return null;
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (hostname !== 'toncenter.com' && !hostname.endsWith('.toncenter.com')) {
+      return null;
+    }
+    return `${url.origin}/api/v3/transactions`;
+  } catch {
+    return null;
+  }
+}
+
+function validateTransactionsApiSource(): string | null {
+  const explicit = process.env.TON_TRANSACTIONS_API_URL?.trim();
+  if (explicit) {
+    return validateUrl(explicit);
+  }
+  if (deriveToncenterV3TransactionsUrl(process.env.CHAIN_RPC_URL)) {
+    return null;
+  }
+  return 'Production TON verification requires TON_TRANSACTIONS_API_URL or a toncenter.com CHAIN_RPC_URL that maps to /api/v3/transactions';
+}
+
 function validateBoolean(value: string): string | null {
   if (!['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(value.trim().toLowerCase())) {
     return 'Value must be a boolean';
@@ -194,6 +224,8 @@ const productionChainRecommended: EnvCheck[] = [
   { name: 'WALLET_SIGNATURE_MODE', hint: 'Production wallet signature verifier implementation. Must not be test or disabled.', validate: validateWalletSignatureMode },
   { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Enable only when chain receipt verification is configured.', validate: (value) => validateBoolean(value) },
   { name: 'CHAIN_RECEIPT_VERIFIER', hint: 'Production receipt verifier implementation. Must not be test or disabled.', validate: validateReceiptVerifier },
+  { name: 'MERKLE_CLAIM_VERIFIER', hint: 'Production Merkle claim receipt verifier implementation.', validate: validateProductionValue },
+  { name: 'TON_TRANSACTIONS_API_URL', hint: 'TON transactions API endpoint. Required for non-Toncenter production receipt or claim verification.', validate: (value) => validateUrl(value) },
   { name: 'REWARD_CLAIM_MODEL', hint: 'Production reward claim model. Use merkle for limited gray launch.', validate: validateProductionValue },
   { name: 'ORACLE_ADDRESS', hint: 'Optional external oracle contract address. Current LockVault can only use staged owner price for testnet/canary.', validate: validateContractValue },
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Only required when REWARD_CLAIM_MODEL=distributor.', validate: validateContractValue },
@@ -262,7 +294,9 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
   const receiptEnabled = isTruthy(process.env.RECEIPT_VERIFICATION_ENABLED);
   const walletEnabled = isTruthy(process.env.WALLET_BINDING_ENABLED);
   const verifier = (process.env.CHAIN_RECEIPT_VERIFIER || '').trim().toLowerCase();
+  const merkleVerifier = (process.env.MERKLE_CLAIM_VERIFIER || '').trim().toLowerCase();
   const walletVerifier = (process.env.WALLET_SIGNATURE_MODE || '').trim().toLowerCase();
+  const needsTransactionsApi = receiptEnabled || verifier === 'ton_rpc' || merkleVerifier === 'ton_rpc' || chainWrites;
 
   if (chainWrites && !receiptEnabled) {
     checks.push({
@@ -295,6 +329,49 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
       hint: 'Production chain writes require a real receipt verifier.',
       message: 'CHAIN_MAINLINE_WRITES_ENABLED=true cannot use test/disabled receipt verifier',
     });
+  }
+  if (receiptEnabled && ['test', 'disabled', ''].includes(verifier)) {
+    checks.push({
+      name: 'CHAIN_RECEIPT_VERIFIER',
+      status: 'invalid',
+      hint: 'Production receipt verification requires a real receipt verifier.',
+      message: 'RECEIPT_VERIFICATION_ENABLED=true cannot use test/disabled receipt verifier',
+    });
+  }
+  if (verifier === 'test') {
+    checks.push({
+      name: 'CHAIN_RECEIPT_VERIFIER',
+      status: 'invalid',
+      hint: 'Production runtime must use a real receipt verifier.',
+      message: 'Production cannot use CHAIN_RECEIPT_VERIFIER=test',
+    });
+  }
+  if (merkleVerifier === 'test') {
+    checks.push({
+      name: 'MERKLE_CLAIM_VERIFIER',
+      status: 'invalid',
+      hint: 'Production Merkle claim receipts require a real verifier.',
+      message: 'Production cannot use MERKLE_CLAIM_VERIFIER=test',
+    });
+  }
+  if (walletVerifier === 'test') {
+    checks.push({
+      name: 'WALLET_SIGNATURE_MODE',
+      status: 'invalid',
+      hint: 'Production runtime must use a real wallet signature verifier.',
+      message: 'Production cannot use WALLET_SIGNATURE_MODE=test',
+    });
+  }
+  if (needsTransactionsApi) {
+    const sourceMessage = validateTransactionsApiSource();
+    if (sourceMessage) {
+      checks.push({
+        name: 'TON_TRANSACTIONS_API_URL',
+        status: 'invalid',
+        hint: 'Set TON_TRANSACTIONS_API_URL to a valid transactions API URL, or use a toncenter.com CHAIN_RPC_URL that maps to /api/v3/transactions.',
+        message: sourceMessage,
+      });
+    }
   }
 
   return checks;

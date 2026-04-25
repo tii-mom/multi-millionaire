@@ -6,7 +6,7 @@ import { useTonConnectUI } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
 import { readBackendAuthToken, readTonWalletSession } from "@/src/lib/tonSession";
-import { buildClaimRewardBody } from "@/src/lib/tonTransactions";
+import { buildClaimRewardBody, createTonQueryId } from "@/src/lib/tonTransactions";
 import type { BootstrapData, RewardLedger, RewardSummary } from "@/src/lib/types";
 
 const emptySummary: RewardSummary = {
@@ -14,6 +14,19 @@ const emptySummary: RewardSummary = {
   approved_amount: "0",
   claimed_amount: "0",
 };
+
+type PendingClaimReceipt = {
+  ledgerId: string;
+  amountRaw: string;
+  batchId: string;
+  queryId: string;
+  recipientAddress: string;
+  contractAddress: string;
+};
+
+function shortValue(value: string) {
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-8)}` : value;
+}
 
 export default function Rewards() {
   const { formatError, locale, t } = useI18n();
@@ -25,6 +38,9 @@ export default function Rewards() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [proofLoadingId, setProofLoadingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingClaimReceipt, setPendingClaimReceipt] = useState<PendingClaimReceipt | null>(null);
+  const [claimTxHash, setClaimTxHash] = useState("");
+  const [claimReceiptLoading, setClaimReceiptLoading] = useState(false);
 
   const rewardStatusLabel = (status: RewardLedger["status"]) => {
     switch (status) {
@@ -99,10 +115,12 @@ export default function Rewards() {
     setClaimingId(ledgerId);
     try {
       const proof = await api.merkleClaimProof(ledgerId, token);
+      const queryId = createTonQueryId();
       const body = await buildClaimRewardBody({
         ledgerId,
         proof,
         recipientAddress: walletSession.rawAddress,
+        queryId,
       });
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -112,17 +130,49 @@ export default function Rewards() {
           payload: body,
         }],
       });
+      setPendingClaimReceipt({
+        ledgerId,
+        amountRaw: proof.amount_raw,
+        batchId: String((proof as any).contract_batch_id || proof.batch_id),
+        queryId,
+        recipientAddress: walletSession.rawAddress,
+        contractAddress: merkleClaimAddress,
+      });
+      setClaimTxHash("");
       toast.success(t("rewards.claimTxSubmitted"));
-      const txHash = window.prompt(t("rewards.claimReceiptPrompt"));
-      if (txHash?.trim()) {
-        await api.submitMerkleClaimReceipt(ledgerId, txHash.trim(), token);
-        toast.success(t("rewards.claimRecorded"));
-      }
-      await loadRewards();
     } catch (error) {
       toast.error(formatError(error, "rewards.claimFailed"));
     } finally {
       setClaimingId(null);
+    }
+  };
+
+  const submitClaimReceipt = async () => {
+    const token = readBackendAuthToken();
+    if (!token) {
+      toast.error(t("rewards.backendAuthPending"));
+      return;
+    }
+    if (!pendingClaimReceipt) {
+      toast.error(t("rewards.claimReceiptRequired"));
+      return;
+    }
+    if (!claimTxHash.trim()) {
+      toast.error(t("rewards.claimReceiptHashRequired"));
+      return;
+    }
+
+    setClaimReceiptLoading(true);
+    try {
+      await api.submitMerkleClaimReceipt(pendingClaimReceipt.ledgerId, claimTxHash.trim(), token);
+      setPendingClaimReceipt(null);
+      setClaimTxHash("");
+      toast.success(t("rewards.claimRecorded"));
+      await loadRewards();
+    } catch (error) {
+      toast.error(formatError(error, "rewards.claimReceiptFailed"));
+    } finally {
+      setClaimReceiptLoading(false);
     }
   };
 
@@ -193,6 +243,39 @@ export default function Rewards() {
           {t("rewards.records")}
         </h3>
 
+        {pendingClaimReceipt && (
+          <div className="mx-2 mb-2 rounded-[18px] border border-[#DBFF00]/20 bg-[#DBFF00]/[0.06] p-4">
+            <div className="mb-2 text-[9px] uppercase tracking-widest text-[#DBFF00]/75">
+              {t("rewards.claimReceiptTitle")}
+            </div>
+            <div className="mb-3 grid gap-1 font-mono text-[10px] leading-5 text-white/50">
+              <div>{t("rewards.claimReceiptLedger", { ledger: shortValue(pendingClaimReceipt.ledgerId) })}</div>
+              <div>{t("rewards.claimReceiptAmount", { amount: pendingClaimReceipt.amountRaw })}</div>
+              <div>{t("rewards.claimReceiptBatch", { batch: pendingClaimReceipt.batchId })}</div>
+              <div>{t("rewards.claimReceiptQuery", { query: pendingClaimReceipt.queryId })}</div>
+              <div>{t("rewards.claimReceiptContract", { contract: shortValue(pendingClaimReceipt.contractAddress) })}</div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input
+                type="text"
+                value={claimTxHash}
+                onChange={(event) => setClaimTxHash(event.target.value)}
+                placeholder={t("rewards.claimReceiptPlaceholder")}
+                disabled={claimReceiptLoading}
+                className="w-full rounded-xl border border-white/10 bg-[#050505]/[0.62] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#DBFF00]/[0.42] disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={submitClaimReceipt}
+                disabled={claimReceiptLoading || !claimTxHash.trim()}
+                className="depth-button focus-ring rounded-xl border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[#DBFF00] hover:bg-[#DBFF00] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {claimReceiptLoading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.submitClaimReceipt")}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-2 flex flex-col gap-1">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-8 font-mono text-xs text-white/[0.42]">
@@ -261,7 +344,7 @@ export default function Rewards() {
                       disabled={reward.status !== "approved" || claimingId === reward.id}
                       className="depth-button focus-ring min-w-[68px] rounded-[14px] border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/15 disabled:opacity-40"
                     >
-                      {claimingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.stub")}
+                      {claimingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.claim")}
                     </button>
                   </div>
                 </div>

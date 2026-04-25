@@ -1,5 +1,5 @@
 import { Address, Cell } from "@ton/core";
-import { buildClaimRewardBody, buildDepositTransferBody, deriveLockVaultPositionId } from "../tonTransactions";
+import { buildClaimRewardBody, buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId } from "../tonTransactions";
 import type { MerkleRewardProofWithBatch } from "../types";
 
 const JETTON_TRANSFER_OPCODE = 0x0f8a7ea5;
@@ -47,10 +47,21 @@ describe("ton transaction body builders", () => {
     forwardPayload.endParse();
     slice.endParse();
 
-    expect(deriveLockVaultPositionId({
+    const positionId = deriveLockVaultPositionId({
       walletAddress: responseAddress,
       queryId: "1",
-    })).toHaveLength(64);
+    });
+    expect(positionId).toMatch(/^\d+$/);
+    expect(positionId.length).toBeGreaterThan(60);
+  });
+
+  it("creates uint64 query ids with time and random entropy", () => {
+    const first = BigInt(createTonQueryId());
+    const second = BigInt(createTonQueryId());
+
+    expect(first).toBeGreaterThan(1_714_000_000_123n);
+    expect(first).toBeLessThan(1n << 64n);
+    expect(second).toBeLessThan(1n << 64n);
   });
 
   it("encodes MerkleClaim claim body with recipient, amount, ledger hash, and proof", async () => {

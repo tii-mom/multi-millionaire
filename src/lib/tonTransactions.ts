@@ -56,17 +56,24 @@ function encodeProofCell(proof: string[]): Cell {
 }
 
 export function createTonQueryId() {
-  return Date.now().toString();
+  const random = new Uint16Array(1);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(random);
+  } else {
+    random[0] = Math.floor(Math.random() * 65_536);
+  }
+  return ((BigInt(Date.now()) << 16n) + BigInt(random[0])).toString();
 }
 
 export function deriveLockVaultPositionId(input: { walletAddress: string; queryId: string | number | bigint }) {
   const queryId = readUint64(input.queryId, "queryId");
-  return beginCell()
+  const hashHex = beginCell()
     .storeAddress(Address.parse(input.walletAddress))
     .storeUint(queryId, 64)
     .endCell()
     .hash()
     .toString("hex");
+  return BigInt(`0x${hashHex}`).toString();
 }
 
 export function buildDepositTransferBody(input: {
@@ -100,6 +107,7 @@ export async function buildClaimRewardBody(input: {
   ledgerId: string;
   proof: MerkleRewardProofWithBatch;
   recipientAddress: string;
+  queryId?: string | number | bigint;
 }) {
   const batchId = String((input.proof as any).contract_batch_id || input.proof.batch_id);
   const ledgerIdHash = String((input.proof as any).ledger_id_hash || `0x${await sha256Hex(input.ledgerId)}`);
@@ -107,7 +115,7 @@ export async function buildClaimRewardBody(input: {
   const proofCell = proofBoc ? Cell.fromBase64(proofBoc) : encodeProofCell(input.proof.proof);
   return beginCell()
     .storeUint(CLAIM_REWARD_OPCODE, 32)
-    .storeUint(BigInt(Date.now()), 64)
+    .storeUint(input.queryId === undefined ? BigInt(Date.now()) : readUint64(input.queryId, "queryId"), 64)
     .storeUint(readUint64(batchId, "batchId"), 64)
     .storeUint(normalizeUint256Hex(ledgerIdHash), 256)
     .storeAddress(Address.parse(input.recipientAddress))
