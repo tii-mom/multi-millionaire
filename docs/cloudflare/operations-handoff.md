@@ -85,29 +85,37 @@ Required operator inputs:
 - `DATABASE_URL`: managed production Postgres direct connection string. Already
   used for the current production migration run; keep it out of git.
 - `CLOUDFLARE_API_TOKEN`: token with permission to update Hyperdrive and deploy
-  the production Worker. Current token can deploy Worker/Pages and list
-  Hyperdrive.
+  the production Worker. Current token can deploy Worker/Pages, list
+  Hyperdrive, and attach the Worker custom domain `api.mm.72h.lol`.
 - Cloudflare Zone permissions still missing for public domains:
   - Zone DNS Edit for `72h.lol`
-  - Workers Routes Edit for `api.mm.72h.lol/*`
-  - Pages custom domain management for `mm.72h.lol`
+  - Workers Routes Edit for zone-level routes such as `api.72h.lol/*`
+  - Zone SSL/certificate read if operators need API visibility into certificate
+    issuance state
 
 Current production resource evidence:
 
 - production Worker: `multi-millionaire-api-production`
 - production API URL:
+  `https://api.mm.72h.lol`
+- fallback production Worker URL:
   `https://multi-millionaire-api-production.348421501.workers.dev`
-- latest production Worker version observed: `525cccfd-f5d7-4045-b9d2-5e6a322206b0`
+- latest production Worker version observed: `574b636e-49d6-40c2-8412-651df4a4c4`
 - production Pages project: `multi-millionaire-production`
 - latest Pages alias:
   `https://production.multi-millionaire-production.pages.dev`
 - latest Pages deployment URL:
-  `https://c2c749a8.multi-millionaire-production.pages.dev`
+  `https://29f929d8.multi-millionaire-production.pages.dev`
+- production frontend custom domain: `mm.72h.lol` exists in Pages but remains
+  pending because the token cannot create the required DNS record.
+- required frontend DNS record:
+  `CNAME mm -> multi-millionaire-production.pages.dev`, proxied.
 - production Hyperdrive:
   `multi-millionaire-production-postgres`
 - production Hyperdrive id: `92267e746955420d80eb707f4cf23e17`
-- production GET-only smoke on 2026-04-25: `/health=200`, `/ready=200`,
-  `/v1/app/bootstrap=200`, `/v1/waves/current=200`
+- production GET-only smoke on 2026-04-25 against `https://api.mm.72h.lol`:
+  `/health=200`, `/ready=200`, `/v1/app/bootstrap=200`,
+  `/v1/waves/current=200`
 
 Production chain configuration rule:
 
@@ -170,6 +178,12 @@ curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/health
 curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/ready
 curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/v1/app/bootstrap
 curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/v1/waves/current
+```
+
+Preferred custom-domain smoke:
+
+```bash
+API_BASE_URL=https://api.mm.72h.lol npm run smoke:production
 ```
 
 Do not run the staging mutating smoke against production unless a canary window,

@@ -29,6 +29,7 @@
     },
     "production": {
       "name": "multi-millionaire-api-production",
+      "workers_dev": true,
       "vars": {
         "NODE_ENV": "production",
         "CORS_ALLOWED_ORIGINS": "https://mm.72h.lol",

@@ -22,15 +22,17 @@ test risk thresholds in production.
 - Cloudflare Worker/API service for production, with production routes only.
   Current status: `server/wrangler.jsonc` defines
   `multi-millionaire-api-production`; production deploy completed on
-  2026-04-25 with version id `525cccfd-f5d7-4045-b9d2-5e6a322206b0`.
+  2026-04-25 with version id `574b636e-49d6-40c2-8412-651df4a4c4`.
   Production API URL:
+  `https://api.mm.72h.lol`. Fallback Worker URL:
   `https://multi-millionaire-api-production.348421501.workers.dev`.
 - Cloudflare Pages project or production frontend deployment, with production
   API origin configured. Current status: Pages project
   `multi-millionaire-production` exists; custom domain `mm.72h.lol` is still
-  blocked on DNS/custom-domain permissions. Production Pages deployment
-  completed with `VITE_API_BASE_URL` pointing to the production Worker:
-  `https://production.multi-millionaire-production.pages.dev`.
+  pending because the current token cannot create DNS records. Production Pages
+  deployment completed with `VITE_API_BASE_URL=https://api.mm.72h.lol`:
+  `https://production.multi-millionaire-production.pages.dev`; deployment URL:
+  `https://29f929d8.multi-millionaire-production.pages.dev`.
 - Hyperdrive config or direct database connection for the production API.
   Current status: production Hyperdrive
   `multi-millionaire-production-postgres` exists with id
@@ -46,9 +48,11 @@ test risk thresholds in production.
   production.
 - DNS records, TLS certificates, cache rules, rate limits, and WAF/firewall
   rules for the public domains. Current status: the current API token can deploy
-  Workers/Pages and list Hyperdrive, but direct DNS record reads/writes and
-  Worker route creation for `mm.72h.lol` / `api.mm.72h.lol` returned
-  authentication errors.
+  Workers/Pages, list Hyperdrive, and attach `api.mm.72h.lol`. Direct DNS
+  record reads/writes still return authentication errors, so `mm.72h.lol`
+  cannot activate until the required DNS CNAME is created. Zone-level Worker
+  route creation for `api.72h.lol/*` also returned an authentication error;
+  `api.72h.lol` is already assigned to another Worker.
 - Log drain or observability sink for API logs, deploy events, and audit events.
 - Incident contacts and escalation channel for release lead, backend, frontend,
   database, chain/contracts, and customer support.
@@ -104,7 +108,7 @@ and commit SHA.
 Latest evidence:
 
 - Date: 2026-04-25
-- API base URL: `https://multi-millionaire-api-production.348421501.workers.dev`
+- API base URL: `https://api.mm.72h.lol`
 - Mode: `production-non-mutating`
 - Result: `pass`
 - Checked paths: `/health`, `/ready`, `/v1/app/bootstrap`,
