@@ -22,13 +22,13 @@ test risk thresholds in production.
 - Cloudflare Worker/API service for production, with production routes only.
   Current status: `server/wrangler.jsonc` defines
   `multi-millionaire-api-production`; production deploy completed on
-  2026-04-24 with version id `749a7f55-10c6-4559-b343-266aa55afb4e`.
+  2026-04-25 with version id `525cccfd-f5d7-4045-b9d2-5e6a322206b0`.
   Production API URL:
   `https://multi-millionaire-api-production.348421501.workers.dev`.
 - Cloudflare Pages project or production frontend deployment, with production
   API origin configured. Current status: Pages project
-  `multi-millionaire-production` exists; custom domain `mm.72h.lol` has been
-  added and is pending Cloudflare verification. Production Pages deployment
+  `multi-millionaire-production` exists; custom domain `mm.72h.lol` is still
+  blocked on DNS/custom-domain permissions. Production Pages deployment
   completed with `VITE_API_BASE_URL` pointing to the production Worker:
   `https://production.multi-millionaire-production.pages.dev`.
 - Hyperdrive config or direct database connection for the production API.
@@ -45,9 +45,10 @@ test risk thresholds in production.
 - Production admin accounts provisioned deliberately; do not run dev seed in
   production.
 - DNS records, TLS certificates, cache rules, rate limits, and WAF/firewall
-  rules for the public domains. Current status: Cloudflare Pages domain
-  `mm.72h.lol` is pending; the current API token can manage Pages domains but
-  returned an authentication error for direct DNS record reads.
+  rules for the public domains. Current status: the current API token can deploy
+  Workers/Pages and list Hyperdrive, but direct DNS record reads/writes and
+  Worker route creation for `mm.72h.lol` / `api.mm.72h.lol` returned
+  authentication errors.
 - Log drain or observability sink for API logs, deploy events, and audit events.
 - Incident contacts and escalation channel for release lead, backend, frontend,
   database, chain/contracts, and customer support.
@@ -102,7 +103,7 @@ and commit SHA.
 
 Latest evidence:
 
-- Date: 2026-04-24
+- Date: 2026-04-25
 - API base URL: `https://multi-millionaire-api-production.348421501.workers.dev`
 - Mode: `production-non-mutating`
 - Result: `pass`
