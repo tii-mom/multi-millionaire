@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useIsConnectionRestored, useTonAddress, useTonConnectModal, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
+import { buildDepositTransferBody, createDepositPositionId } from "@/src/lib/tonTransactions";
 import {
   clearBackendAuthToken,
   clearTonWalletSession,
@@ -259,8 +260,42 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       return;
     }
     if (chainMainlineEnabled) {
-      setApiError(t("home.deposit.walletFlowRequired"));
-      toast.error(t("home.deposit.walletFlowRequired"));
+      const lockVaultAddress = bootstrap?.contracts?.vault;
+      if (!lockVaultAddress) {
+        setApiError(t("home.deposit.contractMissing"));
+        toast.error(t("home.deposit.contractMissing"));
+        return;
+      }
+      try {
+        setIsConfirming(true);
+        const amountRaw = val.toString();
+        const ownerAddress = rawTonAddress || tonSession.rawAddress || tonSession.address;
+        const derived = await api.deriveJettonWallet(ownerAddress, authToken);
+        const body = buildDepositTransferBody({
+          waveId,
+          positionId: createDepositPositionId(),
+          amountRaw,
+          lockVaultAddress,
+          responseAddress: ownerAddress,
+        });
+        await tonConnectUI.sendTransaction({
+          validUntil: Math.floor(Date.now() / 1000) + 300,
+          messages: [{
+            address: derived.jetton_wallet,
+            amount: "150000000",
+            payload: body,
+          }],
+        });
+        setTxHash("");
+        toast.success(t("home.deposit.txSubmitted"));
+        setApiError(t("home.deposit.txSubmittedFollowup"));
+      } catch (error) {
+        const message = formatError(error, "home.deposit.failed");
+        setApiError(message);
+        toast.error(message);
+      } finally {
+        setIsConfirming(false);
+      }
       return;
     }
 

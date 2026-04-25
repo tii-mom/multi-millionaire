@@ -2,7 +2,7 @@ import express from 'express';
 import { getCurrent, getById } from '../controllers/waveController';
 import { claimPass } from '../controllers/passController';
 import { depositPrecheck, deposit } from '../controllers/positionController';
-import { depositReceipt } from '../controllers/chainController';
+import { depositReceipt, deriveJettonWallet } from '../controllers/chainController';
 import { requireAuth } from '../middlewares/auth';
 import squadsRouter from './squads';
 import { requireFields, requirePositiveIntParam } from '../middlewares/validation';
@@ -13,6 +13,9 @@ const depositRateLimit = createRouteRateLimiter('DEPOSIT_RATE_LIMIT', 10 * 60 * 
 
 // GET /v1/waves/current
 router.get('/current', getCurrent);
+
+// GET /v1/waves/chain/jetton-wallet?owner=<wallet>
+router.get('/chain/jetton-wallet', requireAuth, deriveJettonWallet);
 
 // GET /v1/waves/:waveId
 router.get('/:waveId', requirePositiveIntParam('waveId'), getById);

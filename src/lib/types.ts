@@ -142,6 +142,13 @@ export interface DepositReceiptResult {
   chain_event: ChainEvent;
 }
 
+export interface JettonWalletDerivation {
+  owner: string;
+  token: string;
+  jetton_wallet: string;
+  jetton_wallet_raw: string;
+}
+
 export interface SquadLeaderboardRow {
   id: number;
   name: string;
@@ -210,6 +217,10 @@ export interface MerkleRewardProofWithBatch extends MerkleRewardProof {
   merkle_root: string;
   batch_status: MerkleRewardBatchStatus;
   published_tx_hash: string | null;
+  batch_metadata?: Record<string, unknown>;
+  contract_batch_id?: string;
+  ledger_id_hash?: string;
+  proof_boc?: string;
 }
 
 export interface MerkleClaimReceiptResult {

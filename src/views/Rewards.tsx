@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Coins, Gift, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { motion } from "motion/react";
+import { useTonConnectUI } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
 import { readBackendAuthToken, readTonWalletSession } from "@/src/lib/tonSession";
-import type { RewardLedger, RewardSummary } from "@/src/lib/types";
+import { buildClaimRewardBody } from "@/src/lib/tonTransactions";
+import type { BootstrapData, RewardLedger, RewardSummary } from "@/src/lib/types";
 
 const emptySummary: RewardSummary = {
   pending_amount: "0",
@@ -15,8 +17,10 @@ const emptySummary: RewardSummary = {
 
 export default function Rewards() {
   const { formatError, locale, t } = useI18n();
+  const [tonConnectUI] = useTonConnectUI();
   const [summary, setSummary] = useState<RewardSummary>(emptySummary);
   const [rewards, setRewards] = useState<RewardLedger[]>([]);
+  const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [proofLoadingId, setProofLoadingId] = useState<string | null>(null);
@@ -70,6 +74,10 @@ export default function Rewards() {
     loadRewards();
   }, [loadRewards]);
 
+  useEffect(() => {
+    api.bootstrap().then(setBootstrap).catch(() => setBootstrap(null));
+  }, []);
+
   const handleClaim = async (ledgerId: string) => {
     const walletSession = readTonWalletSession();
     if (!walletSession) {
@@ -82,10 +90,34 @@ export default function Rewards() {
       return;
     }
 
+    const merkleClaimAddress = bootstrap?.contracts?.merkle_claim;
+    if (!merkleClaimAddress) {
+      toast.error(t("rewards.claimContractMissing"));
+      return;
+    }
+
     setClaimingId(ledgerId);
     try {
-      await api.claimReward(ledgerId, token);
-      toast.success(t("rewards.claimRecorded"));
+      const proof = await api.merkleClaimProof(ledgerId, token);
+      const body = await buildClaimRewardBody({
+        ledgerId,
+        proof,
+        recipientAddress: walletSession.rawAddress,
+      });
+      await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [{
+          address: merkleClaimAddress,
+          amount: "150000000",
+          payload: body,
+        }],
+      });
+      toast.success(t("rewards.claimTxSubmitted"));
+      const txHash = window.prompt(t("rewards.claimReceiptPrompt"));
+      if (txHash?.trim()) {
+        await api.submitMerkleClaimReceipt(ledgerId, txHash.trim(), token);
+        toast.success(t("rewards.claimRecorded"));
+      }
       await loadRewards();
     } catch (error) {
       toast.error(formatError(error, "rewards.claimFailed"));

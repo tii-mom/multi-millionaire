@@ -10,6 +10,7 @@ import type {
   AuthResult,
   BootstrapData,
   DepositReceiptResult,
+  JettonWalletDerivation,
   MerkleRewardBatch,
   MerkleClaimReceiptResult,
   MerkleRewardProof,
@@ -134,6 +135,10 @@ export const api = {
       token,
       body: input,
     });
+  },
+
+  deriveJettonWallet(owner: string, token: string) {
+    return requestJson<JettonWalletDerivation>(`/v1/waves/chain/jetton-wallet?owner=${encodeURIComponent(owner)}`, { token });
   },
 
   createSquad(waveId: number, name: string, token: string) {

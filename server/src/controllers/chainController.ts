@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Address, JettonMaster, TonClient } from '@ton/ton';
 import { getWaveById } from '../models/waveModel';
 import { withTransaction } from '../db';
 import { insertChainEvent } from '../models/chainEventModel';
@@ -20,6 +21,42 @@ function receiptPayload(receipt: Awaited<ReturnType<typeof verifyDepositReceipt>
     blockTime: receipt.blockTime,
     finalized: receipt.finalized,
   };
+}
+
+function optionalToncenterApiKey(): string | undefined {
+  return process.env.TONCENTER_API_KEY?.trim() || process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
+}
+
+export async function deriveJettonWallet(req: Request, res: Response, next: NextFunction) {
+  try {
+    const owner = typeof req.query.owner === 'string' ? req.query.owner.trim() : '';
+    if (!owner) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'owner is required' } });
+    }
+    const rpcUrl = process.env.CHAIN_RPC_URL?.trim();
+    const tokenAddress = process.env.TOKEN_ADDRESS?.trim();
+    if (!rpcUrl || !tokenAddress) {
+      return res.status(503).json({ request_id: req.id || '', error: { code: 'CHAIN_CONFIG_NOT_READY', message: 'CHAIN_RPC_URL and TOKEN_ADDRESS are required' } });
+    }
+
+    const ownerAddress = Address.parse(owner);
+    const masterAddress = Address.parse(tokenAddress);
+    const client = new TonClient({ endpoint: rpcUrl, apiKey: optionalToncenterApiKey() });
+    const jettonMaster = client.open(JettonMaster.create(masterAddress));
+    const jettonWallet = await jettonMaster.getWalletAddress(ownerAddress);
+
+    return res.json({
+      request_id: req.id || '',
+      data: {
+        owner: ownerAddress.toRawString().toLowerCase(),
+        token: masterAddress.toString(),
+        jetton_wallet: jettonWallet.toString({ bounceable: true, testOnly: (process.env.CHAIN_ID || '').includes('testnet') }),
+        jetton_wallet_raw: jettonWallet.toRawString().toLowerCase(),
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
 }
 
 export async function depositReceipt(req: Request, res: Response, next: NextFunction) {
