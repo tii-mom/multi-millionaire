@@ -1,16 +1,19 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { beginCell, toNano } from '@ton/core';
+import { Address, beginCell, toNano } from '@ton/core';
 import { LockVault } from '../build/LockVault/LockVault_LockVault';
 import { TestJettonMaster } from '../build/TestJetton/TestJetton_TestJettonMaster';
 import { TestJettonWallet } from '../build/TestJetton/TestJetton_TestJettonWallet';
 import '@ton/test-utils';
 
-function depositPayload(waveId: bigint, positionId: bigint) {
+function depositPayload(waveId: bigint) {
     return beginCell()
         .storeBit(false)
         .storeUint(waveId, 32)
-        .storeUint(positionId, 64)
         .asSlice();
+}
+
+function derivedPositionId(owner: Address, queryId: bigint) {
+    return BigInt(`0x${beginCell().storeAddress(owner).storeUint(queryId, 64).endCell().hash().toString('hex')}`);
 }
 
 describe('TestJetton canary path', () => {
@@ -68,7 +71,7 @@ describe('TestJetton canary path', () => {
                 responseDestination: user.address,
                 customPayload: null,
                 forwardTonAmount: toNano('0.03'),
-                forwardPayload: depositPayload(1n, 99n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
@@ -83,7 +86,7 @@ describe('TestJetton canary path', () => {
             success: true,
         });
 
-        const position = await lockVault.getPosition(99n);
+        const position = await lockVault.getPosition(derivedPositionId(user.address, 3n));
         expect(position.owner.equals(user.address)).toBe(true);
         expect(position.amountRaw).toBe(400n);
         expect(position.waveId).toBe(1n);

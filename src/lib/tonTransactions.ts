@@ -37,36 +37,53 @@ function normalizeUint256Hex(value: string): bigint {
 }
 
 function encodeProofCell(proof: string[]): Cell {
-  let builder = beginCell().storeUint(proof.length, 8);
-  for (const item of proof) {
+  if (proof.length === 0) {
+    return beginCell().endCell();
+  }
+  function encodeNode(index: number): Cell {
+    const item = proof[index];
     const [side, hash] = item.split(":");
     if ((side !== "left" && side !== "right") || !hash) {
       throw new Error("Invalid Merkle proof item");
     }
-    builder = builder.storeBit(side === "right").storeUint(normalizeUint256Hex(hash), 256);
+    let node = beginCell().storeBit(side === "right").storeUint(normalizeUint256Hex(hash), 256);
+    if (index + 1 < proof.length) {
+      node = node.storeRef(encodeNode(index + 1));
+    }
+    return node.endCell();
   }
-  return builder.endCell();
+  return beginCell().storeUint(proof.length, 16).storeRef(encodeNode(0)).endCell();
 }
 
-export function createDepositPositionId() {
+export function createTonQueryId() {
   return Date.now().toString();
+}
+
+export function deriveLockVaultPositionId(input: { walletAddress: string; queryId: string | number | bigint }) {
+  const queryId = readUint64(input.queryId, "queryId");
+  return beginCell()
+    .storeAddress(Address.parse(input.walletAddress))
+    .storeUint(queryId, 64)
+    .endCell()
+    .hash()
+    .toString("hex");
 }
 
 export function buildDepositTransferBody(input: {
   waveId: number;
-  positionId: string;
   amountRaw: string;
   lockVaultAddress: string;
   responseAddress: string;
+  queryId?: string | number | bigint;
   forwardTon?: string;
 }) {
   const forwardPayload = beginCell()
     .storeUint(input.waveId, 32)
-    .storeUint(readUint64(input.positionId, "positionId"), 64)
     .endCell();
+  const queryId = input.queryId === undefined ? BigInt(Date.now()) : readUint64(input.queryId, "queryId");
   return beginCell()
     .storeUint(JETTON_TRANSFER_OPCODE, 32)
-    .storeUint(BigInt(Date.now()), 64)
+    .storeUint(queryId, 64)
     .storeCoins(readPositiveBigInt(input.amountRaw, "amountRaw"))
     .storeAddress(Address.parse(input.lockVaultAddress))
     .storeAddress(Address.parse(input.responseAddress))
@@ -100,4 +117,3 @@ export async function buildClaimRewardBody(input: {
     .toBoc()
     .toString("base64");
 }
-

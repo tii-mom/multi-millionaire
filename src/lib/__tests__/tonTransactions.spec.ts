@@ -1,5 +1,5 @@
 import { Address, Cell } from "@ton/core";
-import { buildClaimRewardBody, buildDepositTransferBody } from "../tonTransactions";
+import { buildClaimRewardBody, buildDepositTransferBody, deriveLockVaultPositionId } from "../tonTransactions";
 import type { MerkleRewardProofWithBatch } from "../types";
 
 const JETTON_TRANSFER_OPCODE = 0x0f8a7ea5;
@@ -26,7 +26,6 @@ describe("ton transaction body builders", () => {
 
     const body = buildDepositTransferBody({
       waveId: 7,
-      positionId: "42",
       amountRaw: "123456789",
       lockVaultAddress,
       responseAddress,
@@ -45,9 +44,13 @@ describe("ton transaction body builders", () => {
 
     const forwardPayload = slice.loadRef().beginParse();
     expect(forwardPayload.loadUint(32)).toBe(7);
-    expect(forwardPayload.loadUintBig(64)).toBe(42n);
     forwardPayload.endParse();
     slice.endParse();
+
+    expect(deriveLockVaultPositionId({
+      walletAddress: responseAddress,
+      queryId: "1",
+    })).toHaveLength(64);
   });
 
   it("encodes MerkleClaim claim body with recipient, amount, ledger hash, and proof", async () => {
@@ -93,11 +96,15 @@ describe("ton transaction body builders", () => {
     expect(slice.loadCoins()).toBe(987654321n);
 
     const proofSlice = slice.loadRef().beginParse();
-    expect(proofSlice.loadUint(8)).toBe(2);
-    expect(proofSlice.loadBit()).toBe(false);
-    expect(proofSlice.loadUintBig(256)).toBe(BigInt(`0x${"a".repeat(64)}`));
-    expect(proofSlice.loadBit()).toBe(true);
-    expect(proofSlice.loadUintBig(256)).toBe(BigInt(`0x${"b".repeat(64)}`));
+    expect(proofSlice.loadUint(16)).toBe(2);
+    const firstNode = proofSlice.loadRef().beginParse();
+    expect(firstNode.loadBit()).toBe(false);
+    expect(firstNode.loadUintBig(256)).toBe(BigInt(`0x${"a".repeat(64)}`));
+    const secondNode = firstNode.loadRef().beginParse();
+    expect(secondNode.loadBit()).toBe(true);
+    expect(secondNode.loadUintBig(256)).toBe(BigInt(`0x${"b".repeat(64)}`));
+    secondNode.endParse();
+    firstNode.endParse();
     proofSlice.endParse();
     slice.endParse();
   });

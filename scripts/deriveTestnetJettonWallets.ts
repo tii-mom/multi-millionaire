@@ -54,9 +54,17 @@ function formatError(error: unknown): string {
 }
 
 async function main() {
-  const endpoint = process.env.CHAIN_RPC_URL || process.env.RPC_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC';
+  const chainId = required('CHAIN_ID');
+  if (chainId !== 'ton-testnet') {
+    throw new Error(`Refusing to derive testnet wallets with CHAIN_ID=${chainId}`);
+  }
+  const endpoint = required('CHAIN_RPC_URL');
   if (!endpoint.includes('testnet')) {
     throw new Error('Refusing to derive testnet wallets: CHAIN_RPC_URL is not a testnet endpoint');
+  }
+  const tokenDecimals = process.env.TOKEN_DECIMALS_TESTNET?.trim() || process.env.TOKEN_DECIMALS?.trim();
+  if (tokenDecimals !== '9') {
+    throw new Error('TOKEN_DECIMALS_TESTNET or TOKEN_DECIMALS must be 9 for the 72H token');
   }
 
   const tokenAddress = Address.parse(required('TOKEN_ADDRESS_TESTNET'));

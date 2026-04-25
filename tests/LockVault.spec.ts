@@ -5,13 +5,20 @@ import '@ton/test-utils';
 
 const TOKEN_SCALE = 1_000_000_000n;
 const ONE_YEAR_SECONDS = 31_536_000;
+const PRICE_DELAY_SECONDS = 3_600;
+const PRICE_FRESHNESS_SECONDS = 86_400;
+const POSITION_ACTIVE = 0n;
+const POSITION_WITHDRAWN = 2n;
 
-function depositPayload(waveId: bigint, positionId: bigint) {
+function depositPayload(waveId: bigint) {
     return beginCell()
         .storeBit(false)
         .storeUint(waveId, 32)
-        .storeUint(positionId, 64)
         .asSlice();
+}
+
+function derivedPositionId(owner: Address, queryId: bigint) {
+    return BigInt(`0x${beginCell().storeAddress(owner).storeUint(queryId, 64).endCell().hash().toString('hex')}`);
 }
 
 describe('LockVault', () => {
@@ -22,6 +29,31 @@ describe('LockVault', () => {
     let vaultJettonWallet: SandboxContract<TreasuryContract>;
     let lockVault: SandboxContract<LockVault>;
     let tokenAddress: Address;
+
+    async function stageAndApplyPrice(priceUsdE6: bigint, queryId = 900n) {
+        const stagedAt = blockchain.now || 1_700_000_000;
+        const stage = await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'StagePrice', queryId, priceUsdE6 },
+        );
+        expect(stage.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: lockVault.address,
+            success: true,
+        });
+        blockchain.now = stagedAt + PRICE_DELAY_SECONDS + 1;
+        const apply = await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'ApplyPrice', queryId: queryId + 1n },
+        );
+        expect(apply.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: lockVault.address,
+            success: true,
+        });
+    }
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
@@ -54,16 +86,21 @@ describe('LockVault', () => {
         );
     });
 
-    it('records deposits only from the configured vault Jetton wallet', async () => {
+    it('records deposits only from the configured vault Jetton wallet and derives position id from owner/query', async () => {
+        const queryId = 1n;
+        const expectedPositionId = derivedPositionId(user.address, queryId);
+        const contractPositionId = await lockVault.getDerivedPositionId(user.address, queryId);
+        expect(contractPositionId).toBe(expectedPositionId);
+
         const result = await lockVault.send(
             vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
             {
                 $$type: 'JettonTransferNotification',
-                queryId: 1n,
+                queryId,
                 amount: 1000n,
                 sender: user.address,
-                forwardPayload: depositPayload(7n, 42n),
+                forwardPayload: depositPayload(7n),
             },
         );
 
@@ -83,16 +120,17 @@ describe('LockVault', () => {
         expect(state.lastDepositor?.equals(user.address)).toBe(true);
         expect(state.lastWaveId).toBe(7n);
         expect(state.lastAmountRaw).toBe(1000n);
-        expect(state.lastPositionId).toBe(42n);
+        expect(state.lastPositionId).toBe(expectedPositionId);
 
-        const position = await lockVault.getPosition(42n);
+        const position = await lockVault.getPosition(expectedPositionId);
         expect(position.owner.equals(user.address)).toBe(true);
         expect(position.amountRaw).toBe(1000n);
         expect(position.waveId).toBe(7n);
-        expect(position.withdrawn).toBe(false);
+        expect(position.status).toBe(POSITION_ACTIVE);
 
         const userState = await lockVault.getUserState(user.address);
         expect(userState.activeRaw).toBe(1000n);
+        expect(userState.targetUsdE6).toBe(1_000_000_000_000n);
         expect(userState.goalReached).toBe(false);
     });
 
@@ -105,7 +143,7 @@ describe('LockVault', () => {
                 queryId: 1n,
                 amount: 1000n,
                 sender: user.address,
-                forwardPayload: depositPayload(7n, 42n),
+                forwardPayload: depositPayload(7n),
             },
         );
 
@@ -117,30 +155,28 @@ describe('LockVault', () => {
         });
     });
 
-    it('lets only the position owner withdraw after the price target is reached', async () => {
-        await lockVault.send(
-            deployer.getSender(),
-            { value: toNano('0.05') },
-            { $$type: 'SetPrice', queryId: 1n, priceUsdE6: 1000n },
-        );
+    it('lets only the position owner withdraw after the fixed price target is reached', async () => {
+        await stageAndApplyPrice(1000n);
 
+        const queryId = 2n;
+        const positionId = derivedPositionId(user.address, queryId);
         const oneBillionTokensRaw = 1_000_000_000n * TOKEN_SCALE;
         await lockVault.send(
             vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
             {
                 $$type: 'JettonTransferNotification',
-                queryId: 2n,
+                queryId,
                 amount: oneBillionTokensRaw,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 100n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
         const rejected = await lockVault.send(
             other.getSender(),
             { value: toNano('0.1') },
-            { $$type: 'WithdrawPosition', queryId: 3n, positionId: 100n },
+            { $$type: 'WithdrawPosition', queryId: 3n, positionId },
         );
 
         expect(rejected.transactions).toHaveTransaction({
@@ -153,7 +189,7 @@ describe('LockVault', () => {
         const result = await lockVault.send(
             user.getSender(),
             { value: toNano('0.15') },
-            { $$type: 'WithdrawPosition', queryId: 4n, positionId: 100n },
+            { $$type: 'WithdrawPosition', queryId: 4n, positionId },
         );
 
         expect(result.transactions).toHaveTransaction({
@@ -167,30 +203,28 @@ describe('LockVault', () => {
             success: true,
         });
 
-        const position = await lockVault.getPosition(100n);
-        expect(position.withdrawn).toBe(true);
+        const position = await lockVault.getPosition(positionId);
+        expect(position.status).toBe(POSITION_WITHDRAWN);
         const state = await lockVault.getVaultState();
         expect(state.totalWithdrawnRaw).toBe(oneBillionTokensRaw);
         expect(state.totalActiveRaw).toBe(0n);
     });
 
     it('blocks new deposits after a user reaches the target until the active cycle is withdrawn', async () => {
-        await lockVault.send(
-            deployer.getSender(),
-            { value: toNano('0.05') },
-            { $$type: 'SetPrice', queryId: 1n, priceUsdE6: 1000n },
-        );
+        await stageAndApplyPrice(1000n);
 
+        const firstQueryId = 2n;
+        const firstPositionId = derivedPositionId(user.address, firstQueryId);
         const oneBillionTokensRaw = 1_000_000_000n * TOKEN_SCALE;
         await lockVault.send(
             vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
             {
                 $$type: 'JettonTransferNotification',
-                queryId: 2n,
+                queryId: firstQueryId,
                 amount: oneBillionTokensRaw,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 101n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
@@ -202,7 +236,7 @@ describe('LockVault', () => {
                 queryId: 3n,
                 amount: 1n,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 102n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
@@ -216,7 +250,7 @@ describe('LockVault', () => {
         await lockVault.send(
             user.getSender(),
             { value: toNano('0.15') },
-            { $$type: 'WithdrawPosition', queryId: 4n, positionId: 101n },
+            { $$type: 'WithdrawPosition', queryId: 4n, positionId: firstPositionId },
         );
 
         const nextCycleDeposit = await lockVault.send(
@@ -227,7 +261,7 @@ describe('LockVault', () => {
                 queryId: 5n,
                 amount: 1n,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 103n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
@@ -238,23 +272,25 @@ describe('LockVault', () => {
         });
     });
 
-    it('keeps funds locked until either target or one-year time lock is satisfied', async () => {
+    it('keeps funds locked until either fixed target or one-year time lock is satisfied', async () => {
+        const queryId = 1n;
+        const positionId = derivedPositionId(user.address, queryId);
         await lockVault.send(
             vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
             {
                 $$type: 'JettonTransferNotification',
-                queryId: 1n,
+                queryId,
                 amount: 1000n,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 200n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
         const early = await lockVault.send(
             user.getSender(),
             { value: toNano('0.15') },
-            { $$type: 'WithdrawPosition', queryId: 2n, positionId: 200n },
+            { $$type: 'WithdrawPosition', queryId: 2n, positionId },
         );
         expect(early.transactions).toHaveTransaction({
             from: user.address,
@@ -267,7 +303,7 @@ describe('LockVault', () => {
         const mature = await lockVault.send(
             user.getSender(),
             { value: toNano('0.15') },
-            { $$type: 'WithdrawPosition', queryId: 3n, positionId: 200n },
+            { $$type: 'WithdrawPosition', queryId: 3n, positionId },
         );
         expect(mature.transactions).toHaveTransaction({
             from: user.address,
@@ -276,49 +312,182 @@ describe('LockVault', () => {
         });
     });
 
-    it('allows users to set a custom target before deposits and prevents lowering it with active funds', async () => {
+    it('does not expose a user-controlled low target path', async () => {
+        await stageAndApplyPrice(1n);
+        const queryId = 300n;
+        const positionId = derivedPositionId(user.address, queryId);
         await lockVault.send(
-            user.getSender(),
+            vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
-            { $$type: 'SetUserTarget', queryId: 1n, targetUsdE6: 2_000_000_000_000n },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId,
+                amount: 1n,
+                sender: user.address,
+                forwardPayload: depositPayload(1n),
+            },
         );
+
+        const userState = await lockVault.getUserState(user.address);
+        expect(userState.targetUsdE6).toBe(1_000_000_000_000n);
+        expect(userState.goalReached).toBe(false);
+
+        const early = await lockVault.send(
+            user.getSender(),
+            { value: toNano('0.15') },
+            { $$type: 'WithdrawPosition', queryId: 301n, positionId },
+        );
+        expect(early.transactions).toHaveTransaction({
+            from: user.address,
+            to: lockVault.address,
+            success: false,
+            exitCode: 1023,
+        });
+    });
+
+    it('applies staged prices only after delay and rejects more than 20 percent movement', async () => {
+        await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'StagePrice', queryId: 1n, priceUsdE6: 1000n },
+        );
+
+        const tooEarly = await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'ApplyPrice', queryId: 2n },
+        );
+        expect(tooEarly.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: lockVault.address,
+            success: false,
+            exitCode: 1052,
+        });
+
+        blockchain.now = 1_700_000_000 + PRICE_DELAY_SECONDS + 1;
+        await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'ApplyPrice', queryId: 3n },
+        );
+
+        await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'StagePrice', queryId: 4n, priceUsdE6: 1300n },
+        );
+        blockchain.now = 1_700_000_000 + PRICE_DELAY_SECONDS * 2 + 2;
+        const tooLarge = await lockVault.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            { $$type: 'ApplyPrice', queryId: 5n },
+        );
+        expect(tooLarge.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: lockVault.address,
+            success: false,
+            exitCode: 1053,
+        });
+    });
+
+    it('does not use stale price for price unlock', async () => {
+        await stageAndApplyPrice(1000n);
+
+        const queryId = 20n;
+        const positionId = derivedPositionId(user.address, queryId);
+        const oneBillionTokensRaw = 1_000_000_000n * TOKEN_SCALE;
+        await lockVault.send(
+            vaultJettonWallet.getSender(),
+            { value: toNano('0.05') },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId,
+                amount: oneBillionTokensRaw,
+                sender: user.address,
+                forwardPayload: depositPayload(1n),
+            },
+        );
+
+        blockchain.now = (blockchain.now || 1_700_003_601) + PRICE_FRESHNESS_SECONDS + 1;
+        const stale = await lockVault.send(
+            user.getSender(),
+            { value: toNano('0.15') },
+            { $$type: 'WithdrawPosition', queryId: 21n, positionId },
+        );
+        expect(stale.transactions).toHaveTransaction({
+            from: user.address,
+            to: lockVault.address,
+            success: false,
+            exitCode: 1023,
+        });
+    });
+
+    it('uses sender/query derived position ids so another user cannot preempt a position id', async () => {
+        const sharedQueryId = 77n;
+        const userPositionId = derivedPositionId(user.address, sharedQueryId);
+        const otherPositionId = derivedPositionId(other.address, sharedQueryId);
+        expect(userPositionId).not.toBe(otherPositionId);
 
         await lockVault.send(
             vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
             {
                 $$type: 'JettonTransferNotification',
-                queryId: 2n,
+                queryId: sharedQueryId,
                 amount: 1000n,
-                sender: user.address,
-                forwardPayload: depositPayload(1n, 300n),
+                sender: other.address,
+                forwardPayload: depositPayload(1n),
             },
         );
 
-        const lowering = await lockVault.send(
-            user.getSender(),
+        const userDeposit = await lockVault.send(
+            vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
-            { $$type: 'SetUserTarget', queryId: 3n, targetUsdE6: 1_000_000_000_000n },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId: sharedQueryId,
+                amount: 2000n,
+                sender: user.address,
+                forwardPayload: depositPayload(1n),
+            },
         );
+        expect(userDeposit.transactions).toHaveTransaction({
+            from: vaultJettonWallet.address,
+            to: lockVault.address,
+            success: true,
+        });
 
-        expect(lowering.transactions).toHaveTransaction({
-            from: user.address,
+        const duplicateSameOwner = await lockVault.send(
+            vaultJettonWallet.getSender(),
+            { value: toNano('0.05') },
+            {
+                $$type: 'JettonTransferNotification',
+                queryId: sharedQueryId,
+                amount: 1n,
+                sender: user.address,
+                forwardPayload: depositPayload(1n),
+            },
+        );
+        expect(duplicateSameOwner.transactions).toHaveTransaction({
+            from: vaultJettonWallet.address,
             to: lockVault.address,
             success: false,
-            exitCode: 1011,
+            exitCode: 1006,
         });
     });
 
     it('pauses new deposits without blocking valid withdrawals', async () => {
+        const queryId = 1n;
+        const positionId = derivedPositionId(user.address, queryId);
         await lockVault.send(
             vaultJettonWallet.getSender(),
             { value: toNano('0.05') },
             {
                 $$type: 'JettonTransferNotification',
-                queryId: 1n,
+                queryId,
                 amount: 1000n,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 400n),
+                forwardPayload: depositPayload(1n),
             },
         );
 
@@ -336,7 +505,7 @@ describe('LockVault', () => {
                 queryId: 2n,
                 amount: 1000n,
                 sender: user.address,
-                forwardPayload: depositPayload(1n, 401n),
+                forwardPayload: depositPayload(1n),
             },
         );
         expect(blockedDeposit.transactions).toHaveTransaction({
@@ -350,7 +519,7 @@ describe('LockVault', () => {
         const withdrawal = await lockVault.send(
             user.getSender(),
             { value: toNano('0.15') },
-            { $$type: 'WithdrawPosition', queryId: 3n, positionId: 400n },
+            { $$type: 'WithdrawPosition', queryId: 3n, positionId },
         );
         expect(withdrawal.transactions).toHaveTransaction({
             from: user.address,

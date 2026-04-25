@@ -2,7 +2,14 @@ import crypto from 'crypto';
 import { Address, beginCell, Cell } from '@ton/core';
 import { withTransaction } from '../db';
 import { loadContractIntegrationConfig } from './contracts/config';
-import { findMerkleClaimTransaction, normalizeTonAddress, TonMessageParseError, TonTransactionLike } from './tonMessages';
+import {
+  findMerkleClaimTransaction,
+  getTonTransactionLt,
+  getTonTransactionTime,
+  normalizeTonAddress,
+  TonMessageParseError,
+  TonTransactionLike,
+} from './tonMessages';
 import {
   createMerkleRewardBatch,
   createMerkleRewardProof,
@@ -24,6 +31,10 @@ export interface MerkleLeaf extends MerkleLeafInput {
 
 export interface MerkleTreeOptions {
   batchId?: string;
+  chainId?: string;
+  chainIdHash?: string;
+  tokenAddress?: string;
+  contractAddress?: string;
 }
 
 export interface MerkleTreeBuild {
@@ -96,6 +107,10 @@ export function hashLedgerId(ledgerId: string): string {
   return sha256(ledgerId);
 }
 
+export function hashChainId(chainId: string): string {
+  return sha256(chainId);
+}
+
 function hashPair(left: string, right: string): string {
   return cellHashHex(beginCell()
     .storeUint(normalizeUint256Hex(left), 256)
@@ -105,15 +120,28 @@ function hashPair(left: string, right: string): string {
 
 export function buildMerkleLeaf(input: MerkleLeafInput, options: MerkleTreeOptions = {}): MerkleLeaf {
   const batchId = normalizeUint64(options.batchId || '1');
+  const chainIdHash = normalizeUint256Hex(options.chainIdHash || hashChainId(options.chainId || process.env.CHAIN_ID || 'ton-testnet'));
+  const tokenAddress = options.tokenAddress || process.env.TOKEN_ADDRESS || process.env.TOKEN_ADDRESS_TESTNET || '';
+  const contractAddress = options.contractAddress || process.env.MERKLE_CLAIM_ADDRESS || process.env.MERKLE_CLAIM_ADDRESS_TESTNET || '';
+  if (!tokenAddress || !contractAddress) {
+    throw new Error('Merkle leaf domain requires tokenAddress and contractAddress');
+  }
   const ledgerIdHash = hashLedgerId(input.ledgerId);
   return {
     ...input,
     ledgerIdHash,
     leafHash: cellHashHex(beginCell()
-      .storeUint(batchId, 64)
-      .storeUint(normalizeUint256Hex(ledgerIdHash), 256)
-      .storeAddress(Address.parse(input.beneficiaryWallet))
-      .storeCoins(BigInt(input.amountRaw))
+      .storeUint(chainIdHash, 256)
+      .storeRef(beginCell()
+        .storeAddress(Address.parse(tokenAddress))
+        .storeAddress(Address.parse(contractAddress))
+        .endCell())
+      .storeRef(beginCell()
+        .storeUint(batchId, 64)
+        .storeUint(normalizeUint256Hex(ledgerIdHash), 256)
+        .storeAddress(Address.parse(input.beneficiaryWallet))
+        .storeCoins(BigInt(input.amountRaw))
+        .endCell())
       .endCell()),
   };
 }
@@ -155,17 +183,24 @@ export function buildMerkleTree(inputs: MerkleLeafInput[], options: MerkleTreeOp
 }
 
 export function encodeMerkleProofCell(proof: string[]): string {
-  let builder = beginCell().storeUint(proof.length, 8);
-  for (const item of proof) {
+  if (proof.length === 0) {
+    return beginCell().endCell().toBoc().toString('base64');
+  }
+  function encodeNode(index: number): Cell {
+    const item = proof[index];
     const [side, hash] = item.split(':');
     if ((side !== 'left' && side !== 'right') || !hash) {
       throw new Error(`Invalid Merkle proof item: ${item}`);
     }
-    builder = builder
+    let node = beginCell()
       .storeBit(side === 'right')
       .storeUint(normalizeUint256Hex(hash), 256);
+    if (index + 1 < proof.length) {
+      node = node.storeRef(encodeNode(index + 1));
+    }
+    return node.endCell();
   }
-  return builder.endCell().toBoc().toString('base64');
+  return beginCell().storeUint(proof.length, 16).storeRef(encodeNode(0)).endCell().toBoc().toString('base64');
 }
 
 export async function createDraftMerkleRewardBatch(input: {
@@ -175,12 +210,21 @@ export async function createDraftMerkleRewardBatch(input: {
 }) {
   const eligible = await listEligibleRewardsForMerkle();
   const contractBatchId = String(Date.now());
+  const contractAddress = process.env.MERKLE_CLAIM_ADDRESS || process.env.MERKLE_CLAIM_ADDRESS_TESTNET || '';
+  if (!contractAddress) {
+    throw new Error('MERKLE_CLAIM_ADDRESS is required to create a domain-separated Merkle batch');
+  }
   const tree = buildMerkleTree(eligible.map((reward: EligibleRewardForMerkle) => ({
     ledgerId: reward.ledger_id,
     beneficiaryUserId: reward.beneficiary_user_id,
     beneficiaryWallet: reward.beneficiary_wallet,
     amountRaw: reward.amount_raw,
-  })), { batchId: contractBatchId });
+  })), {
+    batchId: contractBatchId,
+    chainId: input.chainId,
+    tokenAddress: input.tokenAddress,
+    contractAddress,
+  });
   const totalAmountRaw = eligible.reduce((sum, item) => sum + BigInt(item.amount_raw), BigInt(0)).toString();
 
   return withTransaction(async (tx) => {
@@ -272,8 +316,8 @@ export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): 
     amountRaw: match.claim.amountRaw,
     ledgerIdHash: match.claim.ledgerIdHash,
     batchId: match.claim.batchId,
-    blockNumber: match.transaction.transaction_id?.lt ? Number(match.transaction.transaction_id.lt) : null,
-    blockTime: match.transaction.utime ? new Date(match.transaction.utime * 1000).toISOString() : null,
+    blockNumber: getTonTransactionLt(match.transaction) ? Number(getTonTransactionLt(match.transaction)) : null,
+    blockTime: getTonTransactionTime(match.transaction) ? new Date(getTonTransactionTime(match.transaction)! * 1000).toISOString() : null,
     finalized: true,
   };
 }
@@ -295,7 +339,51 @@ function normalizeUint256(value: string): string {
   return BigInt(trimmed).toString();
 }
 
+function readToncenterApiKey(): string | undefined {
+  return process.env.TONCENTER_API_KEY?.trim() || process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
+}
+
+function deriveToncenterV3TransactionsUrl(rpcUrl: string): string | null {
+  const explicit = process.env.TON_TRANSACTIONS_API_URL?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  try {
+    const url = new URL(rpcUrl);
+    if (!url.hostname.includes('toncenter.com')) {
+      return null;
+    }
+    return `${url.origin}/api/v3/transactions`;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchToncenterV3Transactions(apiUrl: string, address: string): Promise<TonTransactionLike[]> {
+  const url = new URL(apiUrl);
+  url.searchParams.set('account', address);
+  url.searchParams.set('limit', String(Number(process.env.TON_RECEIPT_LOOKBACK_LIMIT || 20)));
+  const headers: Record<string, string> = { accept: 'application/json' };
+  const apiKey = readToncenterApiKey();
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new MerkleClaimVerificationError(503, 'CHAIN_RPC_ERROR', `TON transactions API returned HTTP ${response.status}`);
+  }
+  const payload: { transactions?: TonTransactionLike[]; error?: string; message?: string } = await response.json();
+  if (!Array.isArray(payload.transactions)) {
+    throw new MerkleClaimVerificationError(503, 'CHAIN_RPC_ERROR', payload.error || payload.message || 'TON transactions API returned an invalid response');
+  }
+  return payload.transactions;
+}
+
 async function fetchTonTransactions(rpcUrl: string, address: string, _txHash: string): Promise<TonTransactionLike[]> {
+  const v3Url = deriveToncenterV3TransactionsUrl(rpcUrl);
+  if (v3Url) {
+    return fetchToncenterV3Transactions(v3Url, address);
+  }
   const response = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

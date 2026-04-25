@@ -152,19 +152,6 @@ function uint256Hex(value: bigint): string {
   return `0x${value.toString(16).padStart(64, '0')}`;
 }
 
-function cellHashInt(cell: Cell): bigint {
-  return BigInt(`0x${cell.hash().toString('hex')}`);
-}
-
-function buildLeafHash(batchId: bigint, ledgerIdHash: bigint, recipient: Address, amountRaw: bigint): bigint {
-  return cellHashInt(beginCell()
-    .storeUint(batchId, 64)
-    .storeUint(ledgerIdHash, 256)
-    .storeAddress(recipient)
-    .storeCoins(amountRaw)
-    .endCell());
-}
-
 function emptyProof(): Cell {
   return beginCell().endCell();
 }
@@ -407,7 +394,6 @@ async function main() {
   const ledgerIdHash = hashLedgerId(ledgerId);
   const proof = emptyProof();
   const proofBoc = proof.toBoc().toString('base64');
-  const merkleRoot = buildLeafHash(batchId, ledgerIdHash, claimant.address, amountRaw);
 
   const client = new TonClient({ endpoint, apiKey: optionalTestnetApiKey() });
   const ownerSender = client.open(owner.wallet).sender(owner.secretKey);
@@ -470,6 +456,13 @@ async function main() {
       minimumBalance: amountRaw,
     });
   }
+
+  const merkleRoot = await withToncenterRetry('compute Merkle proof leaf hash', () => merkleClaim.getProofLeafHash(
+    batchId,
+    ledgerIdHash,
+    claimant.address,
+    amountRaw,
+  ));
 
   await withToncenterRetry('set one-leaf Merkle root', () => merkleClaim.send(
     ownerSender,

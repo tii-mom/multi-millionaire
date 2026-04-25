@@ -3,6 +3,7 @@ import {
   JETTON_TRANSFER_NOTIFICATION_OPCODE,
   LOCK_VAULT_DEPOSIT_OPCODE,
   MERKLE_CLAIM_OPCODE,
+  deriveLockVaultPositionId,
   findDepositTransaction,
   parseLockVaultDepositBody,
   parseMerkleClaimBody,
@@ -21,7 +22,6 @@ describe('TON Tact message parsers', () => {
       .storeAddress(wallet)
       .storeBit(false)
       .storeUint(7, 32)
-      .storeUint(BigInt('42'), 64)
       .endCell()
       .toBoc()
       .toString('base64');
@@ -31,7 +31,7 @@ describe('TON Tact message parsers', () => {
       queryId: '11',
       waveId: 7,
       amountRaw: '1000',
-      positionId: '42',
+      positionId: deriveLockVaultPositionId({ senderAddress: walletAddress, queryId: '11' }),
       senderAddress: wallet.toRawString().toLowerCase(),
     });
   });
@@ -39,7 +39,6 @@ describe('TON Tact message parsers', () => {
   it('parses Jetton transfer_notification deposit bodies with metadata in a ref payload', () => {
     const forwardPayload = beginCell()
       .storeUint(8, 32)
-      .storeUint(BigInt('43'), 64)
       .endCell();
     const body = beginCell()
       .storeUint(LOCK_VAULT_DEPOSIT_OPCODE, 32)
@@ -56,12 +55,12 @@ describe('TON Tact message parsers', () => {
       queryId: '12',
       waveId: 8,
       amountRaw: '2000',
-      positionId: '43',
+      positionId: deriveLockVaultPositionId({ senderAddress: walletAddress, queryId: '12' }),
       senderAddress: wallet.toRawString().toLowerCase(),
     });
   });
 
-  it('ignores failed TON transactions when searching receipts', () => {
+  it('fails closed on failed TON transactions when searching receipts', () => {
     const body = beginCell()
       .storeUint(JETTON_TRANSFER_NOTIFICATION_OPCODE, 32)
       .storeUint(BigInt('11'), 64)
@@ -69,12 +68,11 @@ describe('TON Tact message parsers', () => {
       .storeAddress(wallet)
       .storeBit(false)
       .storeUint(7, 32)
-      .storeUint(BigInt('42'), 64)
       .endCell()
       .toBoc()
       .toString('base64');
 
-    expect(findDepositTransaction({
+    expect(() => findDepositTransaction({
       txHash: 'tx-hash',
       lockVaultAddress: walletAddress,
       transactions: [{
@@ -89,7 +87,7 @@ describe('TON Tact message parsers', () => {
           compute_ph: { success: false, exit_code: 1003 },
         },
       }],
-    })).toBeNull();
+    })).toThrow(TonMessageParseError);
   });
 
   it('finds deposit receipts when RPC nests the body under msg_data', () => {
@@ -100,7 +98,6 @@ describe('TON Tact message parsers', () => {
       .storeAddress(wallet)
       .storeBit(false)
       .storeUint(7, 32)
-      .storeUint(BigInt('42'), 64)
       .endCell()
       .toBoc()
       .toString('base64');
@@ -115,16 +112,62 @@ describe('TON Tact message parsers', () => {
           destination: walletAddress,
           msg_data: { body },
         },
+        description: {
+          aborted: false,
+          compute_ph: { success: true },
+          action: { success: true },
+        },
       }],
     });
 
     expect(match?.deposit).toMatchObject({
       waveId: 7,
       amountRaw: '1000',
-      positionId: '42',
+      positionId: deriveLockVaultPositionId({ senderAddress: walletAddress, queryId: '11' }),
       senderAddress: wallet.toRawString().toLowerCase(),
     });
   });
+
+  it('finds deposit receipts from Toncenter v3 transaction shapes', () => {
+    const body = beginCell()
+      .storeUint(JETTON_TRANSFER_NOTIFICATION_OPCODE, 32)
+      .storeUint(BigInt('11'), 64)
+      .storeCoins(BigInt('1000'))
+      .storeAddress(wallet)
+      .storeBit(false)
+      .storeUint(7, 32)
+      .endCell()
+      .toBoc()
+      .toString('base64');
+
+    const match = findDepositTransaction({
+      txHash: 'tx-hash',
+      lockVaultAddress: walletAddress,
+      transactions: [{
+        hash: 'tx-hash',
+        lt: '123',
+        now: 1777027651,
+        in_msg: {
+          source: walletAddress,
+          destination: walletAddress,
+          message_content: { body },
+        },
+        description: {
+          aborted: false,
+          compute_ph: { success: true },
+          action: { success: true },
+        },
+      }],
+    });
+
+    expect(match?.deposit).toMatchObject({
+      waveId: 7,
+      amountRaw: '1000',
+      positionId: deriveLockVaultPositionId({ senderAddress: walletAddress, queryId: '11' }),
+      senderAddress: wallet.toRawString().toLowerCase(),
+    });
+  });
+
 
   it('parses Merkle ClaimReward message bodies', () => {
     const body = beginCell()

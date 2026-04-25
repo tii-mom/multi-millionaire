@@ -30,6 +30,7 @@ This checklist names the minimum external inputs required before Sprint 2 can mo
 | `CHAIN_INTEGRATION_ENABLED` | Any real chain access is enabled. | Default must be false. |
 | `CHAIN_READ_ONLY_ENABLED` | Read-only diagnostics or receipt/read paths are exercised before writes. | Can be true while mainline writes remain disabled. |
 | `CHAIN_RPC_URL` | Chain reads, receipt checks, or indexer runs. | May fall back to `RPC_URL` only in backend config. |
+| `TON_TRANSACTIONS_API_URL` | Receipt verification needs execution descriptions that `CHAIN_RPC_URL` does not return. | Optional. Toncenter v2 URLs auto-map to `/api/v3/transactions`; set explicitly for other providers. |
 | `CHAIN_ID` | Always for Sprint 2 config. | Use one canonical value, for example `ton-mainnet` if the current target remains TON. |
 | `TOKEN_ADDRESS` | Deposit receipt validation. | Must be the 72H token address for the same `CHAIN_ID`. |
 | `LOCK_VAULT_ADDRESS` | Deposit, position, withdrawal, and unlock reads. | Must be the deployed lock vault for the same token and chain. |
@@ -91,7 +92,6 @@ If the target chain uses generated wrappers instead of ABI JSON, these variables
 | `TESTNET_DEPLOYER_MNEMONIC` | Deploying/configuring testnet contracts. | Local-only secret. Never commit or print it. |
 | `TESTNET_DEPOSITOR_MNEMONIC` | Sending a user canary deposit. | Optional; falls back to deployer mnemonic for controlled internal canary only. |
 | `TESTNET_CANARY_WAVE_ID` | Sending a canary deposit. | Defaults to `1` if omitted. |
-| `TESTNET_CANARY_POSITION_ID` | Sending a canary deposit. | Optional; defaults to a timestamp-generated unique id. |
 | `TESTNET_CANARY_AMOUNT_RAW` | Sending a canary deposit. | Small raw Jetton amount funded to the depositor wallet. |
 | `TESTNET_CLAIM_AMOUNT_RAW` | Sending a Merkle claim canary. | Optional; defaults to a small raw amount. |
 | `TESTNET_CLAIM_BATCH_ID` | Sending a Merkle claim canary. | Optional; defaults to a timestamp-generated uint64 batch id. |
@@ -110,23 +110,37 @@ Local secrets such as deployer mnemonics and RPC API keys must stay out of git.
 | `CHAIN_ID` | `ton-testnet` |
 | `CHAIN_RPC_URL` | `https://ton-testnet.api.onfinality.io/public/jsonRPC` |
 | `TOKEN_ADDRESS_TESTNET` | `kQAaCCxV8V_naWdAtURJnZ683QFXlGTiTCEHukthk8r_PBec` |
-| `LOCK_VAULT_ADDRESS_TESTNET` | `kQDa42BOYHpCwoHQAWkjsmnLMXP9WxFkKjcnt1jCaz-CBae3` |
-| `LOCK_VAULT_DEPLOYMENT_LT_TESTNET` | `65157232000003` |
-| `LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET` | `kQDOjELOK55pBR83xAbfkFuinoQEEdUNaJPFisFYPTR_nMwR` |
-| `MERKLE_CLAIM_ADDRESS_TESTNET` | `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH` |
-| `MERKLE_CLAIM_DEPLOYMENT_LT_TESTNET` | `65157256000003` |
-| `REWARD_JETTON_WALLET_ADDRESS_TESTNET` | `kQA1fYQl80IBTd_Geavn1VpuNY6_Sf8-iBEn8hudzq5hE3ut` |
+| `LOCK_VAULT_ADDRESS_TESTNET` | `kQDh7ZqTP9y3zryvqfYGxSFN2ePIB8bo1xFy4M_BX3L2uVb9` |
+| `LOCK_VAULT_DEPLOYMENT_LT_TESTNET` | `65315187000006` |
+| `LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET` | `kQD-46x_6K_uogYHHDmkk0WR_ouYcwUVW0ihK6H2XHyg6ytE` |
+| `MERKLE_CLAIM_ADDRESS_TESTNET` | `kQDJUBxBPTZGQjuz0MBzyyT4E9MDkgdXoPlqtz-zq4RDYpjF` |
+| `MERKLE_CLAIM_DEPLOYMENT_LT_TESTNET` | `65315245000003` |
+| `REWARD_JETTON_WALLET_ADDRESS_TESTNET` | `kQB8erGp7_WxOfHI7E9Gr_yBl-ZYgvyZ7tTM4cALOfuK89fm` |
 
 Latest testnet claim canary:
 
 | Evidence | Value |
 | --- | --- |
-| Claim tx hash | `Kidy8e/ZZR9PQHput2wQwkJxUIuhHYrtHY06sAGmK9E=` |
-| Claim LT | `65164428000003` |
-| Contract batch id | `1777041213767` |
-| Backend reward ledger id | `8b05e995-2bb1-4459-9f12-1ebd03b4621c` |
-| Amount raw | `1000` |
-| Backend local apply | `reward=claimed`, `proof=claimed`, `chain_event=applied` |
+| Claim tx hash | `XYvh+RnvK2zA1QkMKeyxUV2C7rkllE026yMQmm6XLec=` |
+| Claim LT | `65318218000003` |
+| Contract batch id | `1777101812106` |
+| Backend reward ledger id placeholder | `testnet-canary-1777101812106` |
+| Amount raw | `1` |
+| Contract getter | `claimCount=1`, `totalClaimedRaw=1`, `ledgerStatus=2` |
+| Backend direct verifier | `passed` with Toncenter v3 transactions API |
+| Backend database apply | Pending rerun against an isolated test database |
+
+Latest testnet deposit canary:
+
+| Evidence | Value |
+| --- | --- |
+| Deposit tx hash | `PeM9BAhtQjYqOtRjuvniVhqQkETeTLTHmOLv1YmLQt8=` |
+| Deposit LT | `65317654000007` |
+| Query id | `1777101618086` |
+| Position id | `9545445453761711350029784004168846980214745002146771544146829047662825645999` |
+| Amount raw | `1` |
+| Backend direct verifier | `passed` with Toncenter v3 transactions API |
+| Backend database apply | Pending rerun against an isolated test database |
 
 For backend testnet receipt apply, map the `_TESTNET` values into the runtime
 variables consumed by the API:

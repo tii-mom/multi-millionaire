@@ -12,6 +12,7 @@ describe('Merkle reward helpers', () => {
   const beneficiaryWallet = 'kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl';
   const merkleClaimAddress = 'kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg';
   const otherWallet = 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt';
+  const tokenAddress = '0:1111111111111111111111111111111111111111111111111111111111111111';
 
   function buildClaimBody(input: { recipient?: string; amountRaw?: string } = {}): string {
     return beginCell()
@@ -43,8 +44,18 @@ describe('Merkle reward helpers', () => {
       },
     ];
 
-    const first = buildMerkleTree(input, { batchId: '2' });
-    const second = buildMerkleTree(input, { batchId: '2' });
+    const first = buildMerkleTree(input, {
+      batchId: '2',
+      chainId: 'ton-testnet',
+      tokenAddress,
+      contractAddress: merkleClaimAddress,
+    });
+    const second = buildMerkleTree(input, {
+      batchId: '2',
+      chainId: 'ton-testnet',
+      tokenAddress,
+      contractAddress: merkleClaimAddress,
+    });
 
     expect(first.root).toBe(second.root);
     expect(first.root).toMatch(/^0x[0-9a-f]{64}$/);
@@ -76,6 +87,7 @@ describe('Merkle reward helpers', () => {
         ok: true,
         result: [{
           transaction_id: { lt: '123', hash: 'claim-hash' },
+          description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
           in_msg: {
             source: beneficiaryWallet,
             destination: merkleClaimAddress,
@@ -103,6 +115,48 @@ describe('Merkle reward helpers', () => {
     process.env = originalEnv;
   });
 
+  it('uses Toncenter v3 transactions for Merkle claim receipts', async () => {
+    const originalEnv = { ...process.env };
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_RPC_URL = 'https://testnet.toncenter.com/api/v2/jsonRPC';
+    process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        transactions: [{
+          hash: 'claim-hash',
+          lt: '123',
+          now: 1777027651,
+          description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
+          in_msg: {
+            source: beneficiaryWallet,
+            destination: merkleClaimAddress,
+            message_content: { body: buildClaimBody() },
+          },
+        }],
+      }),
+    } as any);
+
+    await expect(verifyMerkleClaimReceipt({
+      txHash: 'claim-hash',
+      beneficiaryWallet,
+      amountRaw: '500',
+      ledgerIdHash: '0x03',
+    })).resolves.toMatchObject({
+      txHash: 'claim-hash',
+      amountRaw: '500',
+      batchId: '2',
+      blockNumber: 123,
+      blockTime: '2026-04-24T10:47:31.000Z',
+      finalized: true,
+    });
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v3/transactions');
+
+    fetchMock.mockRestore();
+    process.env = originalEnv;
+  });
+
   it('rejects Merkle claim receipts with the wrong explicit recipient', async () => {
     const originalEnv = { ...process.env };
     process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
@@ -115,6 +169,7 @@ describe('Merkle reward helpers', () => {
         ok: true,
         result: [{
           transaction_id: { lt: '123', hash: 'claim-hash' },
+          description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
           in_msg: {
             source: beneficiaryWallet,
             destination: merkleClaimAddress,

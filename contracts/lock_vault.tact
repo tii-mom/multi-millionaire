@@ -4,6 +4,13 @@ const DEFAULT_LOCK_SECONDS: Int = 31536000;
 const DEFAULT_TARGET_USD_E6: Int = 1000000000000;
 const DEFAULT_TOKEN_SCALE: Int = 1000000000;
 const JETTON_TRANSFER_TON_FEE: Int = 50000000;
+const PRICE_UPDATE_DELAY_SECONDS: Int = 3600;
+const PRICE_FRESHNESS_SECONDS: Int = 86400;
+const MAX_PRICE_CHANGE_BPS: Int = 2000;
+const BPS_SCALE: Int = 10000;
+const POSITION_ACTIVE: Int = 0;
+const POSITION_WITHDRAWING: Int = 1;
+const POSITION_WITHDRAWN: Int = 2;
 
 message(0x7362d09c) JettonTransferNotification {
     queryId: Int as uint64;
@@ -22,13 +29,21 @@ message(0x0f8a7ea5) JettonTransfer {
     forwardPayload: Slice as remaining;
 }
 
+message(0xd53276db) JettonExcesses {
+    queryId: Int as uint64;
+}
+
 message(0x50415553) SetPaused {
     paused: Bool;
 }
 
-message(0x50524943) SetPrice {
+message(0x53505243) StagePrice {
     queryId: Int as uint64;
     priceUsdE6: Int as uint64;
+}
+
+message(0x41505243) ApplyPrice {
+    queryId: Int as uint64;
 }
 
 message(0x4a57544c) SetVaultJettonWallet {
@@ -36,19 +51,13 @@ message(0x4a57544c) SetVaultJettonWallet {
     vaultJettonWallet: Address;
 }
 
-message(0x55545247) SetUserTarget {
-    queryId: Int as uint64;
-    targetUsdE6: Int as uint64;
-}
-
 message(0x57495448) WithdrawPosition {
     queryId: Int as uint64;
-    positionId: Int as uint64;
+    positionId: Int as uint256;
 }
 
 struct DepositPayload {
     waveId: Int as uint32;
-    positionId: Int as uint64;
 }
 
 struct Position {
@@ -56,7 +65,7 @@ struct Position {
     amountRaw: Int as coins;
     waveId: Int as uint32;
     createdAt: Int as uint64;
-    withdrawn: Bool;
+    status: Int as uint8;
 }
 
 contract LockVault with Ownable {
@@ -64,7 +73,10 @@ contract LockVault with Ownable {
     tokenAddress: Address;
     vaultJettonWallet: Address?;
     paused: Bool;
-    priceUsdE6: Int as uint64;
+    activePriceUsdE6: Int as uint64;
+    activePriceUpdatedAt: Int as uint64;
+    pendingPriceUsdE6: Int as uint64;
+    pendingPriceValidAfter: Int as uint64;
     lockSeconds: Int as uint64;
     tokenScale: Int as uint64;
     defaultTargetUsdE6: Int as uint64;
@@ -73,21 +85,24 @@ contract LockVault with Ownable {
     totalActiveRaw: Int as coins;
     depositCount: Int as uint64;
     withdrawCount: Int as uint64;
-    positions: map<Int as uint64, Position>;
+    positions: map<Int as uint256, Position>;
+    pendingWithdrawals: map<Int as uint64, Int as uint256>;
     activeRawByUser: map<Address, Int>;
-    targetUsdE6ByUser: map<Address, Int>;
     goalReachedByUser: map<Address, Bool>;
     lastDepositor: Address?;
     lastWaveId: Int as uint32;
     lastAmountRaw: Int as coins;
-    lastPositionId: Int as uint64;
+    lastPositionId: Int as uint256;
 
     init(owner: Address, tokenAddress: Address) {
         self.owner = owner;
         self.tokenAddress = tokenAddress;
         self.vaultJettonWallet = null;
         self.paused = false;
-        self.priceUsdE6 = 0;
+        self.activePriceUsdE6 = 0;
+        self.activePriceUpdatedAt = 0;
+        self.pendingPriceUsdE6 = 0;
+        self.pendingPriceValidAfter = 0;
         self.lockSeconds = DEFAULT_LOCK_SECONDS;
         self.tokenScale = DEFAULT_TOKEN_SCALE;
         self.defaultTargetUsdE6 = DEFAULT_TARGET_USD_E6;
@@ -97,8 +112,8 @@ contract LockVault with Ownable {
         self.depositCount = 0;
         self.withdrawCount = 0;
         self.positions = emptyMap();
+        self.pendingWithdrawals = emptyMap();
         self.activeRawByUser = emptyMap();
-        self.targetUsdE6ByUser = emptyMap();
         self.goalReachedByUser = emptyMap();
         self.lastDepositor = null;
         self.lastWaveId = 0;
@@ -113,27 +128,34 @@ contract LockVault with Ownable {
         self.paused = msg.paused;
     }
 
-    receive(msg: SetPrice) {
+    receive(msg: StagePrice) {
         self.requireOwner();
-        self.priceUsdE6 = msg.priceUsdE6;
+        throwUnless(1050, msg.priceUsdE6 > 0);
+        self.pendingPriceUsdE6 = msg.priceUsdE6;
+        self.pendingPriceValidAfter = now() + PRICE_UPDATE_DELAY_SECONDS;
+    }
+
+    receive(msg: ApplyPrice) {
+        self.requireOwner();
+        throwUnless(1051, self.pendingPriceUsdE6 > 0);
+        throwUnless(1052, now() >= self.pendingPriceValidAfter);
+
+        if (self.activePriceUsdE6 > 0) {
+            let minPrice: Int = self.activePriceUsdE6 * (BPS_SCALE - MAX_PRICE_CHANGE_BPS) / BPS_SCALE;
+            let maxPrice: Int = self.activePriceUsdE6 * (BPS_SCALE + MAX_PRICE_CHANGE_BPS) / BPS_SCALE;
+            throwUnless(1053, self.pendingPriceUsdE6 >= minPrice && self.pendingPriceUsdE6 <= maxPrice);
+        }
+
+        self.activePriceUsdE6 = self.pendingPriceUsdE6;
+        self.activePriceUpdatedAt = now();
+        self.pendingPriceUsdE6 = 0;
+        self.pendingPriceValidAfter = 0;
     }
 
     receive(msg: SetVaultJettonWallet) {
         self.requireOwner();
         throwUnless(1007, self.depositCount == 0);
         self.vaultJettonWallet = msg.vaultJettonWallet;
-    }
-
-    receive(msg: SetUserTarget) {
-        throwUnless(1010, msg.targetUsdE6 > 0);
-
-        let currentTarget: Int = self.userTarget(sender());
-        let activeRaw: Int = self.activeRaw(sender());
-        if (activeRaw > 0) {
-            throwUnless(1011, msg.targetUsdE6 >= currentTarget);
-        }
-
-        self.targetUsdE6ByUser.set(sender(), msg.targetUsdE6);
     }
 
     receive(msg: JettonTransferNotification) {
@@ -144,16 +166,16 @@ contract LockVault with Ownable {
         throwUnless(1008, !self.isGoalLatched(msg.sender));
 
         let payload: DepositPayload = self.parseDepositPayload(msg.forwardPayload);
-        throwUnless(1005, payload.positionId > 0);
-        throwUnless(1006, !self.positions.exists(payload.positionId));
+        let positionId: Int = self.derivePositionId(msg.sender, msg.queryId);
+        throwUnless(1006, !self.positions.exists(positionId));
 
         let createdAt: Int = now();
-        self.positions.set(payload.positionId, Position {
+        self.positions.set(positionId, Position {
             owner: msg.sender,
             amountRaw: msg.amount,
             waveId: payload.waveId,
             createdAt: createdAt,
-            withdrawn: false,
+            status: POSITION_ACTIVE,
         });
 
         self.totalDepositedRaw += msg.amount;
@@ -168,7 +190,7 @@ contract LockVault with Ownable {
         self.lastDepositor = msg.sender;
         self.lastWaveId = payload.waveId;
         self.lastAmountRaw = msg.amount;
-        self.lastPositionId = payload.positionId;
+        self.lastPositionId = positionId;
     }
 
     receive(msg: WithdrawPosition) {
@@ -177,7 +199,7 @@ contract LockVault with Ownable {
 
         let position: Position = existing!!;
         throwUnless(1021, position.owner == sender());
-        throwUnless(1022, !position.withdrawn);
+        throwUnless(1022, position.status == POSITION_ACTIVE);
 
         let activeRaw: Int = self.activeRaw(position.owner);
         let goalReached: Bool = self.hasReachedGoal(position.owner, activeRaw);
@@ -191,17 +213,16 @@ contract LockVault with Ownable {
             amountRaw: position.amountRaw,
             waveId: position.waveId,
             createdAt: position.createdAt,
-            withdrawn: true,
+            status: POSITION_WITHDRAWING,
         });
 
-        self.totalWithdrawnRaw += position.amountRaw;
         self.totalActiveRaw -= position.amountRaw;
-        self.withdrawCount += 1;
         let nextActiveRaw: Int = activeRaw - position.amountRaw;
         self.activeRawByUser.set(position.owner, nextActiveRaw);
         if (nextActiveRaw == 0) {
             self.goalReachedByUser.set(position.owner, false);
         }
+        self.pendingWithdrawals.set(msg.queryId, msg.positionId);
 
         let jettonWallet: Address? = self.vaultJettonWallet;
         throwUnless(1024, jettonWallet != null);
@@ -220,6 +241,57 @@ contract LockVault with Ownable {
                 forwardPayload: emptySlice(),
             }.toCell(),
         });
+
+        self.positions.set(msg.positionId, Position {
+            owner: position.owner,
+            amountRaw: position.amountRaw,
+            waveId: position.waveId,
+            createdAt: position.createdAt,
+            status: POSITION_WITHDRAWN,
+        });
+        self.totalWithdrawnRaw += position.amountRaw;
+        self.withdrawCount += 1;
+    }
+
+    receive(msg: JettonExcesses) {
+        throwUnless(1025, self.vaultJettonWallet != null && sender() == self.vaultJettonWallet!!);
+        self.pendingWithdrawals.del(msg.queryId);
+    }
+
+    bounced(msg: bounced<JettonTransfer>) {
+        let pendingPositionId: Int? = self.pendingWithdrawals.get(msg.queryId);
+        if (pendingPositionId == null) {
+            return;
+        }
+
+        let existing: Position? = self.positions.get(pendingPositionId!!);
+        if (existing == null) {
+            self.pendingWithdrawals.del(msg.queryId);
+            return;
+        }
+
+        let position: Position = existing!!;
+        if (position.status != POSITION_WITHDRAWING && position.status != POSITION_WITHDRAWN) {
+            self.pendingWithdrawals.del(msg.queryId);
+            return;
+        }
+
+        if (position.status == POSITION_WITHDRAWN) {
+            self.totalWithdrawnRaw -= position.amountRaw;
+            self.withdrawCount -= 1;
+        }
+
+        self.positions.set(pendingPositionId!!, Position {
+            owner: position.owner,
+            amountRaw: position.amountRaw,
+            waveId: position.waveId,
+            createdAt: position.createdAt,
+            status: POSITION_ACTIVE,
+        });
+        self.totalActiveRaw += position.amountRaw;
+        let activeRaw: Int = self.activeRaw(position.owner) + position.amountRaw;
+        self.activeRawByUser.set(position.owner, activeRaw);
+        self.pendingWithdrawals.del(msg.queryId);
     }
 
     fun parseDepositPayload(forwardPayload: Slice): DepositPayload {
@@ -232,19 +304,18 @@ contract LockVault with Ownable {
             payload = payload.loadRef().beginParse();
         }
 
-        throwUnless(1032, payload.bits() >= 96);
+        throwUnless(1032, payload.bits() >= 32);
         return DepositPayload {
             waveId: payload.loadUint(32),
-            positionId: payload.loadUint(64),
         };
     }
 
-    fun userTarget(user: Address): Int {
-        let configured: Int? = self.targetUsdE6ByUser.get(user);
-        if (configured == null) {
-            return self.defaultTargetUsdE6;
-        }
-        return configured!!;
+    fun derivePositionId(user: Address, queryId: Int): Int {
+        return beginCell()
+            .storeAddress(user)
+            .storeUint(queryId, 64)
+            .endCell()
+            .hash();
     }
 
     fun activeRaw(user: Address): Int {
@@ -255,14 +326,15 @@ contract LockVault with Ownable {
         return active!!;
     }
 
+    fun hasFreshPrice(): Bool {
+        return self.activePriceUsdE6 > 0 && self.activePriceUpdatedAt > 0 && now() <= self.activePriceUpdatedAt + PRICE_FRESHNESS_SECONDS;
+    }
+
     fun hasReachedGoal(user: Address, activeRaw: Int): Bool {
-        if (self.isGoalLatched(user)) {
-            return true;
-        }
-        if (self.priceUsdE6 == 0) {
+        if (!self.hasFreshPrice()) {
             return false;
         }
-        return activeRaw * self.priceUsdE6 >= self.userTarget(user) * self.tokenScale;
+        return activeRaw * self.activePriceUsdE6 >= self.defaultTargetUsdE6 * self.tokenScale;
     }
 
     fun isGoalLatched(user: Address): Bool {
@@ -282,7 +354,10 @@ contract LockVault with Ownable {
             tokenAddress: self.tokenAddress,
             vaultJettonWallet: self.vaultJettonWallet,
             paused: self.paused,
-            priceUsdE6: self.priceUsdE6,
+            activePriceUsdE6: self.activePriceUsdE6,
+            activePriceUpdatedAt: self.activePriceUpdatedAt,
+            pendingPriceUsdE6: self.pendingPriceUsdE6,
+            pendingPriceValidAfter: self.pendingPriceValidAfter,
             lockSeconds: self.lockSeconds,
             tokenScale: self.tokenScale,
             defaultTargetUsdE6: self.defaultTargetUsdE6,
@@ -308,9 +383,13 @@ contract LockVault with Ownable {
         let active: Int = self.activeRaw(user);
         return UserState {
             activeRaw: active,
-            targetUsdE6: self.userTarget(user),
+            targetUsdE6: self.defaultTargetUsdE6,
             goalReached: self.hasReachedGoal(user, active),
         };
+    }
+
+    get fun derivedPositionId(user: Address, queryId: Int): Int {
+        return self.derivePositionId(user, queryId);
     }
 }
 
@@ -319,7 +398,10 @@ struct VaultState {
     tokenAddress: Address;
     vaultJettonWallet: Address?;
     paused: Bool;
-    priceUsdE6: Int as uint64;
+    activePriceUsdE6: Int as uint64;
+    activePriceUpdatedAt: Int as uint64;
+    pendingPriceUsdE6: Int as uint64;
+    pendingPriceValidAfter: Int as uint64;
     lockSeconds: Int as uint64;
     tokenScale: Int as uint64;
     defaultTargetUsdE6: Int as uint64;
@@ -331,7 +413,7 @@ struct VaultState {
     lastDepositor: Address?;
     lastWaveId: Int as uint32;
     lastAmountRaw: Int as coins;
-    lastPositionId: Int as uint64;
+    lastPositionId: Int as uint256;
 }
 
 struct UserState {

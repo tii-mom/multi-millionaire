@@ -1,4 +1,4 @@
-import { Address, Cell, Slice } from '@ton/core';
+import { Address, beginCell, Cell, Slice } from '@ton/core';
 
 export const JETTON_TRANSFER_NOTIFICATION_OPCODE = 0x7362d09c;
 export const LOCK_VAULT_DEPOSIT_OPCODE = JETTON_TRANSFER_NOTIFICATION_OPCODE;
@@ -29,6 +29,9 @@ export interface TonTransactionMessage {
   msg_data?: {
     body?: string;
   };
+  message_content?: {
+    body?: string;
+  };
 }
 
 export interface TonTransactionLike {
@@ -36,7 +39,10 @@ export interface TonTransactionLike {
     lt?: string;
     hash?: string;
   };
+  hash?: string;
+  lt?: string;
   utime?: number;
+  now?: number;
   in_msg?: TonTransactionMessage;
   description?: {
     aborted?: boolean;
@@ -78,11 +84,23 @@ function addressToComparableString(address: Address): string {
 }
 
 export function getTonMessageBody(message: TonTransactionMessage): string | null {
-  return message.body || message.msg_data?.body || null;
+  return message.body || message.msg_data?.body || message.message_content?.body || null;
+}
+
+export function getTonTransactionHash(transaction: TonTransactionLike): string | null {
+  return transaction.transaction_id?.hash || transaction.hash || null;
+}
+
+export function getTonTransactionLt(transaction: TonTransactionLike): string | null {
+  return transaction.transaction_id?.lt || transaction.lt || null;
+}
+
+export function getTonTransactionTime(transaction: TonTransactionLike): number | null {
+  return transaction.utime || transaction.now || null;
 }
 
 function loadDepositForwardPayload(slice: Slice): Slice {
-  if (slice.remainingBits === 96) {
+  if (slice.remainingBits === 32) {
     return slice;
   }
   if (slice.remainingBits >= 1) {
@@ -101,21 +119,30 @@ function loadDepositForwardPayload(slice: Slice): Slice {
   throw new TonMessageParseError('INVALID_TON_BODY', 'Jetton deposit notification is missing forward payload metadata');
 }
 
-function transactionSucceeded(transaction: TonTransactionLike): boolean {
+function assertTransactionSucceeded(transaction: TonTransactionLike): void {
   const description = transaction.description;
   if (!description) {
-    return true;
+    throw new TonMessageParseError('TON_TX_NOT_FINALIZED', 'TON transaction is missing execution description');
   }
   if (description.aborted === true) {
-    return false;
+    throw new TonMessageParseError('TON_TX_FAILED', 'TON transaction was aborted');
   }
-  if (description.compute_ph?.success === false) {
-    return false;
+  if (description.compute_ph?.success !== true) {
+    throw new TonMessageParseError('TON_TX_FAILED', 'TON transaction compute phase did not succeed');
   }
-  if (description.action?.success === false) {
-    return false;
+  if (description.action?.success !== true) {
+    throw new TonMessageParseError('TON_TX_FAILED', 'TON transaction action phase did not succeed');
   }
-  return true;
+}
+
+export function deriveLockVaultPositionId(input: { senderAddress: string; queryId: string | bigint }): string {
+  const queryId = typeof input.queryId === 'bigint' ? input.queryId : BigInt(input.queryId);
+  return BigInt(`0x${beginCell()
+    .storeAddress(Address.parse(input.senderAddress))
+    .storeUint(queryId, 64)
+    .endCell()
+    .hash()
+    .toString('hex')}`).toString();
 }
 
 export function parseLockVaultDepositBody(bodyBase64: string): ParsedLockVaultDeposit {
@@ -128,13 +155,14 @@ export function parseLockVaultDepositBody(bodyBase64: string): ParsedLockVaultDe
   const amountRaw = slice.loadCoins().toString();
   const senderAddress = addressToComparableString(slice.loadAddress());
   const forwardPayload = loadDepositForwardPayload(slice);
+  const waveId = Number(forwardPayload.loadUint(32));
 
   return {
     opcode,
     queryId,
-    waveId: Number(forwardPayload.loadUint(32)),
+    waveId,
     amountRaw,
-    positionId: forwardPayload.loadUintBig(64).toString(),
+    positionId: deriveLockVaultPositionId({ senderAddress, queryId }),
     senderAddress,
   };
 }
@@ -168,12 +196,14 @@ export function findDepositTransaction(input: {
   transactions: TonTransactionLike[];
   txHash: string;
   lockVaultAddress: string;
+  vaultJettonWalletAddress?: string;
 }): { transaction: TonTransactionLike; message: TonTransactionMessage; deposit: ParsedLockVaultDeposit } | null {
   const expectedDestination = normalizeTonAddress(input.lockVaultAddress);
+  const expectedSource = input.vaultJettonWalletAddress ? normalizeTonAddress(input.vaultJettonWalletAddress) : null;
   for (const transaction of input.transactions) {
-    const hash = transaction.transaction_id?.hash;
+    const hash = getTonTransactionHash(transaction);
     const message = transaction.in_msg;
-    if (!hash || hash !== input.txHash || !message || !message.destination) {
+    if (!hash || hash !== input.txHash || !message || !message.destination || !message.source) {
       continue;
     }
     const body = getTonMessageBody(message);
@@ -183,9 +213,10 @@ export function findDepositTransaction(input: {
     if (normalizeTonAddress(message.destination) !== expectedDestination) {
       continue;
     }
-    if (!transactionSucceeded(transaction)) {
-      continue;
+    if (expectedSource && normalizeTonAddress(message.source) !== expectedSource) {
+      throw new TonMessageParseError('JETTON_WALLET_MISMATCH', 'Deposit notification source is not the configured LockVault Jetton wallet');
     }
+    assertTransactionSucceeded(transaction);
     const deposit = parseLockVaultDepositBody(body);
     return { transaction, message, deposit };
   }
@@ -199,7 +230,7 @@ export function findMerkleClaimTransaction(input: {
 }): { transaction: TonTransactionLike; message: TonTransactionMessage; claim: ParsedMerkleClaim } | null {
   const expectedDestination = normalizeTonAddress(input.merkleClaimAddress);
   for (const transaction of input.transactions) {
-    const hash = transaction.transaction_id?.hash;
+    const hash = getTonTransactionHash(transaction);
     const message = transaction.in_msg;
     if (!hash || hash !== input.txHash || !message || !message.destination) {
       continue;
@@ -211,9 +242,7 @@ export function findMerkleClaimTransaction(input: {
     if (normalizeTonAddress(message.destination) !== expectedDestination) {
       continue;
     }
-    if (!transactionSucceeded(transaction)) {
-      continue;
-    }
+    assertTransactionSucceeded(transaction);
     const claim = parseMerkleClaimBody(body);
     return { transaction, message, claim };
   }

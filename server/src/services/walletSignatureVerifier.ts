@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Address } from '@ton/core';
+import { Address, Cell, contractAddress, loadStateInit } from '@ton/core';
 import { signVerify } from '@ton/crypto';
 import { normalizeWalletAddress } from '../models/walletBindingModel';
 
@@ -99,6 +99,19 @@ export function getWalletSignatureVerifierDiagnostics(): WalletSignatureVerifier
 interface TonProofPayload {
   publicKey?: string;
   public_key?: string;
+  walletStateInit?: string;
+  wallet_state_init?: string;
+  stateInit?: string;
+  account?: {
+    address?: string;
+    chain?: string | number;
+    network?: string | number;
+    publicKey?: string;
+    public_key?: string;
+    walletStateInit?: string;
+    wallet_state_init?: string;
+    stateInit?: string;
+  };
   proof?: {
     timestamp?: number | string;
     domain?: {
@@ -123,11 +136,21 @@ function parseTonProof(signature: string): TonProofPayload {
 }
 
 function parsePublicKey(input: TonProofPayload): Buffer {
-  const value = input.publicKey || input.public_key;
+  const value = input.publicKey || input.public_key || input.account?.publicKey || input.account?.public_key;
   if (!value || !/^[a-fA-F0-9]{64}$/.test(value)) {
     throw new WalletSignatureVerificationError(400, 'INVALID_TON_PROOF', 'TON proof public key is missing or invalid');
   }
   return Buffer.from(value, 'hex');
+}
+
+function readWalletStateInit(input: TonProofPayload): string {
+  return input.walletStateInit
+    || input.wallet_state_init
+    || input.stateInit
+    || input.account?.walletStateInit
+    || input.account?.wallet_state_init
+    || input.account?.stateInit
+    || '';
 }
 
 function parseTimestamp(value: unknown): number {
@@ -169,6 +192,12 @@ function verifyTonProof(input: WalletSignatureInput): void {
   }
 
   const publicKey = parsePublicKey(proofPayload);
+  verifyTonProofWalletOwnership({
+    proofPayload,
+    walletAddress: address,
+    publicKey,
+  });
+
   const wc = Buffer.alloc(4);
   wc.writeInt32BE(address.workChain, 0);
   const dl = Buffer.alloc(4);
@@ -194,6 +223,52 @@ function verifyTonProof(input: WalletSignatureInput): void {
   const signature = Buffer.from(proof.signature, 'base64');
   if (signature.length !== 64 || !signVerify(signedHash, signature, publicKey)) {
     throw new WalletSignatureVerificationError(401, 'INVALID_WALLET_SIGNATURE', 'TON proof signature is invalid');
+  }
+}
+
+function verifyTonProofWalletOwnership(input: {
+  proofPayload: TonProofPayload;
+  walletAddress: Address;
+  publicKey: Buffer;
+}): void {
+  const accountAddress = input.proofPayload.account?.address;
+  if (accountAddress && normalizeWalletAddress(accountAddress) !== input.walletAddress.toRawString().toLowerCase()) {
+    throw new WalletSignatureVerificationError(401, 'TON_PROOF_ACCOUNT_MISMATCH', 'TON proof account address does not match walletAddress');
+  }
+
+  const accountPublicKey = input.proofPayload.account?.publicKey || input.proofPayload.account?.public_key;
+  if (accountPublicKey && accountPublicKey.toLowerCase() !== input.publicKey.toString('hex')) {
+    throw new WalletSignatureVerificationError(401, 'TON_PROOF_PUBLIC_KEY_MISMATCH', 'TON proof public key does not match account public key');
+  }
+
+  const stateInitBoc = readWalletStateInit(input.proofPayload);
+  if (!stateInitBoc) {
+    throw new WalletSignatureVerificationError(400, 'TON_PROOF_STATE_INIT_REQUIRED', 'TON proof wallet stateInit is required');
+  }
+
+  let stateInitCell: Cell;
+  try {
+    stateInitCell = Cell.fromBase64(stateInitBoc);
+  } catch {
+    throw new WalletSignatureVerificationError(400, 'INVALID_TON_PROOF', 'TON proof wallet stateInit is not a valid BOC');
+  }
+
+  let stateInit;
+  try {
+    stateInit = loadStateInit(stateInitCell.beginParse());
+  } catch {
+    throw new WalletSignatureVerificationError(400, 'INVALID_TON_PROOF', 'TON proof wallet stateInit cannot be parsed');
+  }
+
+  const derivedAddress = contractAddress(input.walletAddress.workChain, stateInit).toRawString().toLowerCase();
+  if (derivedAddress !== input.walletAddress.toRawString().toLowerCase()) {
+    throw new WalletSignatureVerificationError(401, 'TON_PROOF_STATE_INIT_MISMATCH', 'TON proof stateInit does not derive walletAddress');
+  }
+
+  const publicKeyHex = input.publicKey.toString('hex');
+  const stateInitHex = stateInitCell.toBoc().toString('hex');
+  if (!stateInitHex.includes(publicKeyHex)) {
+    throw new WalletSignatureVerificationError(401, 'TON_PROOF_PUBLIC_KEY_MISMATCH', 'TON proof public key is not present in wallet stateInit');
   }
 }
 

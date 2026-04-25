@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Address } from '@ton/core';
+import { Address, beginCell, contractAddress, storeStateInit } from '@ton/core';
 import { keyPairFromSeed, sign } from '@ton/crypto';
 import {
   getWalletSignatureVerifierDiagnostics,
@@ -15,6 +15,8 @@ function buildTonProofSignature(input: {
   timestamp: number;
   publicKey: Buffer;
   secretKey: Buffer;
+  walletStateInit?: string;
+  accountPublicKey?: Buffer;
 }) {
   const wc = Buffer.alloc(4);
   wc.writeInt32BE(input.address.workChain, 0);
@@ -41,6 +43,13 @@ function buildTonProofSignature(input: {
   const signedHash = crypto.createHash('sha256').update(fullMessage).digest();
   return JSON.stringify({
     publicKey: input.publicKey.toString('hex'),
+    walletStateInit: input.walletStateInit,
+    account: {
+      address: input.address.toString(),
+      chain: input.address.workChain === -1 ? '-1' : '0',
+      publicKey: (input.accountPublicKey || input.publicKey).toString('hex'),
+      walletStateInit: input.walletStateInit,
+    },
     proof: {
       timestamp: input.timestamp,
       domain: { lengthBytes: domainBytes.length, value: input.domain },
@@ -48,6 +57,17 @@ function buildTonProofSignature(input: {
       payload: input.payload,
     },
   });
+}
+
+function buildWalletStateInit(publicKey: Buffer) {
+  const stateInit = {
+    code: beginCell().storeUint(0x72, 8).endCell(),
+    data: beginCell().storeBuffer(publicKey).storeUint(0, 32).endCell(),
+  };
+  return {
+    address: contractAddress(0, stateInit),
+    boc: beginCell().store(storeStateInit(stateInit)).endCell().toBoc().toString('base64'),
+  };
 }
 
 describe('wallet signature verifier', () => {
@@ -110,7 +130,8 @@ describe('wallet signature verifier', () => {
     process.env.WALLET_SIGNATURE_MODE = 'ton_proof';
     process.env.WALLET_BINDING_MESSAGE_DOMAIN = 'mm.72h.lol';
     const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
-    const address = new Address(0, Buffer.alloc(32, 9));
+    const walletState = buildWalletStateInit(keyPair.publicKey);
+    const address = walletState.address;
     const nonce = 'nonce-1';
     const timestamp = Math.floor(Date.now() / 1000);
     const signature = buildTonProofSignature({
@@ -120,6 +141,7 @@ describe('wallet signature verifier', () => {
       timestamp,
       publicKey: keyPair.publicKey,
       secretKey: keyPair.secretKey,
+      walletStateInit: walletState.boc,
     });
 
     expect(getWalletSignatureVerifierDiagnostics()).toMatchObject({
@@ -141,7 +163,8 @@ describe('wallet signature verifier', () => {
     process.env.WALLET_SIGNATURE_MODE = 'ton_proof';
     process.env.WALLET_BINDING_MESSAGE_DOMAIN = 'mm.72h.lol';
     const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
-    const address = new Address(0, Buffer.alloc(32, 9));
+    const walletState = buildWalletStateInit(keyPair.publicKey);
+    const address = walletState.address;
     const signature = buildTonProofSignature({
       address,
       domain: 'mm.72h.lol',
@@ -149,11 +172,64 @@ describe('wallet signature verifier', () => {
       timestamp: Math.floor(Date.now() / 1000),
       publicKey: keyPair.publicKey,
       secretKey: keyPair.secretKey,
+      walletStateInit: walletState.boc,
     });
 
     expect(() => verifyWalletSignature({
       nonce: 'nonce-1',
       walletAddress: address.toString(),
+      signature,
+      signableMessage: 'message',
+    })).toThrow(WalletSignatureVerificationError);
+  });
+
+  it('rejects TON proof signatures when attacker key signs a victim wallet address', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.WALLET_BINDING_ENABLED = 'true';
+    process.env.WALLET_SIGNATURE_MODE = 'ton_proof';
+    process.env.WALLET_BINDING_MESSAGE_DOMAIN = 'mm.72h.lol';
+    const victimKeyPair = keyPairFromSeed(Buffer.alloc(32, 8));
+    const attackerKeyPair = keyPairFromSeed(Buffer.alloc(32, 9));
+    const victimWalletState = buildWalletStateInit(victimKeyPair.publicKey);
+    const nonce = 'nonce-1';
+    const signature = buildTonProofSignature({
+      address: victimWalletState.address,
+      domain: 'mm.72h.lol',
+      payload: nonce,
+      timestamp: Math.floor(Date.now() / 1000),
+      publicKey: attackerKeyPair.publicKey,
+      accountPublicKey: attackerKeyPair.publicKey,
+      secretKey: attackerKeyPair.secretKey,
+      walletStateInit: victimWalletState.boc,
+    });
+
+    expect(() => verifyWalletSignature({
+      nonce,
+      walletAddress: victimWalletState.address.toString(),
+      signature,
+      signableMessage: 'message',
+    })).toThrow(WalletSignatureVerificationError);
+  });
+
+  it('rejects TON proof signatures without wallet stateInit in production', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.WALLET_BINDING_ENABLED = 'true';
+    process.env.WALLET_SIGNATURE_MODE = 'ton_proof';
+    process.env.WALLET_BINDING_MESSAGE_DOMAIN = 'mm.72h.lol';
+    const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+    const walletState = buildWalletStateInit(keyPair.publicKey);
+    const signature = buildTonProofSignature({
+      address: walletState.address,
+      domain: 'mm.72h.lol',
+      payload: 'nonce-1',
+      timestamp: Math.floor(Date.now() / 1000),
+      publicKey: keyPair.publicKey,
+      secretKey: keyPair.secretKey,
+    });
+
+    expect(() => verifyWalletSignature({
+      nonce: 'nonce-1',
+      walletAddress: walletState.address.toString(),
       signature,
       signableMessage: 'message',
     })).toThrow(WalletSignatureVerificationError);

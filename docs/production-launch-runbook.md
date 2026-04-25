@@ -121,24 +121,36 @@ Latest evidence:
 Latest testnet evidence is recorded in
 `docs/contracts/testnet-deployment-20260424.md`.
 
-- Date: 2026-04-24
+- Date: 2026-04-25
 - Network: `ton-testnet`
 - Testnet LockVault:
-  `kQDa42BOYHpCwoHQAWkjsmnLMXP9WxFkKjcnt1jCaz-CBae3`
+  `kQDh7ZqTP9y3zryvqfYGxSFN2ePIB8bo1xFy4M_BX3L2uVb9`
 - Testnet MerkleClaim:
-  `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH`
+  `kQDJUBxBPTZGQjuz0MBzyyT4E9MDkgdXoPlqtz-zq4RDYpjF`
 - Verified deposit receipt tx:
-  `9BJVuUvqZ3KpdtSMwa20JRGm3jyZUZoZ3Z1rU4e9Vcg=`
-- Backend local receipt apply: `applied`
+  `PeM9BAhtQjYqOtRjuvniVhqQkETeTLTHmOLv1YmLQt8=`
+- Testnet deposit position id:
+  `9545445453761711350029784004168846980214745002146771544146829047662825645999`
+- Contract getter evidence: `depositCount=1`, `totalDepositedRaw=1`,
+  `totalActiveRaw=1`, position status `active`.
+- Backend direct deposit verifier: `passed` with Toncenter v3 transactions API.
+- Backend deposit database apply: pending rerun against an isolated test
+  database.
 - Verified Merkle claim receipt tx:
-  `Kidy8e/ZZR9PQHput2wQwkJxUIuhHYrtHY06sAGmK9E=`
-- Backend local claim receipt apply: `reward=claimed`,
-  `proof=claimed`, `chain_event=applied`
+  `XYvh+RnvK2zA1QkMKeyxUV2C7rkllE026yMQmm6XLec=`
+- Testnet Merkle claim batch id: `1777101812106`
+- Contract getter evidence: `claimCount=1`, `totalClaimedRaw=1`,
+  ledger status `claimed`.
+- Backend direct claim verifier: `passed` with Toncenter v3 transactions API.
+- Backend claim database apply: pending rerun against an isolated test database.
 
-This proves the testnet deposit receipt path can create a backend chain event
-and position, and the testnet Merkle claim receipt path can mark the reward and
-proof claimed only after chain verification. It does not authorize production
-chain writes or mainnet launch.
+This proves the audit-remediated testnet LockVault can receive a real Jetton
+deposit and expose the derived position by getter, and the audit-remediated
+MerkleClaim can publish a one-leaf root and complete a claimant-owned testnet
+claim. It also proves the latest backend verifiers can parse those receipts
+when a transactions API returns execution descriptions. It does not yet prove
+database apply against an isolated test database, and it does not authorize
+production chain writes or mainnet launch.
 
 ## Canary SOP
 

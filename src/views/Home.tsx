@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useIsConnectionRestored, useTonAddress, useTonConnectModal, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
-import { buildDepositTransferBody, createDepositPositionId } from "@/src/lib/tonTransactions";
+import { buildDepositTransferBody, createTonQueryId } from "@/src/lib/tonTransactions";
 import {
   clearBackendAuthToken,
   clearTonWalletSession,
@@ -196,7 +196,17 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     walletAuthInFlightRef.current = true;
     api.walletLogin({
       walletAddress: account.address,
-      signature: JSON.stringify({ publicKey: account.publicKey, proof: tonProof.proof }),
+      signature: JSON.stringify({
+        account: {
+          address: account.address,
+          chain: account.chain,
+          publicKey: account.publicKey,
+          walletStateInit: account.walletStateInit,
+        },
+        publicKey: account.publicKey,
+        walletStateInit: account.walletStateInit,
+        proof: tonProof.proof,
+      }),
       intentToken,
       walletType: tonWallet.device?.appName || "tonconnect",
     })
@@ -271,12 +281,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         const amountRaw = val.toString();
         const ownerAddress = rawTonAddress || tonSession.rawAddress || tonSession.address;
         const derived = await api.deriveJettonWallet(ownerAddress, authToken);
+        const queryId = createTonQueryId();
         const body = buildDepositTransferBody({
           waveId,
-          positionId: createDepositPositionId(),
           amountRaw,
           lockVaultAddress,
           responseAddress: ownerAddress,
+          queryId,
         });
         await tonConnectUI.sendTransaction({
           validUntil: Math.floor(Date.now() / 1000) + 300,

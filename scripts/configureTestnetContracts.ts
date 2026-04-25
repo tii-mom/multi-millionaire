@@ -61,7 +61,11 @@ async function withToncenterRetry<T>(label: string, action: () => Promise<T>): P
 }
 
 async function main() {
-  const endpoint = process.env.CHAIN_RPC_URL || process.env.RPC_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC';
+  const chainId = required('CHAIN_ID');
+  if (chainId !== 'ton-testnet') {
+    throw new Error(`Refusing to configure testnet contracts with CHAIN_ID=${chainId}`);
+  }
+  const endpoint = required('CHAIN_RPC_URL');
   if (!endpoint.includes('testnet')) {
     throw new Error('Refusing to configure testnet contracts: CHAIN_RPC_URL is not a testnet endpoint');
   }
@@ -90,6 +94,7 @@ async function main() {
   const priceUsdE6 = process.env.LOCK_VAULT_PRICE_USD_E6_TESTNET?.trim()
     ? BigInt(process.env.LOCK_VAULT_PRICE_USD_E6_TESTNET.trim())
     : null;
+  const applyPrice = process.env.APPLY_LOCK_VAULT_PRICE_TESTNET === 'true';
   const lockVault = client.open(LockVault.fromAddress(lockVaultAddress));
   const merkleClaim = client.open(MerkleClaim.fromAddress(merkleClaimAddress));
 
@@ -101,6 +106,7 @@ async function main() {
     vaultJettonWallet: vaultJettonWallet.toString({ testOnly: true }),
     rewardJettonWallet: rewardJettonWallet.toString({ testOnly: true }),
     priceUsdE6: priceUsdE6 ? priceUsdE6.toString() : null,
+    applyPrice,
   }, null, 2));
 
   await withToncenterRetry('set LockVault Jetton wallet', () => lockVault.send(
@@ -118,14 +124,22 @@ async function main() {
   await sleep(4000);
 
   if (priceUsdE6 !== null) {
-    if (priceUsdE6 < 0n) {
-      throw new Error('LOCK_VAULT_PRICE_USD_E6_TESTNET must be non-negative');
+    if (priceUsdE6 <= 0n) {
+      throw new Error('LOCK_VAULT_PRICE_USD_E6_TESTNET must be positive');
     }
-    await withToncenterRetry('set LockVault price', () => lockVault.send(
+    await withToncenterRetry('stage LockVault price', () => lockVault.send(
       sender,
       { value: toNano('0.05') },
-      { $$type: 'SetPrice', queryId: BigInt(Date.now()), priceUsdE6 },
+      { $$type: 'StagePrice', queryId: BigInt(Date.now()), priceUsdE6 },
     ));
+    if (applyPrice) {
+      await sleep(4000);
+      await withToncenterRetry('apply LockVault price', () => lockVault.send(
+        sender,
+        { value: toNano('0.05') },
+        { $$type: 'ApplyPrice', queryId: BigInt(Date.now()) },
+      ));
+    }
   }
 
   console.log(JSON.stringify({

@@ -1,6 +1,9 @@
 import "@stdlib/ownable";
 
 const REWARD_JETTON_TRANSFER_TON_FEE: Int = 50000000;
+const CLAIM_UNCLAIMED: Int = 0;
+const CLAIM_CLAIMING: Int = 1;
+const CLAIM_CLAIMED: Int = 2;
 
 message(0x524f4f54) SetMerkleRoot {
     batchId: Int as uint64;
@@ -31,6 +34,10 @@ message(0x0f8a7ea5) JettonTransfer {
     forwardPayload: Slice as remaining;
 }
 
+message(0xd53276db) JettonExcesses {
+    queryId: Int as uint64;
+}
+
 message(0x50415553) SetPaused {
     paused: Bool;
 }
@@ -38,21 +45,24 @@ message(0x50415553) SetPaused {
 contract MerkleClaim with Ownable {
     owner: Address;
     tokenAddress: Address;
+    chainIdHash: Int as uint256;
     rewardJettonWallet: Address?;
     paused: Bool;
     activeBatchId: Int as uint64;
     merkleRoot: Int as uint256;
     totalClaimedRaw: Int as coins;
     claimCount: Int as uint64;
-    claimedLedgers: map<Int as uint256, Bool>;
+    claimedLedgers: map<Int as uint256, Int as uint8>;
+    pendingClaims: map<Int as uint64, Int as uint256>;
     lastClaimer: Address?;
     lastLedgerIdHash: Int as uint256;
     lastAmountRaw: Int as coins;
     lastLeafHash: Int as uint256;
 
-    init(owner: Address, tokenAddress: Address) {
+    init(owner: Address, tokenAddress: Address, chainIdHash: Int) {
         self.owner = owner;
         self.tokenAddress = tokenAddress;
+        self.chainIdHash = chainIdHash;
         self.rewardJettonWallet = null;
         self.paused = false;
         self.activeBatchId = 0;
@@ -60,6 +70,7 @@ contract MerkleClaim with Ownable {
         self.totalClaimedRaw = 0;
         self.claimCount = 0;
         self.claimedLedgers = emptyMap();
+        self.pendingClaims = emptyMap();
         self.lastClaimer = null;
         self.lastLedgerIdHash = 0;
         self.lastAmountRaw = 0;
@@ -95,19 +106,14 @@ contract MerkleClaim with Ownable {
         throwUnless(1204, msg.amountRaw > 0);
         throwUnless(1205, msg.ledgerIdHash != 0);
         throwUnless(1206, sender() == msg.recipient);
-        throwUnless(1207, !self.claimedLedgers.exists(msg.ledgerIdHash));
+        throwUnless(1207, self.claimStatus(msg.ledgerIdHash) == CLAIM_UNCLAIMED);
 
         let leafHash: Int = self.leafHash(msg.batchId, msg.ledgerIdHash, msg.recipient, msg.amountRaw);
         let calculatedRoot: Int = self.calculateRoot(leafHash, msg.proof);
         throwUnless(1208, calculatedRoot == self.merkleRoot);
 
-        self.claimedLedgers.set(msg.ledgerIdHash, true);
-        self.totalClaimedRaw += msg.amountRaw;
-        self.claimCount += 1;
-        self.lastClaimer = msg.recipient;
-        self.lastLedgerIdHash = msg.ledgerIdHash;
-        self.lastAmountRaw = msg.amountRaw;
-        self.lastLeafHash = leafHash;
+        self.claimedLedgers.set(msg.ledgerIdHash, CLAIM_CLAIMING);
+        self.pendingClaims.set(msg.queryId, msg.ledgerIdHash);
 
         let jettonWallet: Address? = self.rewardJettonWallet;
         throwUnless(1209, jettonWallet != null);
@@ -126,14 +132,60 @@ contract MerkleClaim with Ownable {
                 forwardPayload: emptySlice(),
             }.toCell(),
         });
+
+        self.claimedLedgers.set(msg.ledgerIdHash, CLAIM_CLAIMED);
+        self.totalClaimedRaw += msg.amountRaw;
+        self.claimCount += 1;
+        self.lastClaimer = msg.recipient;
+        self.lastLedgerIdHash = msg.ledgerIdHash;
+        self.lastAmountRaw = msg.amountRaw;
+        self.lastLeafHash = leafHash;
+    }
+
+    receive(msg: JettonExcesses) {
+        throwUnless(1213, self.rewardJettonWallet != null && sender() == self.rewardJettonWallet!!);
+        self.pendingClaims.del(msg.queryId);
+    }
+
+    bounced(msg: bounced<JettonTransfer>) {
+        let pendingLedgerId: Int? = self.pendingClaims.get(msg.queryId);
+        if (pendingLedgerId == null) {
+            return;
+        }
+
+        let status: Int = self.claimStatus(pendingLedgerId!!);
+        if (status == CLAIM_CLAIMED) {
+            self.totalClaimedRaw -= msg.amount;
+            self.claimCount -= 1;
+        }
+
+        if (status == CLAIM_CLAIMING || status == CLAIM_CLAIMED) {
+            self.claimedLedgers.del(pendingLedgerId!!);
+        }
+        self.pendingClaims.del(msg.queryId);
+    }
+
+    fun claimStatus(ledgerIdHash: Int): Int {
+        let status: Int? = self.claimedLedgers.get(ledgerIdHash);
+        if (status == null) {
+            return CLAIM_UNCLAIMED;
+        }
+        return status!!;
     }
 
     fun leafHash(batchId: Int, ledgerIdHash: Int, recipient: Address, amountRaw: Int): Int {
         return beginCell()
-            .storeUint(batchId, 64)
-            .storeUint(ledgerIdHash, 256)
-            .storeAddress(recipient)
-            .storeCoins(amountRaw)
+            .storeUint(self.chainIdHash, 256)
+            .storeRef(beginCell()
+                .storeAddress(self.tokenAddress)
+                .storeAddress(myAddress())
+                .endCell())
+            .storeRef(beginCell()
+                .storeUint(batchId, 64)
+                .storeUint(ledgerIdHash, 256)
+                .storeAddress(recipient)
+                .storeCoins(amountRaw)
+                .endCell())
             .endCell()
             .hash();
     }
@@ -152,22 +204,34 @@ contract MerkleClaim with Ownable {
             return leafHash;
         }
 
-        throwUnless(1210, proofSlice.bits() >= 8);
-        let depth: Int = proofSlice.loadUint(8);
+        throwUnless(1210, proofSlice.bits() >= 16);
+        let depth: Int = proofSlice.loadUint(16);
+        if (depth == 0) {
+            throwUnless(1212, proofSlice.empty());
+            return leafHash;
+        }
+        throwUnless(1211, !proofSlice.refsEmpty());
+        let node: Slice = proofSlice.loadRef().beginParse();
         let currentHash: Int = leafHash;
+        let index: Int = 0;
 
-        repeat (depth) {
-            throwUnless(1211, proofSlice.bits() >= 257);
-            let siblingOnRight: Bool = proofSlice.loadBool();
-            let siblingHash: Int = proofSlice.loadUint(256);
+        while (index < depth) {
+            throwUnless(1211, node.bits() >= 257);
+            let siblingOnRight: Bool = node.loadBool();
+            let siblingHash: Int = node.loadUint(256);
             if (siblingOnRight) {
                 currentHash = self.pairHash(currentHash, siblingHash);
             } else {
                 currentHash = self.pairHash(siblingHash, currentHash);
             }
+
+            index += 1;
+            if (index < depth) {
+                throwUnless(1211, !node.refsEmpty());
+                node = node.loadRef().beginParse();
+            }
         }
 
-        throwUnless(1212, proofSlice.empty());
         return currentHash;
     }
 
@@ -175,6 +239,7 @@ contract MerkleClaim with Ownable {
         return ClaimState {
             owner: self.owner,
             tokenAddress: self.tokenAddress,
+            chainIdHash: self.chainIdHash,
             rewardJettonWallet: self.rewardJettonWallet,
             paused: self.paused,
             activeBatchId: self.activeBatchId,
@@ -189,7 +254,11 @@ contract MerkleClaim with Ownable {
     }
 
     get fun isClaimed(ledgerIdHash: Int): Bool {
-        return self.claimedLedgers.exists(ledgerIdHash);
+        return self.claimStatus(ledgerIdHash) == CLAIM_CLAIMED;
+    }
+
+    get fun ledgerClaimStatus(ledgerIdHash: Int): Int {
+        return self.claimStatus(ledgerIdHash);
     }
 
     get fun proofLeafHash(batchId: Int, ledgerIdHash: Int, recipient: Address, amountRaw: Int): Int {
@@ -200,6 +269,7 @@ contract MerkleClaim with Ownable {
 struct ClaimState {
     owner: Address;
     tokenAddress: Address;
+    chainIdHash: Int as uint256;
     rewardJettonWallet: Address?;
     paused: Bool;
     activeBatchId: Int as uint64;

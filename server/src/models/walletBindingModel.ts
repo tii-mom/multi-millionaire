@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Address } from '@ton/core';
 import { query } from '../db';
 
 export type WalletBindingStatus = 'pending' | 'verified' | 'revoked';
@@ -45,7 +46,15 @@ const walletBindingColumns = `
 `;
 
 export function normalizeWalletAddress(walletAddress: string): string {
-  return walletAddress.trim().toLowerCase();
+  const trimmed = walletAddress.trim();
+  try {
+    return Address.parse(trimmed).toRawString().toLowerCase();
+  } catch {
+    if (['production', 'prod'].includes((process.env.NODE_ENV || '').trim().toLowerCase())) {
+      throw new Error('Invalid TON wallet address');
+    }
+    return trimmed.toLowerCase();
+  }
 }
 
 export function buildWalletBindMessage(input: {

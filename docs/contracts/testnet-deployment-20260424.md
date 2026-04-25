@@ -3,6 +3,8 @@
 This record tracks the current testnet-only deployment line. These addresses are
 not mainnet production addresses.
 
+Latest audit-remediated redeploy: 2026-04-25.
+
 ## Network
 
 - Chain: `ton-testnet`
@@ -16,14 +18,14 @@ not mainnet production addresses.
 - TestJetton deploy LT: `65157150000003`
 - Admin/deployer test Jetton wallet:
   `kQBvlJbxzzjc6cEDd1CsJ-53Ga7R3aPZZIyK9AMCafzgK_If`
-- LockVault: `kQDa42BOYHpCwoHQAWkjsmnLMXP9WxFkKjcnt1jCaz-CBae3`
-- LockVault deployment LT: `65157232000003`
+- LockVault: `kQDh7ZqTP9y3zryvqfYGxSFN2ePIB8bo1xFy4M_BX3L2uVb9`
+- LockVault deployment LT: `65315187000006`
 - LockVault Jetton wallet:
-  `kQDOjELOK55pBR83xAbfkFuinoQEEdUNaJPFisFYPTR_nMwR`
-- MerkleClaim: `kQClCNt7vsSq6cDSbFQha6eRcquGoLIpsebxSjC7K7e2gLRH`
-- MerkleClaim deployment LT: `65157256000003`
+  `kQD-46x_6K_uogYHHDmkk0WR_ouYcwUVW0ihK6H2XHyg6ytE`
+- MerkleClaim: `kQDJUBxBPTZGQjuz0MBzyyT4E9MDkgdXoPlqtz-zq4RDYpjF`
+- MerkleClaim deployment LT: `65315245000003`
 - MerkleClaim reward Jetton wallet:
-  `kQA1fYQl80IBTd_Geavn1VpuNY6_Sf8-iBEn8hudzq5hE3ut`
+  `kQB8erGp7_WxOfHI7E9Gr_yBl-ZYgvyZ7tTM4cALOfuK89fm`
 
 These are testnet-only canary addresses. The TestJetton is not the mainnet 72H
 token and must not be treated as production collateral.
@@ -37,12 +39,19 @@ token and must not be treated as production collateral.
 - Constructor: `owner`, `tokenAddress`
 - Deposit path: standard Jetton `transfer_notification` from the configured
   vault Jetton wallet only.
-- Deposit forward payload: `storeBit(false)`, `waveId:uint32`,
-  `positionId:uint64`.
+- Deposit forward payload: `storeBit(false)`, `waveId:uint32`.
+- Position id: derived by the contract from `(sender, jettonTransferQueryId)`;
+  clients no longer submit or choose `positionId`.
 - Withdraw path: `WithdrawPosition`, callable only by the position owner.
-- Unlock condition: either the user's active raw balance multiplied by current
-  `priceUsdE6` reaches the user's target, or the individual position is at least
-  one year old.
+- Unlock condition: either the user's active raw balance multiplied by a fresh
+  active price reaches the fixed `DEFAULT_TARGET_USD_E6=1000000000000`
+  target, or the individual position is at least one year old.
+- Price path: owner stages a price, waits at least one hour, then applies it;
+  one update may not move more than 20%, and prices older than 24 hours cannot
+  unlock by price.
+- Withdrawal state: positions move through `active -> withdrawing -> withdrawn`;
+  bounce recovery restores a pending withdrawal to `active` so the owner can
+  retry.
 - Cycle rule: after a user's goal is reached, new deposits are blocked until the
   active cycle is fully withdrawn. Once active balance returns to zero, the next
   deposit starts a new locked cycle.
@@ -56,6 +65,11 @@ token and must not be treated as production collateral.
   `recipient`, `amountRaw`, and proof cell.
 - The contract verifies the active Merkle root, blocks duplicate ledgers, and
   transfers Jettons from its configured reward Jetton wallet to the claimant.
+- Merkle leaf domain includes chain id hash, token address, claim contract,
+  batch id, ledger id hash, recipient, and raw amount.
+- Proofs are encoded as a ref chain so batches are not limited to a few leaves.
+- Claim state moves through `unclaimed -> claiming -> claimed`; bounce recovery
+  restores a pending claim to `unclaimed`.
 
 ## Fresh Testnet Canary Flow
 
@@ -135,39 +149,48 @@ and prints the claim receipt hash for backend
 
 ## Latest Testnet Canary Evidence
 
-- Date: 2026-04-24
+- Date: 2026-04-25
 - RPC: `https://ton-testnet.api.onfinality.io/public/jsonRPC`
 - Deployer/depositor wallet:
   `kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl`
-- Contract state after first canary:
+- Contract state after latest canary:
   - `depositCount=1`
-  - `totalDepositedRaw=1000000000`
-  - `totalActiveRaw=1000000000`
-  - `lastPositionId=1777039479260`
+  - `totalDepositedRaw=1`
+  - `totalActiveRaw=1`
+  - `lastPositionId=9545445453761711350029784004168846980214745002146771544146829047662825645999`
 - Script-verified deposit canary:
-  - amount raw: `1000`
+  - amount raw: `1`
   - wave: `1`
-  - position id: `1777039939895`
-  - LockVault tx hash: `9BJVuUvqZ3KpdtSMwa20JRGm3jyZUZoZ3Z1rU4e9Vcg=`
-  - LT: `65161189000007`
+  - query id: `1777101618086`
+  - position id: `9545445453761711350029784004168846980214745002146771544146829047662825645999`
+  - LockVault tx hash: `PeM9BAhtQjYqOtRjuvniVhqQkETeTLTHmOLv1YmLQt8=`
+  - LT: `65317654000007`
+- Script-verified position getter:
+  - owner: `kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl`
+  - amount raw: `1`
+  - wave: `1`
+  - status: `0` (`active`)
 - Backend local receipt apply:
-  - database: temporary local Postgres only
-  - `/health=ok`
-  - `/ready=ready`
-  - wallet binding: `verified` using local `WALLET_SIGNATURE_MODE=test`
-  - chain event apply status: `applied`
-  - position on-chain id: `1777039939895`
+  - direct backend `ton_rpc` verifier: `passed`
+  - database apply: pending rerun against an isolated test database
 - Script-verified Merkle claim canary:
-  - amount raw: `1000`
-  - backend reward ledger id: `8b05e995-2bb1-4459-9f12-1ebd03b4621c`
-  - contract batch id: `1777041213767`
-  - claim tx hash: `Kidy8e/ZZR9PQHput2wQwkJxUIuhHYrtHY06sAGmK9E=`
-  - LT: `65164428000003`
+  - amount raw: `1`
+  - backend reward ledger id placeholder: `testnet-canary-1777101812106`
+  - contract batch id: `1777101812106`
+  - ledger id hash:
+    `0xc87449cb960f7af2280686a7addf91c0bed6b01cbf7f5a33314b496681c1c3ba`
+  - Merkle root:
+    `0x4a7662f392aabea40cadfebd0976cec46e8f5a46beda09cbf4803b4cfa1260e0`
+  - claim tx hash: `XYvh+RnvK2zA1QkMKeyxUV2C7rkllE026yMQmm6XLec=`
+  - LT: `65318218000003`
+- Script-verified Merkle getter:
+  - `activeBatchId=1777101812106`
+  - `claimCount=1`
+  - `totalClaimedRaw=1`
+  - ledger status: `2` (`claimed`)
 - Backend local claim receipt apply:
-  - database: temporary local Postgres only
-  - Merkle proof status: `claimed`
-  - reward ledger status: `claimed`
-  - chain event apply status: `applied`
+  - direct backend `ton_rpc` verifier: `passed`
+  - database apply: pending rerun against an isolated test database
 
 The backend verifier now accepts TON RPC responses that place message bodies in
 `in_msg.msg_data.body`, which is the shape returned by the testnet JSON-RPC
@@ -175,8 +198,9 @@ used for this canary.
 
 ## Mainnet Blockers
 
-- Production TON wallet signature verification; local `WALLET_SIGNATURE_MODE=test`
-  is not allowed for production.
-- Frontend TonConnect transaction builders for LockVault Jetton transfer and
-  MerkleClaim `ClaimReward`.
+- Independent security review of the audit-remediated LockVault and MerkleClaim
+  contracts.
+- Backend database apply for deposit and claim receipts against an isolated
+  test database.
+- Production TON wallet proof smoke against real TonConnect payloads.
 - Mainnet deployment via the admin Tonkeeper wallet only after the above passes.

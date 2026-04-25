@@ -159,8 +159,16 @@ async function findDepositTx(input: {
   return null;
 }
 
+function derivePositionId(owner: Address, queryId: bigint) {
+  return BigInt(`0x${beginCell().storeAddress(owner).storeUint(queryId, 64).endCell().hash().toString('hex')}`).toString();
+}
+
 async function main() {
-  const endpoint = process.env.CHAIN_RPC_URL || process.env.RPC_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC';
+  const chainId = required('CHAIN_ID');
+  if (chainId !== 'ton-testnet') {
+    throw new Error(`Refusing to send testnet deposit with CHAIN_ID=${chainId}`);
+  }
+  const endpoint = required('CHAIN_RPC_URL');
   if (!endpoint.includes('testnet')) {
     throw new Error('Refusing to send deposit: CHAIN_RPC_URL is not a testnet endpoint');
   }
@@ -169,10 +177,6 @@ async function main() {
   const lockVaultAddress = Address.parse(required('LOCK_VAULT_ADDRESS_TESTNET'));
   const amountRaw = readPositiveBigInt('TESTNET_CANARY_AMOUNT_RAW');
   const waveId = readPositiveInteger('TESTNET_CANARY_WAVE_ID', '1');
-  const positionId = BigInt(process.env.TESTNET_CANARY_POSITION_ID?.trim() || Date.now().toString());
-  if (positionId <= 0n) {
-    throw new Error('TESTNET_CANARY_POSITION_ID must be a positive integer');
-  }
 
   const mnemonic = optionalMnemonic().split(/\s+/);
   const keyPair = await mnemonicToPrivateKey(mnemonic);
@@ -193,9 +197,9 @@ async function main() {
   }
 
   const queryId = BigInt(Date.now());
+  const positionId = derivePositionId(senderAddress, queryId);
   const forwardPayload = beginCell()
     .storeUint(waveId, 32)
-    .storeUint(positionId, 64)
     .endCell();
   const transferBody = beginCell()
     .storeUint(JETTON_TRANSFER_OPCODE, 32)
@@ -227,7 +231,7 @@ async function main() {
   const receipt = await findDepositTx({
     rpcUrl: endpoint,
     lockVaultAddress,
-    positionId: positionId.toString(),
+    positionId,
     waveId,
     amountRaw: amountRaw.toString(),
     senderAddress: senderAddress.toRawString().toLowerCase(),
@@ -242,7 +246,8 @@ async function main() {
     depositorJettonWallet: depositorJettonWalletAddress.toString({ testOnly: true }),
     amountRaw: amountRaw.toString(),
     waveId,
-    positionId: positionId.toString(),
+    queryId: queryId.toString(),
+    positionId,
     walletSeqnoBefore: seqno,
     walletSeqnoAfter: nextSeqno,
     lockVaultReceipt: receipt,
