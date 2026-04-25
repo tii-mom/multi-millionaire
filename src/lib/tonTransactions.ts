@@ -14,6 +14,22 @@ function readPositiveBigInt(value: string, label: string): bigint {
   }
 }
 
+export function toRawTokenAmount(value: string, decimals = 9): string {
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error("amount must be a whole-number token amount");
+  }
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+    throw new Error("token decimals must be between 0 and 18");
+  }
+  return (BigInt(normalized) * (10n ** BigInt(decimals))).toString();
+}
+
+export function rawTokenAmountToDisplayNumber(value: string, decimals = 9): number {
+  const parsed = readPositiveBigInt(value, "amountRaw");
+  return Number(parsed) / (10 ** decimals);
+}
+
 function readUint64(value: string | number | bigint, label: string): bigint {
   const parsed = typeof value === "bigint" ? value : BigInt(value);
   if (parsed <= 0n || parsed > (1n << 64n) - 1n) {

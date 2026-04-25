@@ -80,6 +80,23 @@ function isProductionRuntime(): boolean {
   return ['production', 'prod'].includes((process.env.NODE_ENV || '').trim().toLowerCase());
 }
 
+function productionMainnetConfigRequired(): boolean {
+  const chainId = (process.env.CHAIN_ID || '').trim().toLowerCase();
+  const mainlineWrites = ['1', 'true', 'yes', 'on'].includes((process.env.CHAIN_MAINLINE_WRITES_ENABLED || '').trim().toLowerCase());
+  return isProductionRuntime() || mainlineWrites || chainId === 'ton-mainnet';
+}
+
+function readProductionAddress(primaryName: string, testnetName: string): string {
+  const primary = process.env[primaryName]?.trim();
+  if (primary) {
+    return primary;
+  }
+  if (productionMainnetConfigRequired() && process.env[testnetName]?.trim()) {
+    return '';
+  }
+  return process.env[testnetName]?.trim() || '';
+}
+
 class DisabledChainReceiptVerifier implements ChainReceiptVerifier {
   readonly mode = 'disabled' as const;
 
@@ -198,7 +215,7 @@ class TonRpcReceiptVerifier implements ChainReceiptVerifier {
     if (!config.lockVault.address) {
       throw new ReceiptVerificationError(503, 'LOCK_VAULT_NOT_CONFIGURED', 'LOCK_VAULT_ADDRESS is required for TON receipt verification');
     }
-    const vaultJettonWalletAddress = process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS || process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET || '';
+    const vaultJettonWalletAddress = readProductionAddress('LOCK_VAULT_JETTON_WALLET_ADDRESS', 'LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET');
     if (!vaultJettonWalletAddress) {
       throw new ReceiptVerificationError(
         503,

@@ -71,8 +71,10 @@ describe('chain receipt verifier selection', () => {
     delete process.env.CHAIN_RECEIPT_TEST_MODE;
     delete process.env.LOCK_VAULT_ADDRESS;
     delete process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS;
+    delete process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET;
     delete process.env.TON_TRANSACTIONS_API_URL;
     delete process.env.NODE_ENV;
+    delete process.env.CHAIN_MAINLINE_WRITES_ENABLED;
   });
 
   afterAll(() => {
@@ -180,6 +182,26 @@ describe('chain receipt verifier selection', () => {
       positionId: 'position-1',
       finalized: false,
     })).rejects.toBeInstanceOf(ReceiptVerificationError);
+  });
+
+  it('does not use testnet vault Jetton wallet fallback for production mainnet verification', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-mainnet';
+    process.env.CHAIN_RPC_URL = 'https://toncenter.com/api/v2/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET = vaultJettonWalletAddress;
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      waveId: 7,
+      amountRaw: '1000',
+      walletAddress: senderAddress,
+    })).rejects.toMatchObject({
+      status: 503,
+      code: 'LOCK_VAULT_JETTON_WALLET_NOT_CONFIGURED',
+    });
   });
 
   it('verifies TON deposit receipts through RPC responses', async () => {

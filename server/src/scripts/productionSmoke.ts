@@ -2,6 +2,7 @@ type StepStatus = 'pass' | 'fail';
 
 interface SmokeConfig {
   apiBaseUrl: string;
+  allowChainWrites: boolean;
 }
 
 interface StepResult {
@@ -49,6 +50,7 @@ function normalizeBaseUrl(raw: string): string {
 function loadConfig(): SmokeConfig {
   return {
     apiBaseUrl: normalizeBaseUrl(requiredEnv('API_BASE_URL', 'http://127.0.0.1:4000')),
+    allowChainWrites: process.env.ALLOW_PRODUCTION_SMOKE_CHAIN_WRITES === 'true',
   };
 }
 
@@ -158,7 +160,30 @@ async function main() {
       const response = await requestJson(config, '/v1/app/bootstrap');
       const body = objectValue(response.body, 'bootstrap response');
       assert('data' in body, 'Expected bootstrap response to include data');
-      return { status_code: response.status };
+      const data = objectValue(body.data, 'bootstrap response.data');
+      const featureFlags = objectValue(data.feature_flags, 'bootstrap response.data.feature_flags');
+      const contracts = objectValue(data.contracts, 'bootstrap response.data.contracts');
+      const ops = objectValue(data.ops, 'bootstrap response.data.ops');
+      const receiptVerifier = objectValue(ops.receipt_verifier, 'bootstrap response.data.ops.receipt_verifier');
+      const chainId = String(contracts.chain_id || '');
+      const chainWritesEnabled = featureFlags.chain_mainline_writes_enabled === true;
+      const receiptStatus = String(receiptVerifier.status || '');
+
+      assert(chainId !== 'ton-testnet', 'Production bootstrap must not point at ton-testnet');
+      assert(receiptStatus !== 'test', 'Production bootstrap must not expose test receipt verifier');
+      assert(
+        !chainWritesEnabled || config.allowChainWrites,
+        'Production non-mutating smoke refuses chain_mainline_writes_enabled=true unless ALLOW_PRODUCTION_SMOKE_CHAIN_WRITES=true'
+      );
+      if (!config.allowChainWrites) {
+        assert(featureFlags.receipt_verification_enabled !== true, 'Default production smoke expects receipt verification disabled until canary approval');
+      }
+      return {
+        status_code: response.status,
+        chain_id: chainId,
+        chain_mainline_writes_enabled: chainWritesEnabled,
+        receipt_verifier_status: receiptStatus,
+      };
     });
 
     await runStep('current wave', async () => {

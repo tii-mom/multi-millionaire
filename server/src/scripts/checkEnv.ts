@@ -65,6 +65,26 @@ function validateInteger(value: string): string | null {
   return null;
 }
 
+function validatePositiveInteger(value: string): string | null {
+  const integer = validateInteger(value);
+  if (integer) return integer;
+  return BigInt(value) > BigInt(0) ? null : 'Value must be greater than zero';
+}
+
+function validateNonEmptyList(value: string): string | null {
+  return value.split(',').map((item) => item.trim()).filter(Boolean).length > 0
+    ? null
+    : 'Provide at least one value';
+}
+
+function validateNumericList(value: string): string | null {
+  const items = value.split(',').map((item) => item.trim()).filter(Boolean);
+  if (items.length === 0) {
+    return 'Provide at least one numeric value';
+  }
+  return items.every((item) => /^\d+$/.test(item)) ? null : 'All list values must be whole numbers';
+}
+
 function validateUrlList(value: string): string | null {
   const origins = value.split(',').map((origin) => origin.trim()).filter(Boolean);
   if (origins.length === 0) {
@@ -175,6 +195,10 @@ function validateProductionAdminEmails(value: string, profile: Profile): string 
   return null;
 }
 
+function validateTrue(value: string): string | null {
+  return isTruthy(value) ? null : 'Value must be true';
+}
+
 const baseRequired: EnvCheck[] = [
   { name: 'NODE_ENV', hint: 'Set to local/development, staging, or production.', validate: validateNodeEnv },
   { name: 'DATABASE_URL', hint: 'PostgreSQL connection string for the API database.', validate: (value) => validateDatabaseUrl(value) },
@@ -226,6 +250,13 @@ const productionChainRecommended: EnvCheck[] = [
   { name: 'CHAIN_RECEIPT_VERIFIER', hint: 'Production receipt verifier implementation. Must not be test or disabled.', validate: validateReceiptVerifier },
   { name: 'MERKLE_CLAIM_VERIFIER', hint: 'Production Merkle claim receipt verifier implementation.', validate: validateProductionValue },
   { name: 'TON_TRANSACTIONS_API_URL', hint: 'TON transactions API endpoint. Required for non-Toncenter production receipt or claim verification.', validate: (value) => validateUrl(value) },
+  { name: 'CHAIN_CANARY_ALLOWLIST', hint: 'Comma-separated wallet allowlist for limited production chain canary.', validate: validateNonEmptyList },
+  { name: 'CHAIN_CANARY_MAX_AMOUNT_RAW', hint: 'Maximum raw token amount allowed for a production mutating canary.', validate: validatePositiveInteger },
+  { name: 'CHAIN_CANARY_WAVE_IDS', hint: 'Comma-separated wave ids allowed for production mutating canary.', validate: validateNumericList },
+  { name: 'MAINNET_DEPLOYMENT_EVIDENCE_RECORDED', hint: 'Set true only after mainnet contract deployment tx/LT/getter/code-hash evidence is recorded.', validate: validateTrue },
+  { name: 'CONTRACTS_EXTERNAL_AUDIT_APPROVED', hint: 'Set true only after independent review approves the audit-remediated contracts for the planned limit.', validate: validateTrue },
+  { name: 'PRODUCTION_CANARY_APPROVED', hint: 'Set true only for an approved named-operator, allowlisted-wallet, fixed-amount canary window.', validate: validateTrue },
+  { name: 'MAINNET_CANARY_EVIDENCE_URL', hint: 'Evidence URL or artifact path for the approved mainnet canary run.', validate: validateProductionValue },
   { name: 'REWARD_CLAIM_MODEL', hint: 'Production reward claim model. Use merkle for limited gray launch.', validate: validateProductionValue },
   { name: 'ORACLE_ADDRESS', hint: 'Optional external oracle contract address. Current LockVault can only use staged owner price for testnet/canary.', validate: validateContractValue },
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Only required when REWARD_CLAIM_MODEL=distributor.', validate: validateContractValue },
@@ -297,6 +328,39 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
   const merkleVerifier = (process.env.MERKLE_CLAIM_VERIFIER || '').trim().toLowerCase();
   const walletVerifier = (process.env.WALLET_SIGNATURE_MODE || '').trim().toLowerCase();
   const needsTransactionsApi = receiptEnabled || verifier === 'ton_rpc' || merkleVerifier === 'ton_rpc' || chainWrites;
+  const chainWriteRequired: EnvCheck[] = [
+    { name: 'CHAIN_ID', hint: 'Production chain writes require an explicit chain id.', validate: validateContractValue },
+    { name: 'CHAIN_RPC_URL', hint: 'Production chain writes require a production RPC endpoint.', validate: (value) => validateUrl(value) },
+    { name: 'TOKEN_ADDRESS', hint: 'Production chain writes require the production 72H token address.', validate: validateContractValue },
+    { name: 'TOKEN_DECIMALS', hint: 'The audited LockVault math requires 72H token decimals to be 9.', validate: (value) => value.trim() === '9' ? null : 'TOKEN_DECIMALS must be 9' },
+    { name: 'LOCK_VAULT_ADDRESS', hint: 'Production chain writes require the deployed mainnet LockVault address.', validate: validateContractValue },
+    { name: 'LOCK_VAULT_JETTON_WALLET_ADDRESS', hint: 'Production chain writes require the derived LockVault Jetton wallet address.', validate: validateContractValue },
+    { name: 'MERKLE_CLAIM_ADDRESS', hint: 'Production chain writes require the deployed mainnet MerkleClaim address.', validate: validateContractValue },
+    { name: 'REWARD_JETTON_WALLET_ADDRESS', hint: 'Production chain writes require the derived MerkleClaim reward Jetton wallet address.', validate: validateContractValue },
+    { name: 'WALLET_BINDING_ENABLED', hint: 'Production chain writes require wallet binding to be enabled.', validate: validateTrue },
+    { name: 'WALLET_BINDING_MESSAGE_DOMAIN', hint: 'Production ton_proof verification requires the production domain.', validate: validateProductionValue },
+    { name: 'WALLET_SIGNATURE_MODE', hint: 'Production chain writes require WALLET_SIGNATURE_MODE=ton_proof.', validate: (value) => value.trim().toLowerCase() === 'ton_proof' ? null : 'WALLET_SIGNATURE_MODE must be ton_proof' },
+    { name: 'RECEIPT_VERIFICATION_ENABLED', hint: 'Production chain writes require receipt verification.', validate: validateTrue },
+    { name: 'CHAIN_RECEIPT_VERIFIER', hint: 'Production chain writes require CHAIN_RECEIPT_VERIFIER=ton_rpc.', validate: (value) => value.trim().toLowerCase() === 'ton_rpc' ? null : 'CHAIN_RECEIPT_VERIFIER must be ton_rpc' },
+    { name: 'MERKLE_CLAIM_VERIFIER', hint: 'Production Merkle claims require MERKLE_CLAIM_VERIFIER=ton_rpc.', validate: (value) => value.trim().toLowerCase() === 'ton_rpc' ? null : 'MERKLE_CLAIM_VERIFIER must be ton_rpc' },
+    { name: 'REWARD_CLAIM_MODEL', hint: 'Production reward claim model must be merkle for this release line.', validate: (value) => value.trim().toLowerCase() === 'merkle' ? null : 'REWARD_CLAIM_MODEL must be merkle' },
+    { name: 'CHAIN_CANARY_ALLOWLIST', hint: 'Production chain writes require an allowlisted operator wallet.', validate: validateNonEmptyList },
+    { name: 'CHAIN_CANARY_MAX_AMOUNT_RAW', hint: 'Production chain writes require a positive canary amount cap.', validate: validatePositiveInteger },
+    { name: 'CHAIN_CANARY_WAVE_IDS', hint: 'Production chain writes require explicit canary wave ids.', validate: validateNumericList },
+    { name: 'MAINNET_DEPLOYMENT_EVIDENCE_RECORDED', hint: 'Record mainnet tx/LT/getter/code-hash evidence before enabling writes.', validate: validateTrue },
+    { name: 'CONTRACTS_EXTERNAL_AUDIT_APPROVED', hint: 'Require independent security review approval before enabling real funds.', validate: validateTrue },
+    { name: 'PRODUCTION_CANARY_APPROVED', hint: 'Require an approved canary window before enabling production chain writes.', validate: validateTrue },
+    { name: 'MAINNET_CANARY_EVIDENCE_URL', hint: 'Link or path for the approved canary evidence record.', validate: validateProductionValue },
+  ];
+
+  if (chainWrites) {
+    for (const check of chainWriteRequired) {
+      const result = runCheck(check, profile);
+      if (result.status !== 'present') {
+        checks.push(result);
+      }
+    }
+  }
 
   if (chainWrites && !receiptEnabled) {
     checks.push({

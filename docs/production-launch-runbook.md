@@ -50,9 +50,12 @@ test risk thresholds in production.
   rules for the public domains. Current status: the current API token can deploy
   Workers/Pages, list Hyperdrive, and attach `api.mm.72h.lol`. Direct DNS
   record reads/writes still return authentication errors, so `mm.72h.lol`
-  cannot activate until the required DNS CNAME is created. Zone-level Worker
-  route creation for `api.72h.lol/*` also returned an authentication error;
-  `api.72h.lol` is already assigned to another Worker.
+  cannot activate until the required DNS CNAME is created. A direct API attempt
+  on 2026-04-25 to create
+  `CNAME mm -> multi-millionaire-production.pages.dev` returned Cloudflare
+  `403` / `code=10000` authentication error. Zone-level Worker route creation
+  for `api.72h.lol/*` also returned an authentication error; `api.72h.lol` is
+  already assigned to another Worker.
 - Log drain or observability sink for API logs, deploy events, and audit events.
 - Incident contacts and escalation channel for release lead, backend, frontend,
   database, chain/contracts, and customer support.
@@ -69,6 +72,16 @@ test risk thresholds in production.
 - `CHAIN_MAINLINE_WRITES_ENABLED=false` until wallet binding, receipt
   verification, chain event ingest, reward claim verification, and emergency
   controls are all validated on staging.
+- If `CHAIN_MAINLINE_WRITES_ENABLED=true`, `npm run check:env -- production`
+  must fail closed unless all launch gates are present:
+  `TOKEN_DECIMALS=9`, deployed mainnet LockVault/MerkleClaim addresses, derived
+  Jetton wallet addresses, `WALLET_SIGNATURE_MODE=ton_proof`,
+  `CHAIN_RECEIPT_VERIFIER=ton_rpc`, `MERKLE_CLAIM_VERIFIER=ton_rpc`,
+  `REWARD_CLAIM_MODEL=merkle`, `CHAIN_CANARY_ALLOWLIST`,
+  positive `CHAIN_CANARY_MAX_AMOUNT_RAW`, explicit `CHAIN_CANARY_WAVE_IDS`,
+  `MAINNET_DEPLOYMENT_EVIDENCE_RECORDED=true`,
+  `CONTRACTS_EXTERNAL_AUDIT_APPROVED=true`,
+  `PRODUCTION_CANARY_APPROVED=true`, and `MAINNET_CANARY_EVIDENCE_URL`.
 - `CHAIN_RECEIPT_VERIFIER` must remain `disabled` or unset for production until
   mainnet LockVault/MerkleClaim addresses, RPC, wallet binding, and receipt
   parsing are validated against a small approved mainnet canary. The `test`
@@ -105,16 +118,25 @@ It does not register users, create passes, join squads, submit deposits, claim
 rewards, or call admin endpoints. Keep the JSON output with the release marker
 and commit SHA.
 
+The default smoke also fails if `/v1/app/bootstrap` reports
+`chain_mainline_writes_enabled=true` or a `test` receipt verifier. A mutating
+canary window must set `ALLOW_PRODUCTION_SMOKE_CHAIN_WRITES=true` intentionally
+and must keep separate evidence for every transaction.
+
 Latest evidence:
 
 - Date: 2026-04-25
 - API base URL: `https://api.mm.72h.lol`
 - Mode: `production-non-mutating`
 - Result: `pass`
+- Latest strict smoke rerun:
+  `2026-04-25T09:45:28.428Z` to `2026-04-25T09:45:30.731Z`, `pass`
 - Checked paths: `/health`, `/ready`, `/v1/app/bootstrap`,
   `/v1/waves/current`
 - Readiness result: `200`, `database=ok`
 - Current wave result: `200`, wave `1`, status `live`
+- Bootstrap guard result: `chain_id=ton-mainnet`,
+  `chain_mainline_writes_enabled=false`, `receipt_verifier_status=disabled`
 
 ## Testnet Chain Canary Evidence
 

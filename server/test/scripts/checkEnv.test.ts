@@ -44,6 +44,35 @@ function runCheckEnv(overrides: NodeJS.ProcessEnv = {}) {
   };
 }
 
+function productionChainWriteEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return {
+    CHAIN_MAINLINE_WRITES_ENABLED: 'true',
+    RECEIPT_VERIFICATION_ENABLED: 'true',
+    CHAIN_RECEIPT_VERIFIER: 'ton_rpc',
+    MERKLE_CLAIM_VERIFIER: 'ton_rpc',
+    WALLET_BINDING_ENABLED: 'true',
+    WALLET_BINDING_MESSAGE_DOMAIN: 'mm.72h.lol',
+    WALLET_SIGNATURE_MODE: 'ton_proof',
+    CHAIN_ID: 'ton-mainnet',
+    CHAIN_RPC_URL: 'https://toncenter.com/api/v2/jsonRPC',
+    TOKEN_ADDRESS: 'EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8',
+    TOKEN_DECIMALS: '9',
+    LOCK_VAULT_ADDRESS: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+    LOCK_VAULT_JETTON_WALLET_ADDRESS: 'EQBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBM9d',
+    MERKLE_CLAIM_ADDRESS: 'EQCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCM9e',
+    REWARD_JETTON_WALLET_ADDRESS: 'EQDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDM9f',
+    REWARD_CLAIM_MODEL: 'merkle',
+    CHAIN_CANARY_ALLOWLIST: 'UQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQfRq',
+    CHAIN_CANARY_MAX_AMOUNT_RAW: '1000000000',
+    CHAIN_CANARY_WAVE_IDS: '1',
+    MAINNET_DEPLOYMENT_EVIDENCE_RECORDED: 'true',
+    CONTRACTS_EXTERNAL_AUDIT_APPROVED: 'true',
+    PRODUCTION_CANARY_APPROVED: 'true',
+    MAINNET_CANARY_EVIDENCE_URL: 'https://72h.lol/evidence/canary-1',
+    ...overrides,
+  };
+}
+
 function requiredMessages(result: EnvCheckResult, name: string): string[] {
   return result.required
     .filter((item) => item.name === name && item.status === 'invalid')
@@ -101,18 +130,45 @@ describe('checkEnv production chain gates', () => {
   });
 
   it('fails mainline writes closed without a transactions API source', () => {
-    const result = runCheckEnv({
-      CHAIN_MAINLINE_WRITES_ENABLED: 'true',
-      RECEIPT_VERIFICATION_ENABLED: 'true',
-      CHAIN_RECEIPT_VERIFIER: 'ton_rpc',
-      WALLET_BINDING_ENABLED: 'true',
-      WALLET_SIGNATURE_MODE: 'ton_proof',
+    const result = runCheckEnv(productionChainWriteEnv({
       CHAIN_RPC_URL: 'https://rpc.example.invalid/jsonRPC',
-    });
+      TON_TRANSACTIONS_API_URL: '',
+    }));
 
     expect(result.code).toBe(1);
     expect(result.parsed.status).toBe('fail');
     expect(requiredMessages(result.parsed, 'TON_TRANSACTIONS_API_URL')).toHaveLength(1);
+  });
+
+  it('fails mainline writes without canary and launch evidence gates', () => {
+    const result = runCheckEnv(productionChainWriteEnv({
+      CHAIN_CANARY_ALLOWLIST: '',
+      CHAIN_CANARY_MAX_AMOUNT_RAW: '0',
+      CHAIN_CANARY_WAVE_IDS: '',
+      MAINNET_DEPLOYMENT_EVIDENCE_RECORDED: 'false',
+      CONTRACTS_EXTERNAL_AUDIT_APPROVED: 'false',
+      PRODUCTION_CANARY_APPROVED: 'false',
+      MAINNET_CANARY_EVIDENCE_URL: '',
+    }));
+
+    expect(result.code).toBe(1);
+    expect(result.parsed.required).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'CHAIN_CANARY_ALLOWLIST', status: 'missing' }),
+      expect.objectContaining({ name: 'CHAIN_CANARY_WAVE_IDS', status: 'missing' }),
+      expect.objectContaining({ name: 'MAINNET_CANARY_EVIDENCE_URL', status: 'missing' }),
+    ]));
+    expect(requiredMessages(result.parsed, 'CHAIN_CANARY_MAX_AMOUNT_RAW')).toContain('Value must be greater than zero');
+    expect(requiredMessages(result.parsed, 'MAINNET_DEPLOYMENT_EVIDENCE_RECORDED')).toContain('Value must be true');
+    expect(requiredMessages(result.parsed, 'CONTRACTS_EXTERNAL_AUDIT_APPROVED')).toContain('Value must be true');
+    expect(requiredMessages(result.parsed, 'PRODUCTION_CANARY_APPROVED')).toContain('Value must be true');
+  });
+
+  it('passes required checks when production chain write gates are complete', () => {
+    const result = runCheckEnv(productionChainWriteEnv());
+
+    expect(result.stderr).toBe('');
+    expect(result.code).toBe(0);
+    expect(result.parsed.status).toBe('pass');
   });
 
   it('fails production when the receipt verifier is test mode', () => {

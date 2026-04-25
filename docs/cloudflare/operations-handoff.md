@@ -110,12 +110,22 @@ Current production resource evidence:
   pending because the token cannot create the required DNS record.
 - required frontend DNS record:
   `CNAME mm -> multi-millionaire-production.pages.dev`, proxied.
+- latest DNS API attempt: 2026-04-25 direct Cloudflare API create for that
+  CNAME returned `403` / `code=10000` authentication error. The token can list
+  the `72h.lol` zone but still cannot read or write DNS records.
 - production Hyperdrive:
   `multi-millionaire-production-postgres`
 - production Hyperdrive id: `92267e746955420d80eb707f4cf23e17`
 - production GET-only smoke on 2026-04-25 against `https://api.mm.72h.lol`:
   `/health=200`, `/ready=200`, `/v1/app/bootstrap=200`,
   `/v1/waves/current=200`
+- latest strict GET-only smoke rerun:
+  `2026-04-25T09:45:28.428Z` to `2026-04-25T09:45:30.731Z`, `pass`;
+  bootstrap showed `chain_mainline_writes_enabled=false` and
+  `receipt_verifier_status=disabled`.
+- DNS resolution check on 2026-04-25: `api.mm.72h.lol` resolves through
+  Cloudflare; `mm.72h.lol` has no A/AAAA/CNAME records and remains blocked
+  until the CNAME is created.
 
 Production chain configuration rule:
 

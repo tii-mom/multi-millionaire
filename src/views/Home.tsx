@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useIsConnectionRestored, useTonAddress, useTonConnectModal, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
-import { buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId } from "@/src/lib/tonTransactions";
+import { buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId, rawTokenAmountToDisplayNumber, toRawTokenAmount } from "@/src/lib/tonTransactions";
 import {
   clearBackendAuthToken,
   clearTonWalletSession,
@@ -340,7 +340,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       try {
         setIsConfirming(true);
         setApiError(null);
-        const amountRaw = val.toString();
+        const tokenDecimals = Number(bootstrap?.contracts?.token_decimals || 9);
+        const amountRaw = toRawTokenAmount(inputValue, tokenDecimals);
         const ownerAddress = rawTonAddress || tonSession.rawAddress || tonSession.address;
         const derived = await api.deriveJettonWallet(ownerAddress, authToken);
         const queryId = createTonQueryId();
@@ -537,7 +538,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         },
         authToken
       );
-      setMyDeposit((p: number) => p + Number(result.position.amount_raw || 0));
+      const tokenDecimals = Number(bootstrap?.contracts?.token_decimals || 9);
+      setMyDeposit((p: number) => p + rawTokenAmountToDisplayNumber(result.position.amount_raw || "0", tokenDecimals));
       setTxHash("");
       setInputValue("");
       setPendingDepositReceipt(null);

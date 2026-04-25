@@ -101,6 +101,9 @@ export async function getMerkleClaimProof(req: Request, res: Response, next: Nex
     if (!user) {
       return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
     }
+    if (await isControlEnabled('pause_reward_claims')) {
+      return res.status(423).json({ request_id: req.id || '', error: { code: 'REWARD_CLAIMS_PAUSED', message: 'Reward claims are temporarily paused' } });
+    }
     const ledgerId = req.params.ledgerId;
     const ledger = await getRewardLedgerById(ledgerId);
     if (!ledger || ledger.beneficiary_user_id !== user.id) {
@@ -114,6 +117,10 @@ export async function getMerkleClaimProof(req: Request, res: Response, next: Nex
     if (!proof || proof.batch_status !== 'active') {
       return res.status(404).json({ request_id: req.id || '', error: { code: 'MERKLE_PROOF_NOT_AVAILABLE', message: 'Merkle proof is not available for this reward' } });
     }
+    assertChainCanaryMutationAllowed({
+      walletAddress: proof.beneficiary_wallet,
+      amountRaw: proof.amount_raw,
+    });
     const contractBatchId = typeof proof.batch_metadata?.contract_batch_id === 'string'
       ? proof.batch_metadata.contract_batch_id
       : '';
@@ -127,6 +134,9 @@ export async function getMerkleClaimProof(req: Request, res: Response, next: Nex
       },
     });
   } catch (err) {
+    if (err instanceof ChainCanaryGuardError) {
+      return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
+    }
     return next(err);
   }
 }

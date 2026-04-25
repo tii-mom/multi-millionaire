@@ -272,6 +272,8 @@ describe('Reward API and generation', () => {
       reward_ledger_id: 'ledger-1',
       beneficiary_user_id: inviteeUserId,
       batch_status: 'active',
+      beneficiary_wallet: canaryWallet,
+      amount_raw: '100',
       merkle_root: '0xroot',
       proof: ['right:0x0000000000000000000000000000000000000000000000000000000000000001'],
     });
@@ -301,6 +303,45 @@ describe('Reward API and generation', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('RISK_REVIEW_REQUIRED');
     expect(getMerkleProofForLedgerMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks Merkle proof disclosure while reward claims are paused', async () => {
+    process.env.PAUSE_REWARD_CLAIMS = 'true';
+
+    const res = await request(app)
+      .get('/v1/rewards/ledger-1/merkle-proof')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(423);
+    expect(res.body.error.code).toBe('REWARD_CLAIMS_PAUSED');
+    expect(getRewardLedgerByIdMock).not.toHaveBeenCalled();
+    expect(getMerkleProofForLedgerMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for production canary Merkle proof disclosure without an allowlist', async () => {
+    process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
+    delete process.env.CHAIN_CANARY_ALLOWLIST;
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      status: 'approved',
+    });
+    getMerkleProofForLedgerMock.mockResolvedValue({
+      reward_ledger_id: 'ledger-1',
+      beneficiary_user_id: inviteeUserId,
+      batch_status: 'active',
+      beneficiary_wallet: canaryWallet,
+      amount_raw: '100',
+      leaf_hash: '0x01',
+      proof: [],
+    });
+
+    const res = await request(app)
+      .get('/v1/rewards/ledger-1/merkle-proof')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CHAIN_CANARY_WALLET_NOT_ALLOWED');
   });
 
   it('fails closed for Merkle claim receipts until a real verifier is configured', async () => {

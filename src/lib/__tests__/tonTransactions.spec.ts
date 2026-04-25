@@ -1,5 +1,5 @@
 import { Address, Cell } from "@ton/core";
-import { buildClaimRewardBody, buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId } from "../tonTransactions";
+import { buildClaimRewardBody, buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId, rawTokenAmountToDisplayNumber, toRawTokenAmount } from "../tonTransactions";
 import type { MerkleRewardProofWithBatch } from "../types";
 
 const JETTON_TRANSFER_OPCODE = 0x0f8a7ea5;
@@ -62,6 +62,13 @@ describe("ton transaction body builders", () => {
     expect(first).toBeGreaterThan(1_714_000_000_123n);
     expect(first).toBeLessThan(1n << 64n);
     expect(second).toBeLessThan(1n << 64n);
+  });
+
+  it("converts whole-token display amounts to raw Jetton units", () => {
+    expect(toRawTokenAmount("1", 9)).toBe("1000000000");
+    expect(toRawTokenAmount("1000000000", 9)).toBe("1000000000000000000");
+    expect(rawTokenAmountToDisplayNumber("1000000000", 9)).toBe(1);
+    expect(() => toRawTokenAmount("1.5", 9)).toThrow(/whole-number/);
   });
 
   it("encodes MerkleClaim claim body with recipient, amount, ledger hash, and proof", async () => {

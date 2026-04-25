@@ -94,6 +94,20 @@ export default function Rewards() {
     api.bootstrap().then(setBootstrap).catch(() => setBootstrap(null));
   }, []);
 
+  const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
+  const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;
+  const rewardClaimsPaused = !!bootstrap?.controls?.pause_reward_claims?.enabled;
+  const merkleClaimAddress = bootstrap?.contracts?.merkle_claim || "";
+  const rewardClaimDisabledReason = rewardClaimsPaused
+    ? bootstrap?.controls?.pause_reward_claims?.reason || t("rewards.claimsPaused")
+    : !chainMainlineEnabled
+      ? t("rewards.chainWritesDisabled")
+      : !receiptVerifierConfigured
+        ? t("rewards.verifierNotReady")
+        : !merkleClaimAddress
+          ? t("rewards.claimContractMissing")
+          : null;
+
   const handleClaim = async (ledgerId: string) => {
     const walletSession = readTonWalletSession();
     if (!walletSession) {
@@ -106,9 +120,8 @@ export default function Rewards() {
       return;
     }
 
-    const merkleClaimAddress = bootstrap?.contracts?.merkle_claim;
-    if (!merkleClaimAddress) {
-      toast.error(t("rewards.claimContractMissing"));
+    if (rewardClaimDisabledReason) {
+      toast.error(rewardClaimDisabledReason);
       return;
     }
 
@@ -341,7 +354,8 @@ export default function Rewards() {
                     <button
                       type="button"
                       onClick={() => handleClaim(reward.id)}
-                      disabled={reward.status !== "approved" || claimingId === reward.id}
+                      disabled={!!rewardClaimDisabledReason || reward.status !== "approved" || claimingId === reward.id}
+                      title={rewardClaimDisabledReason || undefined}
                       className="depth-button focus-ring min-w-[68px] rounded-[14px] border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/15 disabled:opacity-40"
                     >
                       {claimingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.claim")}

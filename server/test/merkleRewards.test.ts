@@ -75,10 +75,33 @@ describe('Merkle reward helpers', () => {
     expect(tree.leaves).toEqual([]);
   });
 
+  it('does not use testnet MerkleClaim fallback for production mainnet receipt verification', async () => {
+    const originalEnv = { ...process.env };
+    process.env.NODE_ENV = 'production';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_ID = 'ton-mainnet';
+    process.env.CHAIN_RPC_URL = 'https://toncenter.com/api/v2/jsonRPC';
+    process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+
+    await expect(verifyMerkleClaimReceipt({
+      txHash: 'claim-hash',
+      beneficiaryWallet,
+      amountRaw: '500',
+      ledgerIdHash: '0x03',
+    })).rejects.toMatchObject({
+      status: 503,
+      code: 'MERKLE_CLAIM_CONTRACT_NOT_CONFIGURED',
+    });
+
+    process.env = originalEnv;
+  });
+
   it('verifies Merkle claim receipts through TON RPC responses', async () => {
     const originalEnv = { ...process.env };
     process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
     process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
     process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -119,6 +142,7 @@ describe('Merkle reward helpers', () => {
     const originalEnv = { ...process.env };
     process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
     process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://testnet.toncenter.com/api/v2/jsonRPC';
     process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -161,6 +185,7 @@ describe('Merkle reward helpers', () => {
     const originalEnv = { ...process.env };
     process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
     process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
     process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({

@@ -15,6 +15,8 @@ import BottomNav from "./components/BottomNav";
 import LanguageToggle from "./components/LanguageToggle";
 import { Toaster } from "@/src/components/ui/sonner";
 import { LanguageProvider, formatNumber, useI18n } from "@/src/lib/i18n";
+import { api } from "@/src/lib/api";
+import type { BootstrapData } from "@/src/lib/types";
 
 export default function App() {
   const manifestUrl =
@@ -110,10 +112,29 @@ function MainApp() {
     const saved = localStorage.getItem("72h_goal");
     return saved ? Number(saved) : 5000000;
   });
+  const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const targetValue = 1000000;
+  const envLabel = bootstrap?.feature_flags?.chain_mainline_writes_enabled
+    ? t("app.env.canary")
+    : bootstrap
+      ? t("app.env.display")
+      : t("app.env.loading");
 
   useEffect(() => localStorage.setItem("72h_deposit", myDeposit.toString()), [myDeposit]);
   useEffect(() => localStorage.setItem("72h_goal", squadGoal.toString()), [squadGoal]);
+  useEffect(() => {
+    let cancelled = false;
+    api.bootstrap()
+      .then((data) => {
+        if (!cancelled) setBootstrap(data);
+      })
+      .catch(() => {
+        if (!cancelled) setBootstrap(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [activeTab]);
@@ -170,7 +191,7 @@ function MainApp() {
           <LanguageToggle />
           <div className="flex items-center gap-2 rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
             <div className="h-1.5 w-1.5 rounded-full bg-amber-100" />
-            <span className="text-[10px] font-medium tracking-widest text-amber-50/90">{t("app.env.staging")}</span>
+            <span className="text-[10px] font-medium tracking-widest text-amber-50/90">{envLabel}</span>
           </div>
         </div>
 

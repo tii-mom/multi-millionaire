@@ -7,7 +7,7 @@ replace a real Cloudflare staging smoke run against the deployed backend URL.
 
 ## Current Cloudflare Status
 
-As of `2026-04-24`, the Cloudflare staging line satisfies the functional RC1
+As of `2026-04-25`, the Cloudflare staging line satisfies the functional RC1
 candidate gate:
 
 - backend staging URL is live:
@@ -15,26 +15,20 @@ candidate gate:
 - frontend staging URL is live:
   `https://staging.multi-millionaire-staging.pages.dev`
 - backend `GET /health`: `200`
-- earlier backend `GET /ready`: `200`
-- latest live backend `GET /ready` in this thread: `503`, `database=error`
-- Hyperdrive binding is live and backed by existing Postgres
-- Hyperdrive origin is still the local tunnel-backed Postgres route:
-  `Hyperdrive -> VPC Service -> Tunnel -> this machine`
-- real Cloudflare smoke run `cf-20260424-rc1-final`: `pass`
+- backend `GET /ready`: `200`
+- Hyperdrive binding is live and backed by Neon Postgres
+- data plane is `Cloudflare Worker -> Hyperdrive -> Neon Postgres`
+- real Cloudflare smoke run `cf-20260424-neon-rc1`: `pass`
 
-The completed smoke evidence is enough for internal RC1 candidate history, but
-the latest live readiness result means the current staging endpoint should not
-be treated as ready until the data plane is restored or cut over.
+The completed smoke evidence is enough for internal RC1 candidate history and
+the staging environment is now sustainable for RC1 closed beta.
 
 ## Sustainability Gate
 
-For the environment to be called a sustainable RC1 environment, staging must
-move from the current local-origin route to `Hyperdrive + managed Postgres`.
+The sustainable RC1 environment requirement is met for staging.
 
-- Single blocker:
-  `No managed Postgres instance and connection string are provisioned for
-  staging, so Hyperdrive cannot be repointed and migrations/seed cannot be run
-  on a persistent origin.`
+- Current staging data plane:
+  `Cloudflare Worker -> Hyperdrive -> Neon Postgres`
 - Tracking doc: `docs/cloudflare/persistent-db-plan.md`
 
 ## Entry Criteria
@@ -131,6 +125,8 @@ Keep these with the RC1 record:
 
 ## Current Decision
 
-Current result: historical Cloudflare RC1 candidate smoke passed, but latest
-readiness is failing and the sustainable RC1 environment gate remains blocked by
-the missing managed Postgres origin.
+Current result: internal RC1 candidate and sustainable staging environment are
+met. This is still not a real chain-backed production launch: production remains
+No-Go until frontend DNS, mainnet contract deployment evidence, independent
+security review approval, production chain env gates, wallet proof smoke, and a
+small approved mainnet canary are complete.

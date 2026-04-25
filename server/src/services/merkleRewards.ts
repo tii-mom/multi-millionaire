@@ -118,11 +118,35 @@ function hashPair(left: string, right: string): string {
     .endCell());
 }
 
+function isTruthyEnv(value: string | undefined): boolean {
+  return !!value && ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+function productionMainnetConfigRequired(): boolean {
+  const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+  const chainId = (process.env.CHAIN_ID || '').trim().toLowerCase();
+  return nodeEnv === 'production'
+    || nodeEnv === 'prod'
+    || isTruthyEnv(process.env.CHAIN_MAINLINE_WRITES_ENABLED)
+    || chainId === 'ton-mainnet';
+}
+
+function readProductionAddress(primaryName: string, testnetName: string): string {
+  const primary = process.env[primaryName]?.trim();
+  if (primary) {
+    return primary;
+  }
+  if (productionMainnetConfigRequired() && process.env[testnetName]?.trim()) {
+    return '';
+  }
+  return process.env[testnetName]?.trim() || '';
+}
+
 export function buildMerkleLeaf(input: MerkleLeafInput, options: MerkleTreeOptions = {}): MerkleLeaf {
   const batchId = normalizeUint64(options.batchId || '1');
   const chainIdHash = normalizeUint256Hex(options.chainIdHash || hashChainId(options.chainId || process.env.CHAIN_ID || 'ton-testnet'));
-  const tokenAddress = options.tokenAddress || process.env.TOKEN_ADDRESS || process.env.TOKEN_ADDRESS_TESTNET || '';
-  const contractAddress = options.contractAddress || process.env.MERKLE_CLAIM_ADDRESS || process.env.MERKLE_CLAIM_ADDRESS_TESTNET || '';
+  const tokenAddress = options.tokenAddress || readProductionAddress('TOKEN_ADDRESS', 'TOKEN_ADDRESS_TESTNET');
+  const contractAddress = options.contractAddress || readProductionAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET');
   if (!tokenAddress || !contractAddress) {
     throw new Error('Merkle leaf domain requires tokenAddress and contractAddress');
   }
@@ -210,7 +234,7 @@ export async function createDraftMerkleRewardBatch(input: {
 }) {
   const eligible = await listEligibleRewardsForMerkle();
   const contractBatchId = String(Date.now());
-  const contractAddress = process.env.MERKLE_CLAIM_ADDRESS || process.env.MERKLE_CLAIM_ADDRESS_TESTNET || '';
+  const contractAddress = readProductionAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET');
   if (!contractAddress) {
     throw new Error('MERKLE_CLAIM_ADDRESS is required to create a domain-separated Merkle batch');
   }
@@ -266,7 +290,7 @@ export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): 
   }
 
   const config = loadContractIntegrationConfig();
-  const merkleClaimAddress = process.env.MERKLE_CLAIM_ADDRESS || process.env.MERKLE_CLAIM_ADDRESS_TESTNET || '';
+  const merkleClaimAddress = readProductionAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET');
   if (!config.rpcUrl) {
     throw new MerkleClaimVerificationError(503, 'CHAIN_RPC_NOT_CONFIGURED', 'CHAIN_RPC_URL is required for Merkle claim verification');
   }

@@ -103,6 +103,10 @@ jest.mock('../src/models/riskModel', () => ({
   hasBlockingRiskForRewardClaim: jest.fn().mockResolvedValue(false),
 }));
 
+jest.mock('../src/models/opsModel', () => ({
+  getAppControl: jest.fn().mockResolvedValue(null),
+}));
+
 const createWalletBindIntentMock = createWalletBindIntent as jest.Mock;
 const getWalletBindIntentForUserMock = getWalletBindIntentForUser as jest.Mock;
 const listWalletBindingsForUserMock = listWalletBindingsForUser as jest.Mock;
@@ -343,6 +347,31 @@ describe('Production readiness gates', () => {
     expect(res.body.error.code).toBe('CHAIN_CANARY_AMOUNT_LIMIT_EXCEEDED');
     expect(findVerifiedWalletBindingMock).not.toHaveBeenCalled();
     expect(insertChainEventMock).not.toHaveBeenCalled();
+  });
+
+  it('treats NODE_ENV=prod as production for legacy off-chain deposit and claim stubs', async () => {
+    process.env.NODE_ENV = 'prod';
+    getRewardLedgerByIdMock.mockResolvedValue({
+      id: 'ledger-1',
+      beneficiary_user_id: userId,
+      status: 'approved',
+    });
+
+    const deposit = await request(app)
+      .post('/v1/waves/1/deposit')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: '1000' });
+    const claim = await request(app)
+      .post('/v1/rewards/ledger-1/claim')
+      .set('Authorization', `Bearer ${token}`)
+      .send();
+
+    expect(deposit.status).toBe(409);
+    expect(deposit.body.error.code).toBe('CHAIN_RECEIPT_REQUIRED');
+    expect(claim.status).toBe(409);
+    expect(claim.body.error.code).toBe('CHAIN_REWARD_CLAIM_REQUIRED');
+    expect(createPositionMock).not.toHaveBeenCalled();
+    expect(markRewardClaimedMock).not.toHaveBeenCalled();
   });
 
   it('applies verified deposit receipts inside one transaction', async () => {

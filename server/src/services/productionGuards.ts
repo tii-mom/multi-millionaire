@@ -1,7 +1,7 @@
 import { getAppControl } from '../models/opsModel';
 
 export function isProductionRuntime(): boolean {
-  return process.env.NODE_ENV === 'production';
+  return ['production', 'prod'].includes((process.env.NODE_ENV || '').trim().toLowerCase());
 }
 
 export function isTruthyEnv(value: string | undefined): boolean {
@@ -21,6 +21,9 @@ export async function isControlEnabled(key: string): Promise<boolean> {
     const control = await getAppControl(key);
     return !!control?.enabled;
   } catch {
+    if (isProductionRuntime() && key.startsWith('pause_')) {
+      return true;
+    }
     return false;
   }
 }
