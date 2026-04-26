@@ -237,7 +237,11 @@ Deploy with Tonkeeper confirmation:
 ```bash
 export CHAIN_ID=ton-mainnet
 export CHAIN_ADMIN_ADDRESS=UQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQfRq
+export CHAIN_RPC_URL=https://toncenter.com/api/v2/jsonRPC
 export TOKEN_ADDRESS=EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8
+export TOKEN_DECIMALS=9
+export LOCK_VAULT_JETTON_WALLET_ADDRESS=EQAGiEeODWa9q6GyTJm4jkDhC3_TvWgkB8FaohSD34GpefQD
+export REWARD_JETTON_WALLET_ADDRESS=EQDof71U9cKMfLoxiOJHoYENjzRBADGynEcw6UPA-6-vZGlx
 npm run contract:build
 npm run contract:derive:mainnet
 npm run contract:deploy:lock-vault:mainnet
@@ -251,16 +255,18 @@ Precomputed mainnet addresses from `contract:build` followed by
 - MerkleClaim: `EQDoyks8WxF9ctLkfmmT9pFd5topcY_YrzPQaay3BLab4Snw`
 - owner/admin wallet: `EQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQamv`
 - 72H token master: `EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8`
+- LockVault Jetton wallet:
+  `EQAGiEeODWa9q6GyTJm4jkDhC3_TvWgkB8FaohSD34GpefQD`
+- MerkleClaim reward Jetton wallet:
+  `EQDof71U9cKMfLoxiOJHoYENjzRBADGynEcw6UPA-6-vZGlx`
 - chain id hash:
   `88858586448727561562773343990328044603667650321035832086212254018596787063178`
 
 The deploy command reaches the Tonkeeper QR/link step locally. Deployment is not
 complete until the admin wallet confirms each transaction and the scripts print
-successful deploy evidence. On 2026-04-26, Jetton wallet derivation did not
-complete in the local operator shell because the configured RPC hostname
-`ton-mainnet.api.onfinality.io` failed DNS resolution. Confirm the production
-RPC endpoint and derive both Jetton wallet addresses before enabling production
-deposits or reward claims.
+successful deploy evidence. On 2026-04-27, `contract:derive:mainnet` succeeded
+against `https://toncenter.com/api/v2/jsonRPC` with the Toncenter API key in the
+operator environment and returned both Jetton wallet addresses above.
 
 ### Mainnet Deployment Evidence Template
 
