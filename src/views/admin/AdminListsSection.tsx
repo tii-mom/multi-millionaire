@@ -28,10 +28,10 @@ export function AdminListsSection({
   const { t } = useI18n();
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="rounded-lg border border-slate-800 bg-slate-950/75 p-4 shadow-lg shadow-black/20 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">{t("admin.lists.title")}</h2>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">{t("admin.lists.title")}</h2>
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-800 bg-slate-950/80 p-1 sm:flex">
           {listTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeList === tab.key;
@@ -40,13 +40,13 @@ export function AdminListsSection({
                 key={tab.key}
                 type="button"
                 onClick={() => onActiveListChange(tab.key)}
-                className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs uppercase tracking-widest transition-colors ${
+                className={`inline-flex h-8 items-center justify-center gap-2 rounded-md px-3 text-xs font-medium uppercase tracking-widest transition-colors ${
                   isActive
-                    ? "border-[#DBFF00]/30 bg-[#DBFF00]/10 text-[#DBFF00]"
-                    : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white"
+                    ? "bg-emerald-400/15 text-emerald-200"
+                    : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="h-4 w-4" />
                 {t(tab.labelKey)}
               </button>
             );
@@ -54,16 +54,16 @@ export function AdminListsSection({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-3">
         {listError ? (
-          <div className="mb-3 rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/65">
+          <div className="mb-3 rounded-lg border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100/85">
             {listError}
           </div>
         ) : null}
 
         {isListLoading ? (
-          <div className="flex items-center justify-center gap-2 py-12 text-xs uppercase tracking-widest text-white/40">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex items-center justify-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 py-12 text-xs font-medium uppercase tracking-widest text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
             {t("common.loading")}
           </div>
         ) : (

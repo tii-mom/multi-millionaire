@@ -17,7 +17,7 @@ export default function LanguageToggle() {
           onClick={() => setLanguage(item)}
           className={`min-w-8 rounded-full px-2 py-1 text-[10px] font-semibold tracking-widest transition-colors ${
             language === item
-              ? "bg-[#DBFF00] text-black"
+              ? "bg-[#d7b46a] text-black"
               : "text-white/45 hover:bg-white/5 hover:text-white/80"
           }`}
         >

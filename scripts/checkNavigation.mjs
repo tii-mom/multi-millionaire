@@ -4,12 +4,16 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const appUrl = process.env.NAV_CHECK_URL || "http://localhost:3000/";
+const providedAppUrl = process.env.NAV_CHECK_URL;
 const chromePath = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = Number(process.env.NAV_CHECK_DEBUG_PORT || await getFreePort());
 const userDataDir = await mkdtemp(join(tmpdir(), "multi-millionaire-nav-"));
+const appPort = Number(process.env.NAV_CHECK_APP_PORT || await getFreePort());
+const appUrl = providedAppUrl || `http://127.0.0.1:${appPort}/`;
 
 let chrome;
+let appServer;
+let cleaningUp = false;
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,7 +59,7 @@ async function waitForDevtools() {
 }
 
 async function createTarget() {
-  const endpoint = `http://127.0.0.1:${port}/json/new?${encodeURIComponent(appUrl)}`;
+  const endpoint = `http://127.0.0.1:${port}/json/new?${encodeURIComponent("about:blank")}`;
   try {
     return await fetchJson(endpoint, { method: "PUT" });
   } catch {
@@ -121,6 +125,31 @@ async function waitFor(client, expression, label) {
   throw new Error(`Timed out waiting for ${label}.`);
 }
 
+async function startAppServer() {
+  if (providedAppUrl) return;
+
+  appServer = spawn("npx", ["vite", "--host", "127.0.0.1", "--port", String(appPort), "--strictPort"], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+
+  appServer.on("exit", (code, signal) => {
+    if (!cleaningUp && code && code !== 0 && signal !== "SIGTERM") {
+      console.error(`Vite navigation check server exited with code ${code}.`);
+    }
+  });
+
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(appUrl);
+      if (response.ok) return;
+    } catch {
+      await delay(150);
+    }
+  }
+  throw new Error(`Timed out waiting for Vite app server at ${appUrl}.`);
+}
+
 async function clickTabAndAssert(client, label, marker) {
   const clicked = await evaluate(client, `
     (() => {
@@ -143,6 +172,8 @@ async function clickTabAndAssert(client, label, marker) {
 }
 
 try {
+  await startAppServer();
+
   chrome = spawn(chromePath, [
     "--headless=new",
     "--disable-gpu",
@@ -154,8 +185,8 @@ try {
     "about:blank",
   ], { stdio: ["ignore", "ignore", "pipe"] });
 
-  chrome.on("exit", (code) => {
-    if (code && code !== 0) {
+  chrome.on("exit", (code, signal) => {
+    if (!cleaningUp && code && code !== 0 && signal !== "SIGTERM") {
       console.error(`Isolated Chrome exited with code ${code}.`);
     }
   });
@@ -165,15 +196,19 @@ try {
   const client = connectToPage(target.webSocketDebuggerUrl);
   await client.send("Page.enable");
   await client.send("Runtime.enable");
+  await client.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: "localStorage.setItem('72h_language', 'zh');",
+  });
+  await client.send("Page.navigate", { url: appUrl });
 
   await waitFor(client, "document.readyState === 'complete'", "page load");
-  await waitFor(client, "document.body.innerText.includes('Multi Millionaire')", "app shell");
+  await waitFor(client, "Boolean(document.querySelector('.app-shell'))", "app shell");
 
   const checks = [
     ["锁仓", "TON 钱包访问"],
     ["战队", "战队排行榜"],
     ["奖励", "奖励账本"],
-    ["分享", "分享信号"],
+    ["分享", "邀请配额"],
   ];
 
   for (const [label, marker] of checks) {
@@ -183,9 +218,14 @@ try {
   client.close();
   console.log(`Navigation smoke passed for ${appUrl}`);
 } finally {
+  cleaningUp = true;
   if (chrome && !chrome.killed) {
     chrome.kill("SIGTERM");
     await new Promise((resolve) => chrome.once("exit", resolve));
+  }
+  if (appServer && !appServer.killed) {
+    appServer.kill("SIGTERM");
+    await new Promise((resolve) => appServer.once("exit", resolve));
   }
   await rm(userDataDir, { recursive: true, force: true });
 }

@@ -24,6 +24,7 @@
     "contract:derive:mainnet": "tsx scripts/deriveMainnetContracts.ts",
     "contract:configure:testnet": "tsx scripts/configureTestnetContracts.ts",
     "test:nav": "node scripts/checkNavigation.mjs",
+    "test:i18n": "node scripts/checkI18n.mjs",
     "smoke:staging-mutating": "cd server && npm run smoke:staging-mutating",
     "smoke:production-readonly": "cd server && npm run smoke:production-readonly",
     "smoke:production-canary": "cd server && npm run smoke:production-canary",

@@ -84,6 +84,25 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const localizedBootstrapError = bootstrapError
     ? formatError(new Error(bootstrapError), "error.network")
     : "";
+  const statusBannerTitle = backendUnavailable
+    ? t("home.banner.backendUnavailableTitle")
+    : maintenanceBanner?.enabled
+      ? t("home.banner.maintenanceTitle")
+      : depositsPaused
+        ? t("home.banner.depositsPausedTitle")
+        : !chainMainlineEnabled
+          ? t("home.banner.stagingTitle")
+          : "";
+  const statusBannerMessage = backendUnavailable
+    ? t("home.banner.backendUnavailableDetail", { error: localizedBootstrapError })
+    : maintenanceBanner?.enabled
+      ? maintenanceBanner.reason || t("home.banner.maintenance")
+      : depositsPaused
+        ? bootstrap?.controls?.pause_deposits?.reason || t("home.banner.depositsPaused")
+        : !chainMainlineEnabled
+          ? t("home.banner.staging")
+          : "";
+  const showApiError = !!apiError && apiError !== statusBannerMessage;
   const activeWalletLabel = tonSession?.walletName || t("home.ton.walletFallback");
   const chainDisabledReason = backendUnavailable
     ? t("home.wallet.disabledBackend")
@@ -119,7 +138,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         }
       } catch (error) {
         if (!cancelled) {
-          setBootstrapError(error instanceof Error ? error.message : "Backend bootstrap failed.");
+          setBootstrapError(error instanceof Error ? error.message : t("error.bootstrapFailed"));
         }
       }
     }
@@ -271,9 +290,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
   const handleDeposit = async () => {
     if (backendUnavailable) {
-      const message = t("home.banner.backendUnavailable", { error: localizedBootstrapError });
+      const message = t("home.banner.backendUnavailableDetail", { error: localizedBootstrapError });
       setApiError(message);
-      toast.error(message);
       return;
     }
     if (bootstrap?.controls?.pause_deposits?.enabled) {
@@ -380,7 +398,12 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     try {
       const precheck = await api.depositPrecheck(waveId, authToken);
       if (!precheck.ok) {
-        throw new Error(precheck.reasons?.join(", ") || t("home.deposit.precheckFailed"));
+        const translatedReasons = precheck.reasons?.map((reason) => {
+          const key = `home.deposit.precheckReason.${reason.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
+          const translated = t(key);
+          return translated === key ? t("home.deposit.precheckReason.unknown") : translated;
+        });
+        throw new Error(translatedReasons?.join(", ") || t("home.deposit.precheckFailed"));
       }
 
       await api.deposit(waveId, val.toString(), authToken);
@@ -550,39 +573,39 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   }, [authToken, chainMainlineEnabled]);
 
   return (
-    <div className="flex flex-col gap-5 px-6 pb-10">
-      {(backendUnavailable || maintenanceBanner?.enabled || depositsPaused || !chainMainlineEnabled) && (
-        <div className={`rounded-[20px] border px-4 py-3 text-[11px] font-mono leading-relaxed ${
-          backendUnavailable ? "border-red-300/25 bg-red-500/10 text-red-100" : "border-amber-200/20 bg-amber-200/10 text-amber-50/90"
+    <div className="tab-content-safe flex flex-col gap-5 px-6">
+      {statusBannerMessage && (
+        <div className={`status-notice rounded-2xl px-4 py-3 ${
+          backendUnavailable ? "" : "status-notice-caution"
         }`}>
-          {backendUnavailable
-            ? t("home.banner.backendUnavailable", { error: localizedBootstrapError })
-            : maintenanceBanner?.enabled
-              ? maintenanceBanner.reason || t("home.banner.maintenance")
-              : depositsPaused
-                ? bootstrap?.controls?.pause_deposits?.reason || t("home.banner.depositsPaused")
-                : t("home.banner.staging")}
+          <div className="flex gap-3">
+            <span className={`status-dot mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${backendUnavailable ? "bg-white/42" : "bg-[#d7b46a]/80"}`} />
+            <div className="min-w-0">
+              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/38">{statusBannerTitle}</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-white/68">{statusBannerMessage}</div>
+            </div>
+          </div>
         </div>
       )}
 
-      <section className="glass-panel relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035] p-5 backdrop-blur-2xl">
-        <div className="pointer-events-none absolute -left-10 -top-10 h-24 w-24 rounded-full bg-[#DBFF00]/[0.08] blur-3xl" />
+      <section className="financial-panel relative overflow-hidden rounded-[22px] p-5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/35 to-transparent" />
         <div className="relative z-10 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-white/[0.62]">
-              <Wallet className="h-4 w-4 text-[#DBFF00]" />
+              <Wallet className="h-4 w-4 text-[#d7b46a]" />
               <span className="text-[10px] uppercase tracking-[0.2em]">{t("home.account.title")}</span>
             </div>
-            <div className={`text-[9px] uppercase tracking-widest ${tonSession ? "text-[#DBFF00]" : "text-white/35"}`}>
+            <div className={`text-[9px] uppercase tracking-widest ${tonSession ? "text-[#d7b46a]" : "text-white/35"}`}>
               {!connectionRestored ? t("common.loading") : tonSession ? t("common.connected") : t("common.required")}
             </div>
           </div>
 
           {!tonSession ? (
             <div className="grid gap-3">
-              <div className="rounded-[18px] border border-white/10 bg-black/30 px-4 py-4">
+              <div className="metric-card rounded-[16px] px-4 py-4">
                 <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-white/90">
-                  <ShieldCheck className="h-4 w-4 text-[#DBFF00]" />
+                  <ShieldCheck className="h-4 w-4 text-[#d7b46a]" />
                   {t("home.ton.title")}
                 </div>
                 <p className="text-[11px] leading-5 text-white/[0.42]">
@@ -593,7 +616,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
                 type="button"
                 onClick={openTonWallet}
                 disabled={!connectionRestored}
-                className="depth-button focus-ring flex items-center justify-center gap-2 rounded-[18px] bg-[#DBFF00] py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-[#d3f51c] disabled:cursor-wait disabled:opacity-60"
+                className="depth-button focus-ring flex items-center justify-center gap-2 rounded-[18px] bg-[#d7b46a] py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-[#e1c07b] disabled:cursor-wait disabled:opacity-60"
               >
                 {!connectionRestored ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
                 {connectionRestored ? t("home.ton.connect") : t("home.ton.restoring")}
@@ -601,14 +624,14 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             </div>
           ) : (
             <div className="grid gap-3">
-              <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[#DBFF00]/20 bg-[#DBFF00]/[0.06] px-4 py-3">
+              <div className="flex items-center justify-between gap-3 rounded-[16px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.06] px-4 py-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#DBFF00] text-black">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d7b46a] text-black">
                     <ShieldCheck className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-white/90">{activeWalletLabel}</div>
-                    <div className="mt-0.5 truncate font-mono text-[11px] text-[#DBFF00]/80">
+                    <div className="mt-0.5 truncate font-mono text-[11px] text-[#d7b46a]/80">
                       {shortWalletAddress(tonSession.address)}
                     </div>
                   </div>
@@ -624,13 +647,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-[16px] border border-white/10 bg-black/30 px-3 py-3">
+                <div className="metric-card rounded-[14px] px-3 py-3">
                   <div className="text-[9px] uppercase tracking-widest text-white/35">{t("home.account.currentWave")}</div>
                   <div className="mt-1 font-mono text-sm text-white/[0.82]">{waveId ? `#${waveId}` : t("home.account.loadingWave")}</div>
                 </div>
-                <div className="rounded-[16px] border border-white/10 bg-black/30 px-3 py-3">
+                <div className="metric-card rounded-[14px] px-3 py-3">
                   <div className="text-[9px] uppercase tracking-widest text-white/35">{t("home.ton.backend")}</div>
-                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${authToken ? "text-[#DBFF00]" : "text-amber-100/85"}`}>
+                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${authToken ? "text-[#d7b46a]" : "text-amber-100/85"}`}>
                     {authToken ? t("home.ton.backendReady") : t("home.ton.backendPendingShort")}
                   </div>
                 </div>
@@ -644,23 +667,23 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             </div>
           )}
 
-          {apiError && (
-            <div className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-[10px] font-mono text-red-200">
+          {showApiError && (
+            <div className="status-inline-error rounded-xl px-3 py-2 text-[10px] font-mono leading-relaxed">
               {apiError}
             </div>
           )}
         </div>
       </section>
 
-      <section className="glass-panel relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
-        <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-[#DBFF00]/[0.06] blur-[62px]" />
+      <section className="financial-panel relative overflow-hidden rounded-[22px] p-6">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="relative z-10">
           <div className="mb-4 flex items-end justify-between">
             <div className="flex items-center gap-2 text-white/[0.52]">
               <Target className="h-5 w-5" />
               <span className="text-[11px] uppercase tracking-widest">{t("home.goal.title")}</span>
             </div>
-            <div className="font-mono text-lg font-semibold text-[#DBFF00] tabular-nums">
+            <div className="font-mono text-lg font-semibold text-[#d7b46a] tabular-nums">
               {formatNumber(progressPercent, locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
             </div>
           </div>
@@ -671,17 +694,17 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               <div
                 key={milestone}
                 className={`absolute top-1/2 z-10 h-3 w-px -translate-y-1/2 ${
-                  progressPercent >= milestone ? "bg-[#DBFF00]/80" : "bg-white/[0.18]"
+                  progressPercent >= milestone ? "bg-[#d7b46a]/80" : "bg-white/[0.18]"
                 }`}
                 style={{ left: `${milestone}%` }}
                 aria-hidden="true"
               />
             ))}
             <div
-              className="absolute left-0 top-0 z-20 flex h-full items-center justify-end bg-gradient-to-r from-transparent via-[#DBFF00]/80 to-[#DBFF00] transition-all duration-1000 ease-out"
+              className="absolute left-0 top-0 z-20 flex h-full items-center justify-end bg-gradient-to-r from-transparent via-[#d7b46a]/80 to-[#d7b46a] transition-all duration-1000 ease-out"
               style={{ width: `${Math.max(progressPercent, 2)}%` }}
             >
-              <div className="mr-0.5 h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_2px_#DBFF00]" />
+              <div className="mr-0.5 h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_2px_#d7b46a]" />
             </div>
           </div>
 
@@ -693,7 +716,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           </div>
           <div className="mt-3 grid grid-cols-4 gap-1 text-center font-mono text-[8px] uppercase tracking-widest text-white/[0.26]">
             {goalMilestones.map((milestone) => (
-              <span key={milestone} className={progressPercent >= milestone ? "text-[#DBFF00]/70" : ""}>
+              <span key={milestone} className={progressPercent >= milestone ? "text-[#d7b46a]/70" : ""}>
                 {milestone}%
               </span>
             ))}
@@ -701,13 +724,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         </div>
       </section>
 
-      <section className="glass-panel relative flex flex-col items-center justify-center overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035] p-6 text-center backdrop-blur-2xl">
-        <div className="absolute right-4 top-3 flex items-center gap-1.5">
-          <span className="relative flex h-[5px] w-[5px]">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#DBFF00] opacity-70" />
-            <span className="relative inline-flex h-[5px] w-[5px] rounded-full bg-[#DBFF00]" />
-          </span>
-          <span className="text-[8px] uppercase tracking-widest text-[#DBFF00]/[0.72]">{t("home.need.auto")}</span>
+      <section className="financial-panel relative flex flex-col items-center justify-center overflow-hidden rounded-[22px] p-6 text-center">
+        <div className="absolute right-4 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/20 px-2 py-1">
+          <span className="relative h-[5px] w-[5px] rounded-full bg-[#8fd9ad]" />
+          <span className="text-[8px] uppercase tracking-widest text-white/38">{t("home.need.auto")}</span>
         </div>
 
         <h3 className="mb-1.5 mt-1 text-[11px] uppercase tracking-[0.2em] text-white/[0.52]">{t("home.need.label")}</h3>
@@ -715,7 +735,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           key={needed72H}
           initial={{ opacity: 0.8, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="mb-3 flex items-baseline gap-2 font-mono text-4xl font-semibold tracking-tighter"
+          className="mb-3 flex items-baseline gap-2 font-mono text-3xl font-semibold tracking-tight"
         >
           <span className="bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent tabular-nums">
             {formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}
@@ -727,8 +747,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           <motion.span
             key={tokenPrice}
             initial={{ color: "#ffffff" }}
-            animate={{ color: "#DBFF00" }}
-            className="ml-1 font-mono font-bold text-[#DBFF00] tabular-nums"
+            animate={{ color: "#d7b46a" }}
+            className="ml-1 font-mono font-bold text-[#d7b46a] tabular-nums"
           >
             ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
           </motion.span>

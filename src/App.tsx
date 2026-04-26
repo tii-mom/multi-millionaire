@@ -35,16 +35,16 @@ export default function App() {
         borderRadius: "m",
         colorsSet: {
           [THEME.DARK]: {
-            accent: "#DBFF00",
+            accent: "#D7B46A",
             connectButton: {
-              background: "#DBFF00",
+              background: "#D7B46A",
               foreground: "#050505",
             },
             background: {
               primary: "#080808",
               secondary: "#111111",
               segment: "#1A1A1A",
-              tint: "#DBFF00",
+              tint: "#D7B46A",
               qr: "#FFFFFF",
             },
             text: {
@@ -86,9 +86,10 @@ function AppRoutes() {
 }
 
 function RouteLoading() {
+  const { t } = useI18n();
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#070707] font-mono text-xs uppercase tracking-widest text-white/45">
-      Loading
+      {t("common.loading")}
     </div>
   );
 }
@@ -125,12 +126,15 @@ function MainApp() {
     return saved ? Number(saved) : 5000000;
   });
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
+  const [bootstrapStatus, setBootstrapStatus] = useState<"loading" | "ready" | "error">("loading");
   const targetValue = 1000000;
   const envLabel = bootstrap?.feature_flags?.chain_mainline_writes_enabled
     ? t("app.env.canary")
     : bootstrap
       ? t("app.env.display")
-      : t("app.env.loading");
+      : bootstrapStatus === "error"
+        ? t("app.env.unavailable")
+        : t("app.env.loading");
 
   useEffect(() => localStorage.setItem("72h_deposit", myDeposit.toString()), [myDeposit]);
   useEffect(() => localStorage.setItem("72h_goal", squadGoal.toString()), [squadGoal]);
@@ -138,10 +142,16 @@ function MainApp() {
     let cancelled = false;
     api.bootstrap()
       .then((data) => {
-        if (!cancelled) setBootstrap(data);
+        if (!cancelled) {
+          setBootstrap(data);
+          setBootstrapStatus("ready");
+        }
       })
       .catch(() => {
-        if (!cancelled) setBootstrap(null);
+        if (!cancelled) {
+          setBootstrap(null);
+          setBootstrapStatus("error");
+        }
       });
     return () => {
       cancelled = true;
@@ -210,7 +220,7 @@ function MainApp() {
   })();
 
   return (
-    <div className="app-viewport dark flex min-h-screen justify-center overflow-hidden font-sans text-white selection:bg-[#DBFF00]/30 selection:text-[#DBFF00]">
+    <div className="app-viewport dark flex min-h-screen justify-center overflow-hidden font-sans text-white selection:bg-[#d7b46a]/30 selection:text-[#d7b46a]">
       <div
         ref={shellRef}
         onPointerMove={handleShellPointerMove}
@@ -218,7 +228,7 @@ function MainApp() {
           shellRef.current?.style.setProperty("--pointer-x", "50%");
           shellRef.current?.style.setProperty("--pointer-y", "18%");
         }}
-        className="app-shell relative flex h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#060606] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:border-x sm:border-white/[0.06]"
+        className="app-shell relative flex h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#06080a] shadow-[0_40px_120px_rgba(0,0,0,0.72)] sm:border-x sm:border-white/[0.06]"
       >
         <div className="grain-overlay" />
         <div className="scanlines" />
@@ -227,16 +237,16 @@ function MainApp() {
 
         <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
           <LanguageToggle />
-          <div className="flex items-center gap-2 rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
-            <div className="h-1.5 w-1.5 rounded-full bg-amber-100" />
-            <span className="text-[10px] font-medium tracking-widest text-amber-50/90">{envLabel}</span>
+          <div className="status-chip flex items-center gap-2 rounded-full px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#d7b46a]" />
+            <span className="text-[10px] font-medium tracking-[0.16em]">{envLabel}</span>
           </div>
         </div>
 
         <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-5 pt-20">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="relative flex h-[68px] w-[72px] shrink-0 items-center justify-center">
-              <div className="absolute inset-1 rounded-[24px] bg-emerald-900/16 blur-xl" />
+            <div className="relative flex h-[64px] w-[68px] shrink-0 items-center justify-center">
+              <div className="absolute inset-1 rounded-[22px] bg-[#d7b46a]/10 blur-xl" />
               <img
                 src={BRAND_LOGO_SRC}
                 alt={t("app.brand.name")}
@@ -245,12 +255,12 @@ function MainApp() {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-[#C99D38] shadow-[0_0_10px_rgba(201,157,56,0.8)]" />
-                <h1 className="truncate text-[10px] font-medium uppercase tracking-[0.25em] text-white/[0.48]">
+                <div className="h-2 w-2 rounded-full bg-[#d7b46a] shadow-[0_0_10px_rgba(215,180,106,0.45)]" />
+                <h1 className="truncate text-[10px] font-medium uppercase tracking-[0.22em] text-white/[0.48]">
                   {t("app.brand.kicker")}
                 </h1>
               </div>
-              <div className="mt-2 truncate text-[21px] font-semibold tracking-tight text-white/95">
+              <div className={`mt-2 truncate font-semibold tracking-tight text-white/95 ${locale.startsWith("zh") ? "text-[21px]" : "text-[17px]"}`}>
                 {t("app.brand.name")}
               </div>
             </div>
@@ -259,25 +269,25 @@ function MainApp() {
           <div className="top-terminal-panel flex shrink-0 flex-col items-end gap-1">
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] uppercase tracking-widest text-white/[0.38]">{t("app.price.label")}</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-[#DBFF00]/85" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/85" />
             </div>
-            <div className="flex items-center gap-2 font-mono text-[17px] font-semibold text-[#DBFF00] tabular-nums">
+            <div className="flex items-center gap-2 font-mono text-[17px] font-semibold text-[#d7b46a] tabular-nums">
               <motion.span
                 key={tokenPrice}
                 initial={{ opacity: 0.5, color: "#fff" }}
-                animate={{ opacity: 1, color: "#DBFF00" }}
+                animate={{ opacity: 1, color: "#d7b46a" }}
                 transition={{ duration: 0.55 }}
               >
                 ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </motion.span>
-              <span className="rounded-full bg-amber-200/10 px-2 py-0.5 text-[9px] font-bold tracking-wider text-amber-50/80">
+              <span className="rounded-full bg-white/[0.055] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white/55">
                 {t("app.price.offChain")}
               </span>
             </div>
           </div>
         </header>
 
-        <main ref={mainRef} className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-1 no-scrollbar scroll-smooth">
+        <main ref={mainRef} className="app-scroll relative z-10 flex-1 overflow-y-auto overflow-x-hidden pt-1 no-scrollbar scroll-smooth">
           <AnimatePresence mode="popLayout" custom={direction} initial={false}>
             <motion.div
               key={activeTab}
@@ -303,7 +313,7 @@ function MainApp() {
 function TabLoading() {
   const { t } = useI18n();
   return (
-    <div className="px-6 pb-10">
+    <div className="px-6 pb-4">
       <div className="glass-panel rounded-[24px] border border-white/10 bg-white/[0.035] p-8 text-center font-mono text-xs uppercase tracking-widest text-white/45">
         {t("common.loading")}
       </div>

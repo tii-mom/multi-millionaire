@@ -35,16 +35,21 @@ export default function WalletBindingFlow({
   if (!chainMainlineEnabled) {
     return null;
   }
+  const walletStatusLabel = (status: string) => {
+    const key = `admin.status.${status.toLowerCase()}`;
+    const translated = t(key);
+    return translated === key ? t("admin.status.unknown") : translated;
+  };
 
   return (
-    <details className="rounded-[18px] border border-white/10 bg-black/25 p-4">
+    <details className="financial-panel rounded-[18px] p-4">
       <summary className="cursor-pointer list-none">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">{t("home.wallet.title")}</div>
             <div className="mt-1 text-[11px] text-white/35">{chainDisabledReason || t("home.deposit.walletFlowRequired")}</div>
           </div>
-          <div className="shrink-0 text-[9px] uppercase tracking-widest text-[#DBFF00]">
+          <div className="shrink-0 text-[9px] uppercase tracking-widest text-[#d7b46a]">
             {t("home.wallet.enabled")}
           </div>
         </div>
@@ -57,7 +62,7 @@ export default function WalletBindingFlow({
           onChange={(event) => onWalletAddressChange(event.target.value)}
           placeholder={t("home.wallet.addressPlaceholder")}
           disabled={chainActionDisabled || walletLoading}
-          className="w-full rounded-xl border border-white/10 bg-[#050505]/[0.62] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#DBFF00]/[0.42] disabled:opacity-50"
+          className="w-full rounded-xl border border-white/10 bg-[#030405]/[0.68] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#d7b46a]/[0.44] disabled:opacity-50"
         />
 
         {bindIntent && (
@@ -73,7 +78,7 @@ export default function WalletBindingFlow({
           onChange={(event) => onWalletSignatureChange(event.target.value)}
           placeholder={t("home.wallet.signaturePlaceholder")}
           disabled={chainActionDisabled || walletLoading || !bindIntent}
-          className="w-full rounded-xl border border-white/10 bg-[#050505]/[0.62] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#DBFF00]/[0.42] disabled:opacity-50"
+          className="w-full rounded-xl border border-white/10 bg-[#030405]/[0.68] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#d7b46a]/[0.44] disabled:opacity-50"
         />
 
         <div className="grid grid-cols-2 gap-2">
@@ -81,7 +86,7 @@ export default function WalletBindingFlow({
             type="button"
             onClick={onRequestBindIntent}
             disabled={chainActionDisabled || walletLoading || !walletAddress.trim()}
-            className="depth-button focus-ring rounded-xl border border-white/10 bg-white/10 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
+            className="depth-button focus-ring rounded-xl border border-white/10 bg-white/[0.07] py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {walletLoading ? t("common.working") : t("home.wallet.getNonce")}
           </button>
@@ -89,7 +94,7 @@ export default function WalletBindingFlow({
             type="button"
             onClick={onSubmitWalletBind}
             disabled={chainActionDisabled || walletLoading || !bindIntent || !walletSignature.trim()}
-            className="depth-button focus-ring rounded-xl bg-[#DBFF00] py-3 text-[10px] font-bold uppercase tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-50"
+            className="depth-button focus-ring rounded-xl bg-[#d7b46a] py-3 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-[#e1c07b] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t("home.wallet.bind")}
           </button>
@@ -97,7 +102,7 @@ export default function WalletBindingFlow({
 
         {wallets.length > 0 && (
           <div className="break-all font-mono text-[10px] text-white/45">
-            {t("home.wallet.bound", { wallet: wallets[0].wallet_address, status: wallets[0].status })}
+            {t("home.wallet.bound", { wallet: wallets[0].wallet_address, status: walletStatusLabel(wallets[0].status) })}
           </div>
         )}
       </div>

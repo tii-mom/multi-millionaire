@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Coins, Gift, Loader2, RefreshCw, ShieldCheck, Users, Waves } from "lucide-react";
+import { Activity, Coins, Gift, Loader2, RefreshCw, ShieldCheck, TerminalSquare, Users, Waves } from "lucide-react";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 import { api } from "@/src/lib/api";
 import LanguageToggle from "@/src/components/LanguageToggle";
@@ -237,59 +238,76 @@ export default function Admin() {
   const writesDisabled = !hasAdminToken;
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-6 sm:px-8">
-        <header className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.28em] text-[#DBFF00]/70">{t("admin.kicker")}</div>
-            <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-white/95">{t("admin.title")}</h1>
+    <div className="min-h-screen bg-[#050608] text-slate-100">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+        <header className="rounded-lg border border-slate-800/90 bg-slate-950/80 shadow-2xl shadow-black/30">
+          <div className="flex flex-col gap-4 border-b border-slate-800 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-emerald-300/70">
+                <TerminalSquare className="h-3.5 w-3.5" />
+                {t("admin.kicker")}
+              </div>
+              <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-50">{t("admin.title")}</h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <LanguageToggle />
+              <a
+                href="/"
+                className="inline-flex h-9 items-center rounded-md border border-slate-700 bg-slate-900 px-3 text-xs font-medium uppercase tracking-widest text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+              >
+                {t("admin.app")}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  loadDashboard();
+                  loadControls();
+                  loadMerkle();
+                  if (!coreOnlyAdmin) {
+                    loadList(activeList);
+                  }
+                }}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 text-xs font-semibold uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-300 hover:text-slate-950"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t("common.refresh")}
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <LanguageToggle />
-            <a
-              href="/"
-              className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-widest text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              {t("admin.app")}
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                loadDashboard();
-                loadControls();
-                loadMerkle();
-                if (!coreOnlyAdmin) {
-                  loadList(activeList);
-                }
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs uppercase tracking-widest text-white/75 transition-colors hover:bg-[#DBFF00] hover:text-black"
-            >
-              <RefreshCw className="w-4 h-4" />
-              {t("common.refresh")}
-            </button>
+
+          <div className="grid gap-px bg-slate-800/70 sm:grid-cols-3">
+            <HeaderSignal label={t("admin.header.runtime")} value={ops?.runtime_path || t("common.loading")} tone={coreOnlyAdmin ? "accent" : "neutral"} />
+            <HeaderSignal label={t("admin.header.adminToken")} value={hasAdminToken ? t("common.enabled") : t("common.off")} tone={hasAdminToken ? "accent" : "warn"} />
+            <HeaderSignal label={t("admin.header.writeMode")} value={writesDisabled ? t("common.off") : t("common.enabled")} tone={writesDisabled ? "warn" : "accent"} />
           </div>
         </header>
 
         {authError ? (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/70">
+          <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100/85">
             {authError}
           </div>
         ) : null}
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {stats.map((stat) => {
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-widest text-white/35">{stat.label}</div>
-                  <Icon className="w-4 h-4 text-[#DBFF00]/80" />
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03, duration: 0.18 }}
+                className="rounded-lg border border-slate-800 bg-slate-950/85 p-4 shadow-lg shadow-black/20"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                  <div className="truncate text-[10px] font-medium uppercase tracking-widest text-slate-500">{stat.label}</div>
+                  <Icon className="h-4 w-4 text-emerald-300/80" />
                 </div>
-                <div className="mt-4 min-h-8 truncate font-mono text-2xl font-semibold tabular-nums text-white/95">
-                  {isDashboardLoading ? <Loader2 className="w-5 h-5 animate-spin text-white/45" /> : stat.value}
+                <div className="mt-3 min-h-8 truncate font-mono text-2xl font-semibold tabular-nums text-slate-50">
+                  {isDashboardLoading ? <Loader2 className="h-5 w-5 animate-spin text-slate-500" /> : stat.value}
                 </div>
-                <div className="mt-1 truncate text-xs text-white/40">{stat.detail}</div>
-              </div>
+                <div className="mt-1 truncate text-xs text-slate-500">{stat.detail}</div>
+              </motion.div>
             );
           })}
         </section>
@@ -332,6 +350,21 @@ export default function Admin() {
           />
         ) : null}
       </main>
+    </div>
+  );
+}
+
+function HeaderSignal({ label, tone, value }: { label: string; tone: "accent" | "neutral" | "warn"; value: string }) {
+  const toneClass = tone === "accent"
+    ? "text-emerald-200"
+    : tone === "warn"
+      ? "text-amber-200"
+      : "text-slate-300";
+
+  return (
+    <div className="bg-slate-950/80 px-4 py-3 sm:px-5">
+      <div className="text-[10px] font-medium uppercase tracking-widest text-slate-500">{label}</div>
+      <div className={`mt-1 truncate font-mono text-xs uppercase tracking-wide ${toneClass}`}>{value}</div>
     </div>
   );
 }

@@ -34,6 +34,7 @@ export default function Rewards() {
   const [summary, setSummary] = useState<RewardSummary>(emptySummary);
   const [rewards, setRewards] = useState<RewardLedger[]>([]);
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [proofLoadingId, setProofLoadingId] = useState<string | null>(null);
@@ -53,8 +54,13 @@ export default function Rewards() {
       case "rejected":
         return t("rewards.status.rejected");
       default:
-        return status;
+        return t("rewards.status.unknown");
     }
+  };
+  const rewardTypeLabel = (rewardType: string) => {
+    const key = `rewards.type.${rewardType.toLowerCase()}`;
+    const translated = t(key);
+    return translated === key ? t("rewards.type.unknown") : translated;
   };
 
   const loadRewards = useCallback(async () => {
@@ -80,7 +86,6 @@ export default function Rewards() {
       setLoadError(message);
       setSummary(emptySummary);
       setRewards([]);
-      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -91,14 +96,25 @@ export default function Rewards() {
   }, [loadRewards]);
 
   useEffect(() => {
-    api.bootstrap().then(setBootstrap).catch(() => setBootstrap(null));
-  }, []);
+    api.bootstrap()
+      .then((data) => {
+        setBootstrap(data);
+        setBootstrapError(null);
+      })
+      .catch((error) => {
+        setBootstrap(null);
+        setBootstrapError(formatError(error, "error.network"));
+      });
+  }, [formatError]);
 
+  const bootstrapUnavailable = !!bootstrapError && !bootstrap;
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
   const merkleClaimVerifierConfigured = !!bootstrap?.ops?.merkle_claim_verifier?.configured;
   const rewardClaimsPaused = !!bootstrap?.controls?.pause_reward_claims?.enabled;
   const merkleClaimAddress = bootstrap?.contracts?.merkle_claim || "";
-  const rewardClaimDisabledReason = rewardClaimsPaused
+  const rewardClaimDisabledReason = bootstrapUnavailable
+    ? t("rewards.bootstrapUnavailable")
+    : rewardClaimsPaused
     ? bootstrap?.controls?.pause_reward_claims?.reason || t("rewards.claimsPaused")
     : !chainMainlineEnabled
       ? t("rewards.chainWritesDisabled")
@@ -212,20 +228,31 @@ export default function Rewards() {
   };
 
   return (
-    <div className="flex flex-col gap-5 px-6 pb-10">
-      <section className="glass-panel relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#DBFF00]/[0.08] blur-3xl" />
-        <div className="relative z-10 mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-white/[0.52]">
-            <Gift className="h-5 w-5" />
-            <span className="text-[11px] uppercase tracking-widest">{t("rewards.title")}</span>
+    <div className="tab-content-safe flex flex-col gap-4 px-6">
+      {bootstrapUnavailable && (
+        <div className="status-notice rounded-2xl px-4 py-3">
+          <div className="flex gap-3">
+            <span className="status-dot mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/42" />
+            <div className="min-w-0">
+              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/38">{t("home.banner.backendUnavailableTitle")}</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-white/68">{t("rewards.bootstrapUnavailableDetail", { error: bootstrapError })}</div>
+            </div>
           </div>
-          <div className="rounded-full border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-1.5 text-[9px] uppercase tracking-widest text-[#DBFF00]/75">
+        </div>
+      )}
+      <section className="glass-panel relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080b0c]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/45 to-transparent" />
+        <div className="relative z-10 mb-5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white/[0.52]">
+            <Gift className="h-4 w-4 text-[#d7b46a]/80" />
+            <span className="text-[10px] uppercase tracking-[0.18em]">{t("rewards.title")}</span>
+          </div>
+          <div className="rounded-md border border-[#d7b46a]/25 bg-[#d7b46a]/10 px-2.5 py-1 text-[9px] uppercase tracking-widest text-[#d7b46a]">
             {t("rewards.receiptGated")}
           </div>
         </div>
 
-        <div className="relative z-10 mb-5 rounded-[18px] border border-white/10 bg-black/30 px-4 py-3 font-mono text-[10px] uppercase leading-5 tracking-wider text-white/[0.46]">
+        <div className="relative z-10 mb-4 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-[10px] uppercase leading-5 tracking-wider text-white/[0.46]">
           {t("rewards.notice")}
         </div>
 
@@ -235,13 +262,13 @@ export default function Rewards() {
             [t("rewards.proofReady"), summary.approved_amount],
             [t("rewards.recorded"), summary.claimed_amount],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-[18px] border border-white/10 bg-black/30 px-3 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div key={label} className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="mb-2 text-[9px] uppercase tracking-widest text-white/35">{label}</div>
               <motion.div
                 key={value}
                 initial={{ opacity: 0.6 }}
                 animate={{ opacity: 1 }}
-                className="font-mono text-lg font-semibold text-[#DBFF00] tabular-nums"
+                className="font-mono text-lg font-semibold text-[#8fd9ad] tabular-nums"
               >
                 {formatNumber(value, locale, { maximumFractionDigits: 0 })}
               </motion.div>
@@ -250,15 +277,15 @@ export default function Rewards() {
         </div>
       </section>
 
-      <section className="glass-panel rounded-[24px] border border-white/10 bg-white/[0.035] p-2 backdrop-blur-2xl">
-        <h3 className="flex items-center gap-2 p-4 pb-2 text-[11px] uppercase tracking-[0.2em] text-white/[0.52]">
-          <Coins className="h-4 w-4 text-[#DBFF00]/80" />
+      <section className="glass-panel rounded-2xl border border-white/[0.08] bg-[#080b0c]/80 p-2 backdrop-blur-2xl">
+        <h3 className="flex items-center gap-2 px-3 py-3 text-[10px] uppercase tracking-[0.2em] text-white/[0.52]">
+          <Coins className="h-4 w-4 text-[#d7b46a]/85" />
           {t("rewards.records")}
         </h3>
 
         {pendingClaimReceipt && (
-          <div className="mx-2 mb-2 rounded-[18px] border border-[#DBFF00]/20 bg-[#DBFF00]/[0.06] p-4">
-            <div className="mb-2 text-[9px] uppercase tracking-widest text-[#DBFF00]/75">
+          <div className="mx-1 mb-2 rounded-xl border border-[#d7b46a]/25 bg-[#d7b46a]/[0.07] p-4">
+            <div className="mb-2 text-[9px] uppercase tracking-widest text-[#d7b46a]">
               {t("rewards.claimReceiptTitle")}
             </div>
             <div className="mb-3 grid gap-1 font-mono text-[10px] leading-5 text-white/50">
@@ -275,13 +302,13 @@ export default function Rewards() {
                 onChange={(event) => setClaimTxHash(event.target.value)}
                 placeholder={t("rewards.claimReceiptPlaceholder")}
                 disabled={claimReceiptLoading}
-                className="w-full rounded-xl border border-white/10 bg-[#050505]/[0.62] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#DBFF00]/[0.42] disabled:opacity-50"
+                className="w-full rounded-lg border border-white/10 bg-[#050505]/[0.62] px-3 py-3 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.22] focus:border-[#8fd9ad]/45 disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={submitClaimReceipt}
                 disabled={claimReceiptLoading || !claimTxHash.trim()}
-                className="depth-button focus-ring rounded-xl border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[#DBFF00] hover:bg-[#DBFF00] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+                className="depth-button focus-ring rounded-lg border border-[#8fd9ad]/35 bg-[#8fd9ad]/15 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[#b7f3cc] hover:bg-[#8fd9ad]/25 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {claimReceiptLoading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.submitClaimReceipt")}
               </button>
@@ -289,7 +316,7 @@ export default function Rewards() {
           </div>
         )}
 
-        <div className="mt-2 flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-8 font-mono text-xs text-white/[0.42]">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -306,7 +333,7 @@ export default function Rewards() {
               <button
                 type="button"
                 onClick={loadRewards}
-                className="depth-button focus-ring mt-1 inline-flex items-center gap-2 rounded-[16px] border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:border-[#DBFF00]/40 hover:bg-[#DBFF00]/10 hover:text-[#DBFF00]"
+                className="depth-button focus-ring mt-1 inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:border-[#8fd9ad]/40 hover:bg-[#8fd9ad]/10 hover:text-[#b7f3cc]"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 {t("common.retry")}
@@ -320,24 +347,24 @@ export default function Rewards() {
             rewards.map((reward) => (
               <div
                 key={reward.id}
-                className="flex items-center justify-between gap-3 rounded-[18px] border border-transparent p-4 transition-colors hover:bg-white/[0.035]"
+                className="flex items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-3 transition-colors hover:bg-white/[0.035]"
               >
                 <div className="flex min-w-0 items-center gap-3.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#DBFF00]">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[#8fd9ad]">
                     {reward.status === "approved" ? <CheckCircle2 className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium tracking-wide text-white/90">
-                      {reward.reward_type.replace(/_/g, " ")}
+                      {rewardTypeLabel(reward.reward_type)}
                     </div>
                     <div className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42]">
-                      {rewardStatusLabel(reward.status)} · wave #{reward.wave_id}
+                      {rewardStatusLabel(reward.status)} · {t("rewards.wave")} #{reward.wave_id}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-end text-right font-mono text-sm">
-                    <span className="font-semibold tracking-tight text-[#DBFF00] tabular-nums">
+                    <span className="font-semibold tracking-tight text-[#8fd9ad] tabular-nums">
                       {formatNumber(reward.final_amount, locale, { maximumFractionDigits: 0 })}
                     </span>
                     <span className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42] tabular-nums">72H</span>
@@ -347,7 +374,7 @@ export default function Rewards() {
                       type="button"
                       onClick={() => handleProof(reward.id)}
                       disabled={reward.status !== "approved" || proofLoadingId === reward.id}
-                      className="depth-button focus-ring min-w-[68px] rounded-[14px] border border-[#DBFF00]/20 bg-[#DBFF00]/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#DBFF00] hover:border-[#DBFF00] hover:bg-[#DBFF00] hover:text-black disabled:opacity-40 disabled:hover:border-[#DBFF00]/20 disabled:hover:bg-[#DBFF00]/10 disabled:hover:text-[#DBFF00]"
+                      className="depth-button focus-ring min-w-[68px] rounded-lg border border-[#8fd9ad]/30 bg-[#8fd9ad]/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#b7f3cc] hover:border-[#8fd9ad]/50 hover:bg-[#8fd9ad]/18 disabled:opacity-40 disabled:hover:border-[#8fd9ad]/30 disabled:hover:bg-[#8fd9ad]/10 disabled:hover:text-[#b7f3cc]"
                     >
                       {proofLoadingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.proof")}
                     </button>
@@ -356,7 +383,7 @@ export default function Rewards() {
                       onClick={() => handleClaim(reward.id)}
                       disabled={!!rewardClaimDisabledReason || reward.status !== "approved" || claimingId === reward.id}
                       title={rewardClaimDisabledReason || undefined}
-                      className="depth-button focus-ring min-w-[68px] rounded-[14px] border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/15 disabled:opacity-40"
+                      className="depth-button focus-ring min-w-[68px] rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/85 hover:bg-white/[0.12] disabled:opacity-40"
                     >
                       {claimingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.claim")}
                     </button>
