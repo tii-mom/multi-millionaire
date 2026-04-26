@@ -26,5 +26,22 @@ export default defineConfig(({mode}) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('@tonconnect')) return 'vendor-tonconnect';
+            if (id.includes('@ton/crypto')) return 'vendor-ton-crypto';
+            if (id.includes('@ton/core')) return 'vendor-ton-core';
+            if (id.includes('@ton/')) return 'vendor-ton';
+            if (id.includes('motion')) return 'vendor-motion';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+            return 'vendor';
+          },
+        },
+      },
+    },
   };
 });

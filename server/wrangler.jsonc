@@ -19,11 +19,19 @@
         "CORS_ALLOWED_ORIGINS": "https://staging.multi-millionaire-staging.pages.dev",
         "ADMIN_EMAILS": "admin@example.com",
         "HIGH_RISK_DEPOSIT_THRESHOLD": "1000000",
-        "CHAIN_ID": "ton-mainnet",
-        "TOKEN_ADDRESS": "EQDTESTTOKENADDRESS000000000000000000000000000000000",
-        "LOCK_VAULT_ADDRESS": "EQDTESTLOCKVAULTADDRESS0000000000000000000000000000",
-        "ORACLE_ADDRESS": "EQDTESTORACLEADDRESS00000000000000000000000000000000",
-        "REWARD_DISTRIBUTOR_ADDRESS": "EQDTESTREWARDDISTRIBUTORADDRESS0000000000000000000"
+        "CHAIN_ID": "ton-testnet",
+        "CHAIN_INTEGRATION_ENABLED": "false",
+        "CHAIN_READ_ONLY_ENABLED": "false",
+        "CHAIN_INDEXER_ENABLED": "false",
+        "CHAIN_MAINLINE_WRITES_ENABLED": "false",
+        "WALLET_BINDING_ENABLED": "false",
+        "RECEIPT_VERIFICATION_ENABLED": "false",
+        "TOKEN_ADDRESS": "",
+        "LOCK_VAULT_ADDRESS": "",
+        "ORACLE_ADDRESS": "",
+        "REWARD_DISTRIBUTOR_ADDRESS": "",
+        "CHAIN_RECEIPT_VERIFIER": "disabled",
+        "MERKLE_CLAIM_VERIFIER": "disabled"
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "88b8cd7fd84e4064ad29b43a16c579f2" }]
     },
@@ -66,6 +74,8 @@
         "MAINNET_DEPLOYMENT_EVIDENCE_RECORDED": "false",
         "CONTRACTS_EXTERNAL_AUDIT_APPROVED": "false",
         "PRODUCTION_CANARY_APPROVED": "false",
+        "PRODUCTION_PUBLIC_LAUNCH_ENABLED": "false",
+        "PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED": "false",
         "MAINNET_CANARY_EVIDENCE_URL": ""
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "92267e746955420d80eb707f4cf23e17" }]
