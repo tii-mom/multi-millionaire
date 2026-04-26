@@ -23,7 +23,11 @@
   - `CHAIN_RECEIPT_VERIFIER`
   - `WALLET_SIGNATURE_MODE`
   - `REWARD_CLAIM_MODEL=merkle`
+  - `MERKLE_CLAIM_VERIFIER`
+  - `REWARD_JETTON_WALLET_ADDRESS`
   - `CHAIN_MAINLINE_WRITES_ENABLED`
+- Keep `PRODUCTION_PUBLIC_LAUNCH_ENABLED=false` unless an external oracle path has
+  been approved; owner staged price remains testnet/canary-only.
 - Confirm database connectivity and backup coverage.
 - Confirm the frontend build passes.
 - Confirm the backend build and test suite pass.

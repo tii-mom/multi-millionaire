@@ -34,11 +34,14 @@ This checklist names the minimum external inputs required before Sprint 2 can mo
 | `CHAIN_ID` | Always for Sprint 2 config. | Use one canonical value, for example `ton-mainnet` if the current target remains TON. |
 | `TOKEN_ADDRESS` | Deposit receipt validation. | Must be the 72H token address for the same `CHAIN_ID`. |
 | `LOCK_VAULT_ADDRESS` | Deposit, position, withdrawal, and unlock reads. | Must be the deployed lock vault for the same token and chain. |
-| `ORACLE_ADDRESS` | Optional external price oracle path. | Not required for the current LockVault, where the owner wallet sends `SetPrice`. |
+| `ORACLE_ADDRESS` | Optional external price oracle path. | Not required for testnet/canary owner-staged price. Required before `PRODUCTION_PUBLIC_LAUNCH_ENABLED=true`. |
 | `MERKLE_CLAIM_ADDRESS` | Merkle reward claim flow. | Must match the Merkle proof format used by backend batches. |
+| `REWARD_JETTON_WALLET_ADDRESS` | Merkle reward claim receipt finality. | Required when `MERKLE_CLAIM_VERIFIER=ton_rpc`; backend verifies `JettonExcesses` from this wallet before marking claimed. |
 | `REWARD_DISTRIBUTOR_ADDRESS` | Distributor reward claim flow. | Required only when `REWARD_CLAIM_MODEL=distributor`. |
 | `CHAIN_INDEXER_ENABLED` | Background event ingestion runs. | Keep isolated until event apply is ready. |
 | `CHAIN_MAINLINE_WRITES_ENABLED` | Backend is allowed to submit chain-backed writes. | Keep false for RC1. |
+| `PRODUCTION_PUBLIC_LAUNCH_ENABLED` | Public production launch gate is being evaluated. | Keep false until independent oracle approval is recorded. |
+| `PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED` | Public launch price mechanism approval. | Must be true for public launch; owner staged price alone is canary-only. |
 
 ## ABI Or Contract Wrapper Env
 

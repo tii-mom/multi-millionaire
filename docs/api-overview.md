@@ -40,8 +40,9 @@ Authenticated endpoints require `Authorization: Bearer <jwt>`.
 - `GET /v1/waves/:waveId`: wave by ID.
 - `POST /v1/waves/:waveId/passes`: claim a Rush Pass for the authenticated user.
 - `POST /v1/waves/:waveId/deposit-precheck`: check wave and price availability for deposit.
-- `POST /v1/waves/:waveId/deposit`: record an off-chain MVP deposit stub.
-- `POST /v1/waves/:waveId/deposit-receipt`: submit a chain deposit receipt for verification and position application. This fails closed unless receipt verification is explicitly enabled.
+- `POST /v1/waves/:waveId/staging-mvp/deposit`: record an off-chain MVP deposit stub for staging/demo runtimes only.
+- `POST /v1/waves/:waveId/deposit`: legacy alias for the staging MVP deposit stub. Production chain runtimes fail closed with `CHAIN_RECEIPT_REQUIRED`.
+- `POST /v1/waves/:waveId/deposit-receipt`: production-chain deposit path. Submit a chain deposit receipt for verification and position application. This fails closed unless receipt verification is explicitly enabled.
 
 ### Wallet Binding
 
@@ -76,12 +77,13 @@ Leaderboard ordering:
 - `GET /v1/rewards/summary`: current user's pending, approved, and claimed reward totals.
 - `GET /v1/rewards?status=approved`: current user's reward ledgers, optionally filtered by status.
 - `GET /v1/rewards/:ledgerId/merkle-proof`: return active Merkle proof data for the reward owner. Risk review blocks access.
-- `POST /v1/rewards/:ledgerId/claim-receipt`: submit a claim transaction hash for chain-event verification. This fails closed until the real claim verifier is configured.
-- `POST /v1/rewards/:ledgerId/claim`: claim an approved reward ledger through an off-chain status update stub.
+- `POST /v1/rewards/:ledgerId/claim-receipt`: production-chain reward claim confirmation path. Submit a claim transaction hash for chain-event verification. This fails closed until the real claim verifier is configured.
+- `POST /v1/rewards/:ledgerId/staging-mvp/claim`: claim an approved reward ledger through an off-chain status update stub for staging/demo runtimes only.
+- `POST /v1/rewards/:ledgerId/claim`: legacy alias for the staging MVP reward claim stub. Production chain runtimes fail closed with `CHAIN_REWARD_CLAIM_REQUIRED`.
 
-When production chain writes are required, the off-chain reward claim endpoint
-fails closed. Production reward status must follow a chain-backed or proof-backed
-reward distribution flow.
+When production chain writes are required, off-chain deposit and reward claim
+stubs fail closed. Production status must follow deposit receipts and Merkle
+claim receipts.
 
 The limited gray-launch reward model is Merkle Claim. Draft batches and proofs
 can be generated and inspected by admins, but ledger status must not become
@@ -104,7 +106,7 @@ Risk endpoints are admin-only. The authenticated user's email must be listed in 
 - `GET /v1/admin/audit-logs`: list recent admin audit logs.
 - `GET /v1/admin/chain-events`: list chain event apply/review records.
 - `GET /v1/admin/merkle/batches`: list Merkle reward batches.
-- `POST /v1/admin/merkle/batches/draft`: generate a draft Merkle batch from eligible approved rewards.
+- `POST /v1/admin/merkle/batches/draft`: generate a draft Merkle batch from eligible approved rewards. In production this requires admin operations plus the explicit Merkle draft/canary gates.
 - `GET /v1/admin/merkle/proofs`: list Merkle reward proofs.
 
 Automatic Sprint 1 flags:

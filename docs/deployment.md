@@ -92,10 +92,11 @@ Before any production launch with real funds:
 
 ## Current Stub Boundaries
 
-- `POST /v1/waves/:waveId/deposit` records an off-chain database position. It does not verify or submit a real token lock.
-- `POST /v1/rewards/:ledgerId/claim` marks an approved reward ledger as claimed. It does not transfer tokens on-chain.
+- `POST /v1/waves/:waveId/staging-mvp/deposit` records an off-chain database position for staging/demo runtimes. The legacy `/deposit` alias remains for compatibility only. Neither path verifies or submits a real token lock.
+- `POST /v1/rewards/:ledgerId/staging-mvp/claim` marks an approved reward ledger as claimed for staging/demo runtimes. The legacy `/claim` alias remains for compatibility only. Neither path transfers tokens on-chain.
 - `GET /v1/rewards/:ledgerId/merkle-proof` exposes proof-backed claim data only after an active Merkle batch exists.
+- `POST /v1/waves/:waveId/deposit-receipt` is the production-chain deposit path and requires wallet binding plus receipt verification.
 - `POST /v1/rewards/:ledgerId/claim-receipt` fails closed until a real chain claim-event verifier is configured.
 - Risk blocking is enforced through `risk_flags` rows with `open` or `reviewing` status.
 - Chain-related env values are tracked for readiness, but RC1 smoke does not prove chain settlement.
-- When production chain writes are required, the legacy off-chain deposit and reward claim endpoints fail closed.
+- When production chain writes are required, the staging MVP and legacy off-chain deposit/reward claim endpoints fail closed.
