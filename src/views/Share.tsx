@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Download, Loader2, ShareIcon, Zap } from "lucide-react";
-import html2canvas from "html2canvas";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
+
+const BRAND_LOGO_SRC = "/logo-transparent.png";
 
 type ShareProps = {
   myDeposit: number;
@@ -19,6 +20,7 @@ export default function Share({ myDeposit }: ShareProps) {
     if (!posterRef.current) return null;
     try {
       setIsGenerating(true);
+      const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: null,
         scale: 2,
@@ -39,7 +41,7 @@ export default function Share({ myDeposit }: ShareProps) {
     const dataUrl = await generateImage();
     if (dataUrl) {
       const link = document.createElement("a");
-      link.download = "72H-Millionaire-Path.png";
+      link.download = "Multi-Millionaire.png";
       link.href = dataUrl;
       link.click();
       toast.success(t("share.saved"));
@@ -54,7 +56,7 @@ export default function Share({ myDeposit }: ShareProps) {
     try {
       if (navigator.share) {
         const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], "72H-Millionaire-Path.png", { type: "image/png" });
+        const file = new File([blob], "Multi-Millionaire.png", { type: "image/png" });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
@@ -68,7 +70,7 @@ export default function Share({ myDeposit }: ShareProps) {
       }
 
       const link = document.createElement("a");
-      link.download = "72H-Millionaire-Path.png";
+      link.download = "Multi-Millionaire.png";
       link.href = dataUrl;
       link.click();
       toast.message(t("share.unsupported"));
@@ -156,8 +158,23 @@ export default function Share({ myDeposit }: ShareProps) {
         <div className="absolute -bottom-1/2 -right-1/2 z-0 h-[150%] w-[150%] rounded-full bg-[#DBFF00]/10 blur-[60px]" />
 
         <div className="absolute inset-0 z-10 flex flex-col p-8">
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#DBFF00]">
-            {t("app.brand.kicker")}
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-16 w-20 shrink-0 items-center justify-center">
+              <div className="absolute inset-1 rounded-[24px] bg-emerald-950/20 blur-xl" />
+              <img
+                src={BRAND_LOGO_SRC}
+                alt={t("app.brand.name")}
+                className="relative h-full w-full object-contain drop-shadow-[0_8px_22px_rgba(0,0,0,0.5)]"
+              />
+            </div>
+            <div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#C99D38]">
+                {t("app.brand.kicker")}
+              </div>
+              <div className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-white">
+                {t("app.brand.name")}
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-1 flex-col justify-center">
