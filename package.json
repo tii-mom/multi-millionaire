@@ -23,6 +23,10 @@
     "contract:jetton-wallets:testnet": "tsx scripts/deriveTestnetJettonWallets.ts",
     "contract:derive:mainnet": "tsx scripts/deriveMainnetContracts.ts",
     "contract:configure:testnet": "tsx scripts/configureTestnetContracts.ts",
+    "test:nav": "node scripts/checkNavigation.mjs",
+    "smoke:staging-mutating": "cd server && npm run smoke:staging-mutating",
+    "smoke:production-readonly": "cd server && npm run smoke:production-readonly",
+    "smoke:production-canary": "cd server && npm run smoke:production-canary",
     "contract:deploy:lock-vault:mainnet": "node -e \"require('fs').mkdirSync('build',{recursive:true});require('fs').writeFileSync('build/package.json','{\\\"type\\\":\\\"commonjs\\\"}\\n')\" && TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' blueprint run deployLockVault --mainnet --tonconnect",
     "contract:deploy:merkle-claim:mainnet": "node -e \"require('fs').mkdirSync('build',{recursive:true});require('fs').writeFileSync('build/package.json','{\\\"type\\\":\\\"commonjs\\\"}\\n')\" && TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' blueprint run deployMerkleClaim --mainnet --tonconnect",
     "contract:canary:deposit:testnet": "tsx scripts/sendTestnetDeposit.ts"

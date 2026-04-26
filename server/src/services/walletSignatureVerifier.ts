@@ -161,6 +161,16 @@ function parseTimestamp(value: unknown): number {
   return parsed as number;
 }
 
+function cellContainsBuffer(cell: Cell | null | undefined, needle: Buffer, depth = 0): boolean {
+  if (!cell || depth > 8) {
+    return false;
+  }
+  if (cell.toBoc().includes(needle)) {
+    return true;
+  }
+  return cell.refs.some((ref) => cellContainsBuffer(ref, needle, depth + 1));
+}
+
 function verifyTonProof(input: WalletSignatureInput): void {
   const proofPayload = parseTonProof(input.signature);
   const proof = proofPayload.proof!;
@@ -265,10 +275,8 @@ function verifyTonProofWalletOwnership(input: {
     throw new WalletSignatureVerificationError(401, 'TON_PROOF_STATE_INIT_MISMATCH', 'TON proof stateInit does not derive walletAddress');
   }
 
-  const publicKeyHex = input.publicKey.toString('hex');
-  const stateInitHex = stateInitCell.toBoc().toString('hex');
-  if (!stateInitHex.includes(publicKeyHex)) {
-    throw new WalletSignatureVerificationError(401, 'TON_PROOF_PUBLIC_KEY_MISMATCH', 'TON proof public key is not present in wallet stateInit');
+  if (!cellContainsBuffer(stateInit.data, input.publicKey)) {
+    throw new WalletSignatureVerificationError(401, 'TON_PROOF_PUBLIC_KEY_MISMATCH', 'TON proof public key is not present in wallet stateInit data');
   }
 }
 

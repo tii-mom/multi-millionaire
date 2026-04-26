@@ -6,12 +6,13 @@ import {
   hashLedgerId,
   verifyMerkleClaimReceipt,
 } from '../src/services/merkleRewards';
-import { MERKLE_CLAIM_OPCODE } from '../src/services/tonMessages';
+import { JETTON_EXCESSES_OPCODE, MERKLE_CLAIM_OPCODE } from '../src/services/tonMessages';
 
 describe('Merkle reward helpers', () => {
   const beneficiaryWallet = 'kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl';
   const merkleClaimAddress = 'kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg';
   const otherWallet = 'kQDdFuJo_tCecQe0ejR7iyTKd8ld5A6ur25jRdO6sGcEklRt';
+  const rewardJettonWalletAddress = '0:2222222222222222222222222222222222222222222222222222222222222222';
   const tokenAddress = '0:1111111111111111111111111111111111111111111111111111111111111111';
 
   function buildClaimBody(input: { recipient?: string; amountRaw?: string } = {}): string {
@@ -26,6 +27,41 @@ describe('Merkle reward helpers', () => {
       .endCell()
       .toBoc()
       .toString('base64');
+  }
+
+  function buildExcessesBody(queryId = '1'): string {
+    return beginCell()
+      .storeUint(JETTON_EXCESSES_OPCODE, 32)
+      .storeUint(BigInt(queryId), 64)
+      .endCell()
+      .toBoc()
+      .toString('base64');
+  }
+
+  function claimTx(input: { body?: string } = {}) {
+    return {
+      transaction_id: { lt: '123', hash: 'claim-hash' },
+      description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
+      in_msg: {
+        source: beneficiaryWallet,
+        destination: merkleClaimAddress,
+        body: input.body || buildClaimBody(),
+      },
+    };
+  }
+
+  function excessesTx(input: { body?: string; description?: any } = {}) {
+    return {
+      transaction_id: { lt: '124', hash: 'excesses-hash' },
+      description: Object.prototype.hasOwnProperty.call(input, 'description')
+        ? input.description
+        : { aborted: false, compute_ph: { success: true }, action: { success: true } },
+      in_msg: {
+        source: rewardJettonWalletAddress,
+        destination: merkleClaimAddress,
+        body: input.body || buildExcessesBody(),
+      },
+    };
   }
 
   it('builds deterministic roots and proofs for reward leaves', () => {
@@ -104,19 +140,12 @@ describe('Merkle reward helpers', () => {
     process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
     process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+    process.env.REWARD_JETTON_WALLET_ADDRESS_TESTNET = rewardJettonWalletAddress;
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         ok: true,
-        result: [{
-          transaction_id: { lt: '123', hash: 'claim-hash' },
-          description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
-          in_msg: {
-            source: beneficiaryWallet,
-            destination: merkleClaimAddress,
-            body: buildClaimBody(),
-          },
-        }],
+        result: [claimTx(), excessesTx()],
       }),
     } as any);
 
@@ -145,10 +174,11 @@ describe('Merkle reward helpers', () => {
     process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://testnet.toncenter.com/api/v2/jsonRPC';
     process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+    process.env.REWARD_JETTON_WALLET_ADDRESS_TESTNET = rewardJettonWalletAddress;
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        transactions: [{
+        transactions: [({
           hash: 'claim-hash',
           lt: '123',
           now: 1777027651,
@@ -158,7 +188,7 @@ describe('Merkle reward helpers', () => {
             destination: merkleClaimAddress,
             message_content: { body: buildClaimBody() },
           },
-        }],
+        }), excessesTx()],
       }),
     } as any);
 
@@ -188,19 +218,12 @@ describe('Merkle reward helpers', () => {
     process.env.CHAIN_ID = 'ton-testnet';
     process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
     process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+    process.env.REWARD_JETTON_WALLET_ADDRESS_TESTNET = rewardJettonWalletAddress;
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         ok: true,
-        result: [{
-          transaction_id: { lt: '123', hash: 'claim-hash' },
-          description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
-          in_msg: {
-            source: beneficiaryWallet,
-            destination: merkleClaimAddress,
-            body: buildClaimBody({ recipient: otherWallet }),
-          },
-        }],
+        result: [claimTx({ body: buildClaimBody({ recipient: otherWallet }) }), excessesTx()],
       }),
     } as any);
 
@@ -211,6 +234,66 @@ describe('Merkle reward helpers', () => {
     })).rejects.toMatchObject({
       status: 409,
       code: 'RECIPIENT_MISMATCH',
+    });
+
+    fetchMock.mockRestore();
+    process.env = originalEnv;
+  });
+
+  it('rejects Merkle claim receipts until the reward Jetton wallet confirms finality', async () => {
+    const originalEnv = { ...process.env };
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+    process.env.REWARD_JETTON_WALLET_ADDRESS_TESTNET = rewardJettonWalletAddress;
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        result: [claimTx()],
+      }),
+    } as any);
+
+    await expect(verifyMerkleClaimReceipt({
+      txHash: 'claim-hash',
+      beneficiaryWallet,
+      amountRaw: '500',
+      ledgerIdHash: '0x03',
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'CLAIM_TRANSFER_NOT_FINALIZED',
+    });
+
+    fetchMock.mockRestore();
+    process.env = originalEnv;
+  });
+
+  it('rejects Merkle claim receipts when JettonExcesses bounced or failed', async () => {
+    const originalEnv = { ...process.env };
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.REWARD_CLAIM_MODEL = 'merkle';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.MERKLE_CLAIM_ADDRESS_TESTNET = merkleClaimAddress;
+    process.env.REWARD_JETTON_WALLET_ADDRESS_TESTNET = rewardJettonWalletAddress;
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        result: [claimTx(), excessesTx({ description: { aborted: true, compute_ph: { success: false }, action: { success: false } } })],
+      }),
+    } as any);
+
+    await expect(verifyMerkleClaimReceipt({
+      txHash: 'claim-hash',
+      beneficiaryWallet,
+      amountRaw: '500',
+      ledgerIdHash: '0x03',
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'TON_TX_FAILED',
     });
 
     fetchMock.mockRestore();

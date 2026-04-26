@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export type ContractRole = 'token' | 'lock_vault' | 'oracle' | 'reward_distributor';
+export type ContractRole = 'token' | 'lock_vault' | 'merkle_claim' | 'oracle' | 'reward_distributor';
 
 export interface ContractConfigIssue {
   severity: 'warning' | 'error';
@@ -23,6 +23,7 @@ export interface TokenResourceConfig {
 export interface AbiManifestConfig {
   rootDir: string;
   lockVault: string;
+  merkleClaim: string;
   oracle: string;
   rewardDistributor: string;
 }
@@ -71,6 +72,7 @@ export interface ContractIntegrationConfig {
   rpcUrl: string | null;
   token: TokenResourceConfig;
   lockVault: ContractResourceConfig;
+  merkleClaim: ContractResourceConfig;
   oracle: ContractResourceConfig;
   rewardDistributor: ContractResourceConfig;
   abi: AbiManifestConfig;
@@ -185,10 +187,12 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = process.e
   const lockVaultAddress = readString(env.LOCK_VAULT_ADDRESS);
   const oracleAddress = readString(env.ORACLE_ADDRESS);
   const rewardDistributorAddress = readString(env.REWARD_DISTRIBUTOR_ADDRESS);
+  const merkleClaimAddress = readString(env.MERKLE_CLAIM_ADDRESS);
   const tokenDecimals = readInteger(env.TOKEN_DECIMALS, null);
 
   const abiRootDir = normalizeString(env.CONTRACT_ABI_DIR) ?? 'src/services/contracts/abi';
   const lockVaultAbiPath = buildAbiPath(abiRootDir, 'lock-vault/lock-vault.abi.json', env.LOCK_VAULT_ABI_PATH);
+  const merkleClaimAbiPath = buildAbiPath(abiRootDir, 'merkle-claim/merkle-claim.abi.json', env.MERKLE_CLAIM_ABI_PATH);
   const oracleAbiPath = buildAbiPath(abiRootDir, 'oracle/oracle.abi.json', env.ORACLE_ABI_PATH);
   const rewardDistributorAbiPath = buildAbiPath(
     abiRootDir,
@@ -212,6 +216,11 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = process.e
       abiPath: lockVaultAbiPath,
       startBlock: readInteger(env.LOCK_VAULT_START_BLOCK, null),
     },
+    merkleClaim: {
+      address: merkleClaimAddress,
+      abiPath: merkleClaimAbiPath,
+      startBlock: readInteger(env.MERKLE_CLAIM_START_BLOCK, null),
+    },
     oracle: {
       address: oracleAddress,
       abiPath: oracleAbiPath,
@@ -225,6 +234,7 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = process.e
     abi: {
       rootDir: abiRootDir,
       lockVault: lockVaultAbiPath,
+      merkleClaim: merkleClaimAbiPath,
       oracle: oracleAbiPath,
       rewardDistributor: rewardDistributorAbiPath,
     },
@@ -283,6 +293,13 @@ export function validateContractIntegrationConfig(
         'REWARD_DISTRIBUTOR_ADDRESS',
         config.rewardDistributor.address,
         'REWARD_DISTRIBUTOR_ADDRESS is required when REWARD_CLAIM_MODEL=distributor'
+      );
+    }
+    if (config.rewardClaim.model === 'merkle' && config.mainlineWritesEnabled) {
+      requireField(
+        'MERKLE_CLAIM_ADDRESS',
+        config.merkleClaim.address,
+        'MERKLE_CLAIM_ADDRESS is required when production chain writes use REWARD_CLAIM_MODEL=merkle'
       );
     }
   }
@@ -344,13 +361,22 @@ export function validateContractIntegrationConfig(
 }
 
 export function getContractArtifactStatuses(config: ContractIntegrationConfig): ContractArtifactStatus[] {
-  return [
+  const artifacts: ContractArtifactStatus[] = [
     {
       role: 'lock_vault',
       path: config.abi.lockVault,
       resolvedPath: buildResolvedPath(config.abi.lockVault),
       exists: fs.existsSync(buildResolvedPath(config.abi.lockVault)),
     },
+    {
+      role: 'merkle_claim',
+      path: config.abi.merkleClaim,
+      resolvedPath: buildResolvedPath(config.abi.merkleClaim),
+      exists: fs.existsSync(buildResolvedPath(config.abi.merkleClaim)),
+    },
+  ];
+  if (config.rewardClaim.model === 'distributor' || readBoolean(process.env.CHAIN_FUTURE_RESOURCES_ENABLED, false)) {
+    artifacts.push(
     {
       role: 'oracle',
       path: config.abi.oracle,
@@ -363,7 +389,9 @@ export function getContractArtifactStatuses(config: ContractIntegrationConfig): 
       resolvedPath: buildResolvedPath(config.abi.rewardDistributor),
       exists: fs.existsSync(buildResolvedPath(config.abi.rewardDistributor)),
     },
-  ];
+    );
+  }
+  return artifacts;
 }
 
 export function getContractIntegrationDiagnostics(

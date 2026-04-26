@@ -13,7 +13,10 @@
     "migrate:reset": "ts-node src/scripts/migrate.ts reset",
     "seed:dev": "ts-node src/scripts/seedDev.ts",
     "smoke": "ts-node src/scripts/smoke.ts",
-    "smoke:production": "ts-node src/scripts/productionSmoke.ts"
+    "smoke:staging-mutating": "ts-node src/scripts/smoke.ts",
+    "smoke:production": "ts-node src/scripts/productionSmoke.ts",
+    "smoke:production-readonly": "ts-node src/scripts/productionSmoke.ts",
+    "smoke:production-canary": "node -e \"if (process.env.PRODUCTION_CANARY_APPROVED !== 'true') { console.error('PRODUCTION_CANARY_APPROVED=true is required for production canary smoke'); process.exit(1); }\" && ts-node src/scripts/smoke.ts"
   },
   "dependencies": {
     "@ton/core": "^0.63.1",

@@ -17,6 +17,7 @@ import {
   getContractIntegrationDiagnostics,
   loadContractIntegrationConfig,
 } from '../services/contracts/config';
+import { currentRuntimePath, merkleDraftWritesEnabled } from '../services/runtimeModes';
 
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
@@ -134,6 +135,8 @@ export async function getOpsDiagnostics(req: Request, res: Response, next: NextF
         merkle_claim_verifier: getMerkleClaimVerifierDiagnostics(),
         contract_integration: getContractIntegrationDiagnostics(contractConfig),
         contract_artifacts: getContractArtifactStatuses(contractConfig),
+        runtime_path: currentRuntimePath(),
+        merkle_draft_writes_enabled: merkleDraftWritesEnabled(),
       },
     });
   } catch (err) {
@@ -166,6 +169,15 @@ export async function postMerkleDraftBatch(req: Request, res: Response, next: Ne
   try {
     const chainId = String(req.body.chainId || process.env.CHAIN_ID || '').trim();
     const tokenAddress = String(req.body.tokenAddress || process.env.TOKEN_ADDRESS || '').trim();
+    if (!merkleDraftWritesEnabled()) {
+      return res.status(403).json({
+        request_id: req.id || '',
+        error: {
+          code: 'MERKLE_DRAFT_WRITES_DISABLED',
+          message: 'Merkle draft writes require admin operations and an approved production canary gate in production',
+        },
+      });
+    }
     if (!chainId || !tokenAddress) {
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'chainId and tokenAddress are required' } });
     }

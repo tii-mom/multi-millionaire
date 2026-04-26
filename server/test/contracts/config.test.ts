@@ -33,7 +33,7 @@ describe('contract config loader', () => {
     expect(config.rewardClaim.model).toBe('merkle');
     expect(diagnostics.readyForReads).toBe(true);
     expect(diagnostics.readyForIndexer).toBe(false);
-    expect(diagnostics.abiArtifacts).toHaveLength(3);
+    expect(diagnostics.abiArtifacts.map((artifact) => artifact.role)).toEqual(['lock_vault', 'merkle_claim']);
   });
 
   it('requires a distributor address only for the distributor claim model', () => {

@@ -4,6 +4,7 @@ import { getCurrentWave, getWaveById } from '../models/waveModel';
 import { withTransaction } from '../db';
 import { applyDeposit } from '../services/depositApplyService';
 import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
+import { currentRuntimePath, stagingMvpEnabled } from '../services/runtimeModes';
 
 /**
  * Deposit precheck endpoint.
@@ -40,9 +41,10 @@ export async function depositPrecheck(req: Request, res: Response, next: NextFun
           bound: !!req.user,
           primary_wallet: null,
         },
+        runtime_path: currentRuntimePath(),
         notes: productionChainRequired()
           ? ['Production deposits require wallet binding and a verified chain receipt.']
-          : ['Current deposit endpoint records an off-chain staging deposit stub.'],
+          : ['Current deposit endpoint records a staging-mvp off-chain deposit stub.'],
       },
     });
   } catch (err) {
@@ -70,6 +72,15 @@ export async function deposit(req: Request, res: Response, next: NextFunction) {
         error: {
           code: 'CHAIN_RECEIPT_REQUIRED',
           message: 'Production deposits must use /v1/waves/:waveId/deposit-receipt with a verified chain receipt',
+        },
+      });
+    }
+    if (!stagingMvpEnabled()) {
+      return res.status(404).json({
+        request_id: req.id || '',
+        error: {
+          code: 'STAGING_MVP_DISABLED',
+          message: 'The off-chain staging-mvp deposit endpoint is not enabled in this runtime',
         },
       });
     }

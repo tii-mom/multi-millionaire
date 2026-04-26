@@ -29,15 +29,19 @@ router.post('/:waveId/passes', requireAuth, requirePositiveIntParam('waveId'), c
 // POST /v1/waves/:waveId/deposit-precheck
 router.post('/:waveId/deposit-precheck', requireAuth, requirePositiveIntParam('waveId'), depositPrecheck);
 
-// POST /v1/waves/:waveId/deposit
-router.post(
-  '/:waveId/deposit',
+const stagingMvpDepositHandlers = [
   requireAuth,
   depositRateLimit,
   requirePositiveIntParam('waveId'),
   requireFields('body', ['amount']),
-  deposit
-);
+  deposit,
+] as const;
+
+// POST /v1/waves/:waveId/staging-mvp/deposit
+router.post('/:waveId/staging-mvp/deposit', ...stagingMvpDepositHandlers);
+
+// Legacy alias kept for existing staging clients. Production still fails closed.
+router.post('/:waveId/deposit', ...stagingMvpDepositHandlers);
 
 // POST /v1/waves/:waveId/deposit-receipt
 router.post(

@@ -8,6 +8,7 @@ import {
 } from '../models/rewardModel';
 import { hasBlockingRiskForRewardClaim } from '../models/riskModel';
 import { isControlEnabled, productionChainRequired, riskReviewEnabled } from '../services/productionGuards';
+import { stagingMvpEnabled } from '../services/runtimeModes';
 import { assertChainCanaryMutationAllowed, ChainCanaryGuardError } from '../services/chainCanaryGuards';
 import { getMerkleProofForLedger, markMerkleClaimVerified } from '../models/merkleRewardModel';
 import { encodeMerkleProofCell, hashLedgerId, MerkleClaimVerificationError, verifyMerkleClaimReceipt } from '../services/merkleRewards';
@@ -71,6 +72,15 @@ export async function claimReward(req: Request, res: Response, next: NextFunctio
         error: {
           code: 'CHAIN_REWARD_CLAIM_REQUIRED',
           message: 'Production reward claims must be confirmed by the chain-backed reward distribution flow',
+        },
+      });
+    }
+    if (!stagingMvpEnabled()) {
+      return res.status(404).json({
+        request_id: req.id || '',
+        error: {
+          code: 'STAGING_MVP_DISABLED',
+          message: 'The legacy staging-mvp reward claim endpoint is not enabled in this runtime',
         },
       });
     }

@@ -14,10 +14,7 @@ import {
   verifyWalletSignature,
   WalletSignatureVerificationError,
 } from '../services/walletSignatureVerifier';
-
-function walletBindingEnabled(): boolean {
-  return process.env.WALLET_BINDING_ENABLED === 'true';
-}
+import { walletBindingRuntimeEnabled } from '../services/runtimeModes';
 
 export async function createBindIntent(req: Request, res: Response, next: NextFunction) {
   try {
@@ -25,7 +22,7 @@ export async function createBindIntent(req: Request, res: Response, next: NextFu
     if (!user) {
       return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
     }
-    if (!walletBindingEnabled()) {
+    if (!walletBindingRuntimeEnabled()) {
       return res.status(503).json({ request_id: req.id || '', error: { code: 'WALLET_BINDING_DISABLED', message: 'Wallet binding is not enabled' } });
     }
 
@@ -63,7 +60,7 @@ export async function bindWallet(req: Request, res: Response, next: NextFunction
     if (!user) {
       return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
     }
-    if (!walletBindingEnabled()) {
+    if (!walletBindingRuntimeEnabled()) {
       return res.status(503).json({ request_id: req.id || '', error: { code: 'WALLET_BINDING_DISABLED', message: 'Wallet binding is not enabled' } });
     }
 

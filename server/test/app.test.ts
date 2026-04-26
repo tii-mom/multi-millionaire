@@ -75,5 +75,25 @@ describe('API integration tests', () => {
       status: 'disabled',
       mode: 'disabled',
     });
+    expect(res.body.data.ops.merkle_claim_verifier).toMatchObject({
+      configured: false,
+      status: 'not_configured',
+    });
+    expect(res.body.data.ops.runtime_path).toBe('staging-mvp');
+    expect(res.body.data.feature_flags.staging_mvp_enabled).toBe(true);
+  });
+
+  it('does not expose testnet MerkleClaim fallback in production bootstrap', async () => {
+    const originalEnv = { ...process.env };
+    process.env.NODE_ENV = 'production';
+    process.env.CHAIN_ID = 'ton-mainnet';
+    delete process.env.MERKLE_CLAIM_ADDRESS;
+    process.env.MERKLE_CLAIM_ADDRESS_TESTNET = 'EQDTESTMERKLECLAIMADDRESS000000000000000000000000000';
+
+    const res = await request(app).get('/v1/app/bootstrap');
+    expect(res.status).toBe(200);
+    expect(res.body.data.contracts.merkle_claim).toBe('');
+
+    process.env = originalEnv;
   });
 });

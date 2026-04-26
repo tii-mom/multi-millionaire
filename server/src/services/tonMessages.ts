@@ -3,6 +3,7 @@ import { Address, beginCell, Cell, Slice } from '@ton/core';
 export const JETTON_TRANSFER_NOTIFICATION_OPCODE = 0x7362d09c;
 export const LOCK_VAULT_DEPOSIT_OPCODE = JETTON_TRANSFER_NOTIFICATION_OPCODE;
 export const MERKLE_CLAIM_OPCODE = 0x434c414d;
+export const JETTON_EXCESSES_OPCODE = 0xd53276db;
 
 export interface ParsedLockVaultDeposit {
   opcode: number;
@@ -20,6 +21,11 @@ export interface ParsedMerkleClaim {
   ledgerIdHash: string;
   recipient: string;
   amountRaw: string;
+}
+
+export interface ParsedJettonExcesses {
+  opcode: number;
+  queryId: string;
 }
 
 export interface TonTransactionMessage {
@@ -44,6 +50,8 @@ export interface TonTransactionLike {
   utime?: number;
   now?: number;
   in_msg?: TonTransactionMessage;
+  out_msgs?: TonTransactionMessage[];
+  out_msgs_count?: number;
   description?: {
     aborted?: boolean;
     compute_ph?: {
@@ -192,6 +200,18 @@ export function parseMerkleClaimBody(bodyBase64: string): ParsedMerkleClaim {
   };
 }
 
+export function parseJettonExcessesBody(bodyBase64: string): ParsedJettonExcesses {
+  const slice = readBodyCell(bodyBase64).beginParse();
+  const opcode = slice.loadUint(32);
+  if (opcode !== JETTON_EXCESSES_OPCODE) {
+    throw new TonMessageParseError('UNEXPECTED_TON_OPCODE', 'Message body is not a JettonExcesses message');
+  }
+  return {
+    opcode,
+    queryId: slice.loadUintBig(64).toString(),
+  };
+}
+
 export function findDepositTransaction(input: {
   transactions: TonTransactionLike[];
   txHash: string;
@@ -245,6 +265,39 @@ export function findMerkleClaimTransaction(input: {
     assertTransactionSucceeded(transaction);
     const claim = parseMerkleClaimBody(body);
     return { transaction, message, claim };
+  }
+  return null;
+}
+
+export function findJettonExcessesTransaction(input: {
+  transactions: TonTransactionLike[];
+  queryId: string;
+  merkleClaimAddress: string;
+  rewardJettonWalletAddress: string;
+}): { transaction: TonTransactionLike; message: TonTransactionMessage; excesses: ParsedJettonExcesses } | null {
+  const expectedDestination = normalizeTonAddress(input.merkleClaimAddress);
+  const expectedSource = normalizeTonAddress(input.rewardJettonWalletAddress);
+  for (const transaction of input.transactions) {
+    const message = transaction.in_msg;
+    if (!message?.destination || !message.source) {
+      continue;
+    }
+    if (normalizeTonAddress(message.destination) !== expectedDestination) {
+      continue;
+    }
+    if (normalizeTonAddress(message.source) !== expectedSource) {
+      continue;
+    }
+    const body = getTonMessageBody(message);
+    if (!body) {
+      continue;
+    }
+    assertTransactionSucceeded(transaction);
+    const excesses = parseJettonExcessesBody(body);
+    if (excesses.queryId !== input.queryId) {
+      continue;
+    }
+    return { transaction, message, excesses };
   }
   return null;
 }

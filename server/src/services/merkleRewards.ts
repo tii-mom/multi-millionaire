@@ -3,6 +3,7 @@ import { Address, beginCell, Cell } from '@ton/core';
 import { withTransaction } from '../db';
 import { loadContractIntegrationConfig } from './contracts/config';
 import {
+  findJettonExcessesTransaction,
   findMerkleClaimTransaction,
   getTonTransactionLt,
   getTonTransactionTime,
@@ -291,11 +292,15 @@ export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): 
 
   const config = loadContractIntegrationConfig();
   const merkleClaimAddress = readProductionAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET');
+  const rewardJettonWalletAddress = readProductionAddress('REWARD_JETTON_WALLET_ADDRESS', 'REWARD_JETTON_WALLET_ADDRESS_TESTNET');
   if (!config.rpcUrl) {
     throw new MerkleClaimVerificationError(503, 'CHAIN_RPC_NOT_CONFIGURED', 'CHAIN_RPC_URL is required for Merkle claim verification');
   }
   if (!merkleClaimAddress) {
     throw new MerkleClaimVerificationError(503, 'MERKLE_CLAIM_CONTRACT_NOT_CONFIGURED', 'MERKLE_CLAIM_ADDRESS is required for Merkle claim verification');
+  }
+  if (!rewardJettonWalletAddress) {
+    throw new MerkleClaimVerificationError(503, 'REWARD_JETTON_WALLET_NOT_CONFIGURED', 'REWARD_JETTON_WALLET_ADDRESS is required for Merkle claim finality verification');
   }
 
   const transactions = await fetchTonTransactions(config.rpcUrl, merkleClaimAddress, input.txHash);
@@ -329,6 +334,27 @@ export async function verifyMerkleClaimReceipt(input: MerkleClaimReceiptInput): 
   }
   if (match.claim.amountRaw !== input.amountRaw) {
     throw new MerkleClaimVerificationError(409, 'AMOUNT_MISMATCH', 'Claim receipt amount does not match the Merkle proof');
+  }
+  let finality;
+  try {
+    finality = findJettonExcessesTransaction({
+      transactions,
+      queryId: match.claim.queryId,
+      merkleClaimAddress,
+      rewardJettonWalletAddress,
+    });
+  } catch (error) {
+    if (error instanceof TonMessageParseError) {
+      throw new MerkleClaimVerificationError(409, error.code, error.message);
+    }
+    throw error;
+  }
+  if (!finality) {
+    throw new MerkleClaimVerificationError(
+      409,
+      'CLAIM_TRANSFER_NOT_FINALIZED',
+      'Claim receipt does not include final JettonExcesses confirmation from the reward Jetton wallet'
+    );
   }
 
   return {

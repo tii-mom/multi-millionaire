@@ -8,6 +8,7 @@ router.get('/summary', requireAuth, rewardSummary);
 router.get('/', requireAuth, listRewards);
 router.get('/:ledgerId/merkle-proof', requireAuth, getMerkleClaimProof);
 router.post('/:ledgerId/claim-receipt', requireAuth, submitMerkleClaimReceipt);
+router.post('/:ledgerId/staging-mvp/claim', requireAuth, claimReward);
 router.post('/:ledgerId/claim', requireAuth, claimReward);
 
 export default router;

@@ -171,6 +171,23 @@ describe('checkEnv production chain gates', () => {
     expect(result.parsed.status).toBe('pass');
   });
 
+  it('fails public launch when only owner staged price is available', () => {
+    const result = runCheckEnv(productionChainWriteEnv({
+      PRODUCTION_PUBLIC_LAUNCH_ENABLED: 'true',
+      ORACLE_ADDRESS: '',
+      PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED: 'false',
+    }));
+
+    expect(result.code).toBe(1);
+    expect(result.parsed.status).toBe('fail');
+    expect(result.parsed.required).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'ORACLE_ADDRESS', status: 'missing' }),
+    ]));
+    expect(requiredMessages(result.parsed, 'PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED')).toContain(
+      'Public launch cannot rely on owner staged price only'
+    );
+  });
+
   it('fails production when the receipt verifier is test mode', () => {
     const result = runCheckEnv({
       CHAIN_RECEIPT_VERIFIER: 'test',

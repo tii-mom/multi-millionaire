@@ -152,7 +152,25 @@ describe('Admin read API', () => {
       configured: false,
       status: 'not_configured',
     });
+    expect(res.body.data.runtime_path).toBe('staging-mvp');
+    expect(res.body.data.merkle_draft_writes_enabled).toBe(true);
     expect(res.body.data.contract_integration).toHaveProperty('readyForReads');
+  });
+
+  it('blocks Merkle draft writes in production without canary approval', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.MERKLE_DRAFT_WRITES_ENABLED;
+    delete process.env.PRODUCTION_CANARY_APPROVED;
+
+    const res = await request(app)
+      .post('/v1/admin/merkle/batches/draft')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ chainId: 'ton-mainnet', tokenAddress: 'token-1' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('MERKLE_DRAFT_WRITES_DISABLED');
+    expect(createDraftMerkleRewardBatchMock).not.toHaveBeenCalled();
+    delete process.env.NODE_ENV;
   });
 
   it('requires admin access for operations controls', async () => {

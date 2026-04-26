@@ -241,13 +241,15 @@ describe('Production readiness gates', () => {
   it('blocks the off-chain deposit stub when production chain writes are required', async () => {
     process.env.CHAIN_MAINLINE_WRITES_ENABLED = 'true';
 
-    const res = await request(app)
-      .post('/v1/waves/1/deposit')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ amount: '1000' });
+    for (const path of ['/v1/waves/1/deposit', '/v1/waves/1/staging-mvp/deposit']) {
+      const res = await request(app)
+        .post(path)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ amount: '1000' });
 
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('CHAIN_RECEIPT_REQUIRED');
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('CHAIN_RECEIPT_REQUIRED');
+    }
   });
 
   it('blocks the off-chain reward claim stub when production chain writes are required', async () => {
@@ -258,12 +260,14 @@ describe('Production readiness gates', () => {
       status: 'approved',
     });
 
-    const res = await request(app)
-      .post('/v1/rewards/ledger-1/claim')
-      .set('Authorization', `Bearer ${token}`);
+    for (const path of ['/v1/rewards/ledger-1/claim', '/v1/rewards/ledger-1/staging-mvp/claim']) {
+      const res = await request(app)
+        .post(path)
+        .set('Authorization', `Bearer ${token}`);
 
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('CHAIN_REWARD_CLAIM_REQUIRED');
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('CHAIN_REWARD_CLAIM_REQUIRED');
+    }
     expect(markRewardClaimedMock).not.toHaveBeenCalled();
   });
 

@@ -18,6 +18,12 @@ interface CheckResult {
   message?: string;
 }
 
+interface CheckGroup {
+  name: 'base-api' | 'production-chain' | 'canary-audit';
+  required: CheckResult[];
+  recommended: CheckResult[];
+}
+
 const defaultSecrets = new Set(['secret', 'supersecretjwt']);
 const placeholderPattern = /^(<.*>|.*example.*|.*placeholder.*|.*test.*address.*)$/i;
 
@@ -327,6 +333,7 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
   const verifier = (process.env.CHAIN_RECEIPT_VERIFIER || '').trim().toLowerCase();
   const merkleVerifier = (process.env.MERKLE_CLAIM_VERIFIER || '').trim().toLowerCase();
   const walletVerifier = (process.env.WALLET_SIGNATURE_MODE || '').trim().toLowerCase();
+  const publicLaunch = isTruthy(process.env.PRODUCTION_PUBLIC_LAUNCH_ENABLED);
   const needsTransactionsApi = receiptEnabled || verifier === 'ton_rpc' || merkleVerifier === 'ton_rpc' || chainWrites;
   const chainWriteRequired: EnvCheck[] = [
     { name: 'CHAIN_ID', hint: 'Production chain writes require an explicit chain id.', validate: validateContractValue },
@@ -437,6 +444,23 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
       });
     }
   }
+  if (publicLaunch) {
+    if (!hasValue('ORACLE_ADDRESS')) {
+      checks.push({
+        name: 'ORACLE_ADDRESS',
+        status: 'missing',
+        hint: 'Public launch requires an audited external oracle address; owner staged price is canary-only.',
+      });
+    }
+    if (!isTruthy(process.env.PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED)) {
+      checks.push({
+        name: 'PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED',
+        status: 'invalid',
+        hint: 'Set true only after the external oracle mechanism is independently approved for public launch.',
+        message: 'Public launch cannot rely on owner staged price only',
+      });
+    }
+  }
 
   return checks;
 }
@@ -475,21 +499,60 @@ function printHuman(profile: Profile, required: CheckResult[], recommended: Chec
   }
 }
 
+function buildCheckGroups(profile: Profile): CheckGroup[] {
+  const checks = profileChecks[profile];
+  const productionChecks = productionConsistencyChecks(profile);
+  const canaryAuditNames = new Set([
+    'CHAIN_CANARY_ALLOWLIST',
+    'CHAIN_CANARY_MAX_AMOUNT_RAW',
+    'CHAIN_CANARY_WAVE_IDS',
+    'MAINNET_DEPLOYMENT_EVIDENCE_RECORDED',
+    'CONTRACTS_EXTERNAL_AUDIT_APPROVED',
+    'PRODUCTION_CANARY_APPROVED',
+    'MAINNET_CANARY_EVIDENCE_URL',
+    'PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED',
+  ]);
+
+  const baseRequired = checks.required.map((check) => runCheck(check, profile));
+  const baseRecommended = checks.recommended
+    .filter((check) => !check.name.startsWith('CHAIN_')
+      && !check.name.includes('WALLET')
+      && !check.name.includes('RECEIPT')
+      && !check.name.includes('MERKLE')
+      && !check.name.includes('TOKEN')
+      && !check.name.includes('LOCK_VAULT')
+      && !canaryAuditNames.has(check.name))
+    .map((check) => runCheck(check, profile));
+  const productionRecommended = checks.recommended
+    .filter((check) => !canaryAuditNames.has(check.name))
+    .filter((check) => !baseRecommended.some((result) => result.name === check.name))
+    .map((check) => runCheck(check, profile));
+  const canaryRecommended = checks.recommended
+    .filter((check) => canaryAuditNames.has(check.name))
+    .map((check) => runCheck(check, profile));
+  const canaryRequired = productionChecks.filter((check) => canaryAuditNames.has(check.name));
+  const productionRequired = productionChecks.filter((check) => !canaryAuditNames.has(check.name));
+
+  return [
+    { name: 'base-api', required: baseRequired, recommended: baseRecommended },
+    { name: 'production-chain', required: productionRequired, recommended: productionRecommended },
+    { name: 'canary-audit', required: canaryRequired, recommended: canaryRecommended },
+  ];
+}
+
 function main() {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
   const profileArg = args.find((arg) => !arg.startsWith('--'));
   const profile = normalizeProfile(profileArg || process.env.NODE_ENV);
-  const checks = profileChecks[profile];
-  const required = [
-    ...checks.required.map((check) => runCheck(check, profile)),
-    ...productionConsistencyChecks(profile),
-  ];
-  const recommended = checks.recommended.map((check) => runCheck(check, profile));
+  const groups = buildCheckGroups(profile);
+  const required = groups.flatMap((group) => group.required);
+  const recommended = groups.flatMap((group) => group.recommended);
   const missingRequired = required.filter((item) => item.status !== 'present');
   const result = {
     status: missingRequired.length === 0 ? 'pass' : 'fail',
     profile,
+    groups,
     required,
     recommended,
   };
