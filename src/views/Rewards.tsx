@@ -95,14 +95,14 @@ export default function Rewards() {
   }, []);
 
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
-  const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;
+  const merkleClaimVerifierConfigured = !!bootstrap?.ops?.merkle_claim_verifier?.configured;
   const rewardClaimsPaused = !!bootstrap?.controls?.pause_reward_claims?.enabled;
   const merkleClaimAddress = bootstrap?.contracts?.merkle_claim || "";
   const rewardClaimDisabledReason = rewardClaimsPaused
     ? bootstrap?.controls?.pause_reward_claims?.reason || t("rewards.claimsPaused")
     : !chainMainlineEnabled
       ? t("rewards.chainWritesDisabled")
-      : !receiptVerifierConfigured
+      : !merkleClaimVerifierConfigured
         ? t("rewards.verifierNotReady")
         : !merkleClaimAddress
           ? t("rewards.claimContractMissing")

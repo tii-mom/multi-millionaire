@@ -16,13 +16,22 @@ function readPositiveBigInt(value: string, label: string): bigint {
 
 export function toRawTokenAmount(value: string, decimals = 9): string {
   const normalized = value.trim();
-  if (!/^\d+$/.test(normalized)) {
-    throw new Error("amount must be a whole-number token amount");
-  }
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
     throw new Error("token decimals must be between 0 and 18");
   }
-  return (BigInt(normalized) * (10n ** BigInt(decimals))).toString();
+  if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(normalized)) {
+    throw new Error("amount must be a non-negative decimal token amount");
+  }
+  const [whole, fractional = ""] = normalized.split(".");
+  if (fractional.length > decimals) {
+    throw new Error(`amount supports at most ${decimals} decimal places`);
+  }
+  const scale = 10n ** BigInt(decimals);
+  const wholeRaw = BigInt(whole) * scale;
+  const fractionalRaw = fractional
+    ? BigInt(fractional.padEnd(decimals, "0"))
+    : 0n;
+  return (wholeRaw + fractionalRaw).toString();
 }
 
 export function rawTokenAmountToDisplayNumber(value: string, decimals = 9): number {

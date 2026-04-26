@@ -53,11 +53,17 @@ export interface BootstrapData {
   feature_flags: Record<string, boolean>;
   controls?: Record<string, { enabled: boolean; reason: string | null }>;
   ops?: {
+    runtime_path?: 'production-chain' | 'staging-mvp' | 'future-disabled';
     receipt_verifier?: {
       configured: boolean;
       status: string;
       mode: string;
       receipt_verification_enabled: boolean;
+    };
+    merkle_claim_verifier?: {
+      configured: boolean;
+      status: string;
+      model: string;
     };
   };
 }
@@ -74,6 +80,11 @@ export interface AppControl {
   reason: string | null;
   updated_by: string | null;
   updated_at: string;
+}
+
+export interface AdminOpsDiagnostics {
+  runtime_path?: 'production-chain' | 'staging-mvp' | 'future-disabled';
+  merkle_draft_writes_enabled?: boolean;
 }
 
 export interface Position {

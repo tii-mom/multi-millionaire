@@ -1,6 +1,7 @@
 import type {
   ApiEnvelope,
   AdminDashboard,
+  AdminOpsDiagnostics,
   AdminReward,
   AdminRiskFlag,
   AdminSquad,
@@ -33,6 +34,18 @@ type RequestOptions = {
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
 
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.body !== undefined) {
@@ -51,7 +64,7 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message = payload?.error?.message || `Request failed with ${response.status}`;
-    throw new Error(message);
+    throw new ApiRequestError(message, response.status, payload?.error?.code);
   }
 
   return (payload as ApiEnvelope<T>).data;
@@ -102,7 +115,7 @@ export const api = {
   },
 
   deposit(waveId: number, amount: string, token: string) {
-    return requestJson<Position>(`/v1/waves/${waveId}/deposit`, {
+    return requestJson<Position>(`/v1/waves/${waveId}/staging-mvp/deposit`, {
       method: "POST",
       token,
       body: { amount },
@@ -170,7 +183,7 @@ export const api = {
   },
 
   claimReward(ledgerId: string, token: string) {
-    return requestJson<RewardLedger>(`/v1/rewards/${ledgerId}/claim`, {
+    return requestJson<RewardLedger>(`/v1/rewards/${ledgerId}/staging-mvp/claim`, {
       method: "POST",
       token,
     });
@@ -210,6 +223,10 @@ export const api = {
 
   adminControls(token: string) {
     return requestJson<AppControl[]>("/v1/admin/controls", { token });
+  },
+
+  adminOps(token: string) {
+    return requestJson<AdminOpsDiagnostics>("/v1/admin/ops", { token });
   },
 
   updateAdminControl(key: AppControlKey, input: { enabled: boolean; reason?: string | null }, token: string) {

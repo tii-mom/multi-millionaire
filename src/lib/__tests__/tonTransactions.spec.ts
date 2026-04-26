@@ -66,9 +66,14 @@ describe("ton transaction body builders", () => {
 
   it("converts whole-token display amounts to raw Jetton units", () => {
     expect(toRawTokenAmount("1", 9)).toBe("1000000000");
+    expect(toRawTokenAmount("1.5", 9)).toBe("1500000000");
+    expect(toRawTokenAmount("1.25", 9)).toBe("1250000000");
+    expect(toRawTokenAmount("0.000000001", 9)).toBe("1");
     expect(toRawTokenAmount("1000000000", 9)).toBe("1000000000000000000");
     expect(rawTokenAmountToDisplayNumber("1000000000", 9)).toBe(1);
-    expect(() => toRawTokenAmount("1.5", 9)).toThrow(/whole-number/);
+    expect(() => toRawTokenAmount("1.1234567891", 9)).toThrow(/decimal places/);
+    expect(() => toRawTokenAmount("-1", 9)).toThrow(/decimal/);
+    expect(() => toRawTokenAmount("1e3", 9)).toThrow(/decimal/);
   });
 
   it("encodes MerkleClaim claim body with recipient, amount, ledger hash, and proof", async () => {
