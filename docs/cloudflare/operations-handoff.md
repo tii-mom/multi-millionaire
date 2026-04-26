@@ -1,6 +1,6 @@
 # Cloudflare Operations Handoff
 
-Date: 2026-04-25
+Date: 2026-04-26
 
 ## Current State
 
@@ -28,8 +28,7 @@ Current RC1 judgment:
   uses Hyperdrive -> Neon Postgres
 - production environment: `infrastructure canary only`, because production
   Worker, Pages, Hyperdrive, Neon migrations, and GET-only smoke evidence now
-  exist, but mainnet contracts, DNS/custom domains, and mutating canary evidence
-  are still unfinished
+  exist, but mainnet contracts and mutating canary evidence are still unfinished
 
 ## Current Data Plane
 
@@ -73,9 +72,9 @@ Target route:
 `Cloudflare Worker -> Hyperdrive -> managed Postgres`
 
 The staging cutover has been completed. The production cutover remains blocked
-for real chain-backed use until mainnet contracts are deployed, DNS/custom
-domains are attached, and a small mainnet canary is recorded. Production Neon,
-Hyperdrive, Worker, Pages, and non-mutating smoke have been exercised.
+for real chain-backed use until mainnet contracts are deployed and a small
+mainnet canary is recorded. Production Neon, Hyperdrive, Worker, Pages, custom
+domains, and non-mutating smoke have been exercised.
 
 Do not put real secrets in this repository. Export them only in the operator
 shell that runs the cutover commands.
@@ -107,25 +106,24 @@ Current production resource evidence:
 - latest Pages deployment URL:
   `https://29f929d8.multi-millionaire-production.pages.dev`
 - production frontend custom domain: `mm.72h.lol` exists in Pages but remains
-  pending because the token cannot create the required DNS record.
-- required frontend DNS record:
-  `CNAME mm -> multi-millionaire-production.pages.dev`, proxied.
+  live; `https://mm.72h.lol` returned `200` on 2026-04-26.
+- required frontend DNS record is now present through Cloudflare. DNS answers
+  for `mm.72h.lol` returned Cloudflare A/AAAA records on 2026-04-26.
 - latest DNS API attempt: 2026-04-25 direct Cloudflare API create for that
   CNAME returned `403` / `code=10000` authentication error. The token can list
-  the `72h.lol` zone but still cannot read or write DNS records.
+  the `72h.lol` zone but still may not be sufficient for future DNS changes.
 - production Hyperdrive:
   `multi-millionaire-production-postgres`
 - production Hyperdrive id: `92267e746955420d80eb707f4cf23e17`
-- production GET-only smoke on 2026-04-25 against `https://api.mm.72h.lol`:
+- production GET-only smoke on 2026-04-26 against `https://api.mm.72h.lol`:
   `/health=200`, `/ready=200`, `/v1/app/bootstrap=200`,
   `/v1/waves/current=200`
 - latest strict GET-only smoke rerun:
-  `2026-04-25T09:45:28.428Z` to `2026-04-25T09:45:30.731Z`, `pass`;
+  `2026-04-26T15:32:47.292Z` to `2026-04-26T15:32:48.804Z`, `pass`;
   bootstrap showed `chain_mainline_writes_enabled=false` and
   `receipt_verifier_status=disabled`.
-- DNS resolution check on 2026-04-25: `api.mm.72h.lol` resolves through
-  Cloudflare; `mm.72h.lol` has no A/AAAA/CNAME records and remains blocked
-  until the CNAME is created.
+- DNS resolution check on 2026-04-26: both `api.mm.72h.lol` and `mm.72h.lol`
+  resolve through Cloudflare; `mm.72h.lol` returned the production frontend.
 
 Production chain configuration rule:
 
@@ -137,8 +135,7 @@ Production chain configuration rule:
 - Backend code reads `TOKEN_ADDRESS` for Jetton wallet derivation. Setting only
   `TOKEN_ADDRESS_MAINNET` is not sufficient for production runtime.
 - Keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until LockVault and MerkleClaim are
-  deployed, DNS/custom domains are attached, canary limits are configured, and a
-  named canary window is approved.
+  deployed, canary limits are configured, and a named canary window is approved.
 
 ## Cutover Checklist
 

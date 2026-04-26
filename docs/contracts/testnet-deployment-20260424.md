@@ -172,9 +172,8 @@ and prints the claim receipt hash for backend
   - status: `0` (`active`)
 - Backend local receipt apply:
   - direct backend `ton_rpc` verifier: `passed`
-  - database apply: pending. Count as complete only after
-    `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
-    database.
+  - database apply: `passed` on 2026-04-26 against an ephemeral local
+    PostgreSQL database named `multi_millionaire_receipt_apply_test`.
 - Script-verified Merkle claim canary:
   - amount raw: `1`
   - backend reward ledger id placeholder: `testnet-canary-1777101812106`
@@ -192,20 +191,36 @@ and prints the claim receipt hash for backend
   - ledger status: `2` (`claimed`)
 - Backend local claim receipt apply:
   - direct backend `ton_rpc` verifier: `passed`
-  - database apply: pending. Count as complete only after
-    `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
-    database.
+  - database apply: `passed` on 2026-04-26 against an ephemeral local
+    PostgreSQL database named `multi_millionaire_receipt_apply_test`.
 
 The backend verifier now accepts TON RPC responses that place message bodies in
 `in_msg.msg_data.body`, which is the shape returned by the testnet JSON-RPC
 used for this canary.
 
-## Optional Receipt Apply Integration Harness
+## Receipt Apply Integration Harness
 
-The database apply portion remains pending by default. To produce evidence, run
-the skipped integration harness against a migrated throwaway PostgreSQL
-database whose database name clearly indicates `test`, `integration`, `ci`, or
-`isolated`:
+The database apply portion is skipped by default and must only run against a
+migrated throwaway PostgreSQL database whose database name clearly indicates
+`test`, `integration`, `ci`, or `isolated`.
+
+Latest evidence:
+
+- Date: 2026-04-26
+- Database: ephemeral local PostgreSQL on `127.0.0.1`, database
+  `multi_millionaire_receipt_apply_test`
+- Migrations applied: `001_init.sql` through `006_merkle_rewards.sql`
+- Command:
+  `NODE_ENV=test RUN_RECEIPT_APPLY_INTEGRATION=true npm test -- receiptApply.integration.test.ts`
+- Result: `pass`
+- Coverage:
+  - applies one verified deposit receipt and rejects the duplicate without a
+    second position
+  - applies one verified Merkle claim receipt and rejects the duplicate without
+    reopening the ledger
+
+To reproduce, run the skipped integration harness against a migrated throwaway
+PostgreSQL database:
 
 ```bash
 cd server

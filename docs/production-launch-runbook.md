@@ -28,9 +28,9 @@ test risk thresholds in production.
   `https://multi-millionaire-api-production.348421501.workers.dev`.
 - Cloudflare Pages project or production frontend deployment, with production
   API origin configured. Current status: Pages project
-  `multi-millionaire-production` exists; custom domain `mm.72h.lol` is still
-  pending because the current token cannot create DNS records. Production Pages
-  deployment completed with `VITE_API_BASE_URL=https://api.mm.72h.lol`:
+  `multi-millionaire-production` exists; custom domain `mm.72h.lol` is live
+  and returned `200` on 2026-04-26. Production Pages deployment completed with
+  `VITE_API_BASE_URL=https://api.mm.72h.lol`:
   `https://production.multi-millionaire-production.pages.dev`; deployment URL:
   `https://29f929d8.multi-millionaire-production.pages.dev`.
 - Hyperdrive config or direct database connection for the production API.
@@ -48,14 +48,11 @@ test risk thresholds in production.
   production.
 - DNS records, TLS certificates, cache rules, rate limits, and WAF/firewall
   rules for the public domains. Current status: the current API token can deploy
-  Workers/Pages, list Hyperdrive, and attach `api.mm.72h.lol`. Direct DNS
-  record reads/writes still return authentication errors, so `mm.72h.lol`
-  cannot activate until the required DNS CNAME is created. A direct API attempt
-  on 2026-04-25 to create
-  `CNAME mm -> multi-millionaire-production.pages.dev` returned Cloudflare
-  `403` / `code=10000` authentication error. Zone-level Worker route creation
-  for `api.72h.lol/*` also returned an authentication error; `api.72h.lol` is
-  already assigned to another Worker.
+  Workers/Pages, list Hyperdrive, and attach `api.mm.72h.lol`. Earlier direct
+  DNS record reads/writes returned authentication errors, but `mm.72h.lol` now
+  resolves through Cloudflare and returns the production frontend. Zone-level
+  Worker route creation for `api.72h.lol/*` previously returned an
+  authentication error; `api.72h.lol` was already assigned to another Worker.
 - Log drain or observability sink for API logs, deploy events, and audit events.
 - Incident contacts and escalation channel for release lead, backend, frontend,
   database, chain/contracts, and customer support.
@@ -125,12 +122,12 @@ and must keep separate evidence for every transaction.
 
 Latest evidence:
 
-- Date: 2026-04-25
+- Date: 2026-04-26
 - API base URL: `https://api.mm.72h.lol`
 - Mode: `production-non-mutating`
 - Result: `pass`
 - Latest strict smoke rerun:
-  `2026-04-25T09:45:28.428Z` to `2026-04-25T09:45:30.731Z`, `pass`
+  `2026-04-26T15:32:47.292Z` to `2026-04-26T15:32:48.804Z`, `pass`
 - Checked paths: `/health`, `/ready`, `/v1/app/bootstrap`,
   `/v1/waves/current`
 - Readiness result: `200`, `database=ok`
@@ -156,26 +153,26 @@ Latest testnet evidence is recorded in
 - Contract getter evidence: `depositCount=1`, `totalDepositedRaw=1`,
   `totalActiveRaw=1`, position status `active`.
 - Backend direct deposit verifier: `passed` with Toncenter v3 transactions API.
-- Backend deposit database apply: pending. It is not launch evidence until
-  `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
-  database.
+- Backend deposit database apply: `passed` on 2026-04-26 with
+  `RUN_RECEIPT_APPLY_INTEGRATION=true` against an ephemeral local PostgreSQL
+  database named `multi_millionaire_receipt_apply_test`.
 - Verified Merkle claim receipt tx:
   `XYvh+RnvK2zA1QkMKeyxUV2C7rkllE026yMQmm6XLec=`
 - Testnet Merkle claim batch id: `1777101812106`
 - Contract getter evidence: `claimCount=1`, `totalClaimedRaw=1`,
   ledger status `claimed`.
 - Backend direct claim verifier: `passed` with Toncenter v3 transactions API.
-- Backend claim database apply: pending. It is not launch evidence until
-  `RUN_RECEIPT_APPLY_INTEGRATION=true` passes against a safe isolated test
-  database.
+- Backend claim database apply: `passed` on 2026-04-26 with
+  `RUN_RECEIPT_APPLY_INTEGRATION=true` against an ephemeral local PostgreSQL
+  database named `multi_millionaire_receipt_apply_test`.
 
 This proves the audit-remediated testnet LockVault can receive a real Jetton
 deposit and expose the derived position by getter, and the audit-remediated
 MerkleClaim can publish a one-leaf root and complete a claimant-owned testnet
 claim. It also proves the latest backend verifiers can parse those receipts
-when a transactions API returns execution descriptions. It does not yet prove
-database apply against an isolated test database, and it does not authorize
-production chain writes or mainnet launch.
+when a transactions API returns execution descriptions. The local isolated
+database apply harness has also passed for deposit and claim receipts. This
+does not authorize production chain writes or mainnet launch.
 
 Optional database apply harness:
 
@@ -247,18 +244,23 @@ npm run contract:deploy:lock-vault:mainnet
 npm run contract:deploy:merkle-claim:mainnet
 ```
 
-Precomputed mainnet addresses from `contract:derive:mainnet` on 2026-04-25:
+Precomputed mainnet addresses from `contract:build` followed by
+`contract:derive:mainnet` on 2026-04-26:
 
-- LockVault: `EQDrBbGqXv_LnY_kSzJXP9bB0n0dnMlCklkerG8WdKHGJX4z`
-- MerkleClaim: `EQCf97B3-PdVVndsi_nhVrmK-gFUzK_H2uCO5zk_umYQyLEd`
+- LockVault: `EQAGRYLCBGAehR8RKVvQswLpVS-sQBK2i0wVVW-u6bd3IEOO`
+- MerkleClaim: `EQDoyks8WxF9ctLkfmmT9pFd5topcY_YrzPQaay3BLab4Snw`
 - owner/admin wallet: `EQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQamv`
 - 72H token master: `EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8`
+- chain id hash:
+  `88858586448727561562773343990328044603667650321035832086212254018596787063178`
 
 The deploy command reaches the Tonkeeper QR/link step locally. Deployment is not
 complete until the admin wallet confirms each transaction and the scripts print
-successful deploy evidence. Jetton wallet derivation for the supplied 72H token
-returned TON get-method `exit_code=-13`; confirm the token's Jetton getter
-compatibility before enabling production deposits.
+successful deploy evidence. On 2026-04-26, Jetton wallet derivation did not
+complete in the local operator shell because the configured RPC hostname
+`ton-mainnet.api.onfinality.io` failed DNS resolution. Confirm the production
+RPC endpoint and derive both Jetton wallet addresses before enabling production
+deposits or reward claims.
 
 ### Mainnet Deployment Evidence Template
 
