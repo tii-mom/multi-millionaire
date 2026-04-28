@@ -6,6 +6,7 @@ import { loadContractIntegrationConfig } from '../services/contracts/config';
 import { getReceiptVerifierDiagnostics } from '../services/receiptVerifier';
 import { getMerkleClaimVerifierDiagnostics } from '../services/merkleRewards';
 import { currentRuntimePath } from '../services/runtimeModes';
+import { readPublicV2Tokenomics } from '../services/contracts/v2Tokenomics';
 
 /**
  * Handles GET /v1/app/bootstrap
@@ -32,14 +33,22 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
     };
     // TODO: Resolve actual user from auth token. Here we provide a minimal stub.
     const me = null;
+    const v2Tokenomics = readPublicV2Tokenomics();
+    const tokenAddress = process.env.TOKEN_ADDRESS || v2Tokenomics.token_address;
     const contracts = {
       chain_id: process.env.CHAIN_ID || 'ton-mainnet',
-      token: process.env.TOKEN_ADDRESS || 'EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8',
+      token: tokenAddress,
+      token_address: tokenAddress,
+      token_address_mainnet: v2Tokenomics.token_address,
       token_decimals: process.env.TOKEN_DECIMALS || '9',
       vault: process.env.LOCK_VAULT_ADDRESS || (productionMainnetConfigRequired ? '' : process.env.VAULT_ADDRESS) || '',
       oracle: process.env.ORACLE_ADDRESS || '',
       reward_distributor: process.env.REWARD_DISTRIBUTOR_ADDRESS || '',
       merkle_claim: readBootstrapAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET'),
+      merkle_claim_role: 'legacy_reward_claim_path',
+      season_vault: v2Tokenomics.season_vault_address,
+      season_claim: v2Tokenomics.season_claim_address,
+      v2_tokenomics: v2Tokenomics,
     };
     const controlMap = Object.fromEntries(controls.map((control) => [control.key, { enabled: control.enabled, reason: control.reason }]));
     const receiptVerifier = getReceiptVerifierDiagnostics();

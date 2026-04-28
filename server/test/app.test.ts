@@ -81,6 +81,9 @@ describe('API integration tests', () => {
     });
     expect(res.body.data.ops.runtime_path).toBe('staging-mvp');
     expect(res.body.data.feature_flags.staging_mvp_enabled).toBe(true);
+    expect(res.body.data.contracts.token_address_mainnet).toBe('EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg');
+    expect(res.body.data.contracts.season_claim).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
+    expect(res.body.data.contracts.merkle_claim_role).toBe('legacy_reward_claim_path');
   });
 
   it('does not expose testnet MerkleClaim fallback in production bootstrap', async () => {

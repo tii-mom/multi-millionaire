@@ -17,6 +17,7 @@ import {
   getContractIntegrationDiagnostics,
   loadContractIntegrationConfig,
 } from '../services/contracts/config';
+import { readPublicV2Tokenomics } from '../services/contracts/v2Tokenomics';
 import { currentRuntimePath, merkleDraftWritesEnabled } from '../services/runtimeModes';
 
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
@@ -135,6 +136,9 @@ export async function getOpsDiagnostics(req: Request, res: Response, next: NextF
         merkle_claim_verifier: getMerkleClaimVerifierDiagnostics(),
         contract_integration: getContractIntegrationDiagnostics(contractConfig),
         contract_artifacts: getContractArtifactStatuses(contractConfig),
+        season_vault: readPublicV2Tokenomics().season_vault_address,
+        season_claim: readPublicV2Tokenomics().season_claim_address,
+        v2_tokenomics: readPublicV2Tokenomics(),
         runtime_path: currentRuntimePath(),
         merkle_draft_writes_enabled: merkleDraftWritesEnabled(),
       },

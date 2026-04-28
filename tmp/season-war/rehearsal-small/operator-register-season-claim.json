@@ -1,0 +1,17 @@
+{
+  "rehearsal": true,
+  "production_root_publishable": false,
+  "contract_address": "EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS",
+  "message": "RegisterSeasonClaim",
+  "params": {
+    "seasonId": 1,
+    "merkleRoot": "0x7604928c5e3e17ccc14a9741dca5ba2dd847d41b5f07128a7d9c465c6852b880",
+    "totalAmount72H": "500000000000000000",
+    "personalDepositTotal72H": "250000000000000000",
+    "teamDepositTotal72H": "125000000000000000",
+    "referralTotal72H": "75000000000000000",
+    "leaderboardTotal72H": "50000000000000000",
+    "openAt": 1800000000,
+    "evidenceHash": "0x513212978deb62599bfde97982c06745b782c2d1b868fd27f880b2c938a98647"
+  }
+}

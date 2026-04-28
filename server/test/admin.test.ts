@@ -155,6 +155,8 @@ describe('Admin read API', () => {
     expect(res.body.data.runtime_path).toBe('staging-mvp');
     expect(res.body.data.merkle_draft_writes_enabled).toBe(true);
     expect(res.body.data.contract_integration).toHaveProperty('readyForReads');
+    expect(res.body.data.season_claim).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
+    expect(res.body.data.v2_tokenomics.token_address).toBe('EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg');
   });
 
   it('blocks Merkle draft writes in production without canary approval', async () => {

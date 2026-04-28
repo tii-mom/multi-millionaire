@@ -219,9 +219,15 @@ Any production canary that submits a transaction or mutates application state
 requires an approved operator, documented account, documented amount, and an
 incident rollback owner.
 
-## Mainnet Contract Deployment
+## Legacy App Contract Deployment
 
-Mainnet contract deployment uses Blueprint with TonConnect. The connected
+Do not use this section for the 72H V2 Season War exporter. `multi-millionaire/contracts`
+must not be deployed to mainnet until the app contracts are migrated, hardened,
+tested, and audited in the 72H contracts repository. The current Season War path
+uses the deployed V2 Jetton Master `EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`
+and SeasonClaim `EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`.
+
+Legacy mainnet contract deployment uses Blueprint with TonConnect. The connected
 Tonkeeper wallet must match `CHAIN_ADMIN_ADDRESS`; the scripts refuse to deploy
 if a different wallet is connected.
 
@@ -229,7 +235,7 @@ Required environment:
 
 ```bash
 export CHAIN_ADMIN_ADDRESS="UQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQfRq"
-export TOKEN_ADDRESS="EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8"
+export TOKEN_ADDRESS="<legacy-token-address-not-for-season-war>"
 ```
 
 Deploy with Tonkeeper confirmation:
@@ -238,7 +244,7 @@ Deploy with Tonkeeper confirmation:
 export CHAIN_ID=ton-mainnet
 export CHAIN_ADMIN_ADDRESS=UQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQfRq
 export CHAIN_RPC_URL=https://toncenter.com/api/v2/jsonRPC
-export TOKEN_ADDRESS=EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8
+export TOKEN_ADDRESS=<legacy-token-address-not-for-season-war>
 export TOKEN_DECIMALS=9
 export LOCK_VAULT_JETTON_WALLET_ADDRESS=EQAGiEeODWa9q6GyTJm4jkDhC3_TvWgkB8FaohSD34GpefQD
 export REWARD_JETTON_WALLET_ADDRESS=EQDof71U9cKMfLoxiOJHoYENjzRBADGynEcw6UPA-6-vZGlx
@@ -252,9 +258,9 @@ Precomputed mainnet addresses from `contract:build` followed by
 `contract:derive:mainnet` on 2026-04-26:
 
 - LockVault: `EQAGRYLCBGAehR8RKVvQswLpVS-sQBK2i0wVVW-u6bd3IEOO`
-- MerkleClaim: `EQDoyks8WxF9ctLkfmmT9pFd5topcY_YrzPQaay3BLab4Snw`
+- MerkleClaim: historical pre-V2 derived address, not used by Season War.
 - owner/admin wallet: `EQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQamv`
-- 72H token master: `EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8`
+- 72H token master: legacy placeholder, not the V2 Season War Jetton Master.
 - LockVault Jetton wallet:
   `EQAGiEeODWa9q6GyTJm4jkDhC3_TvWgkB8FaohSD34GpefQD`
 - MerkleClaim reward Jetton wallet:

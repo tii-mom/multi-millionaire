@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-04-28T08:20:47.211Z",
+  "rehearsal": true,
+  "production_root_publishable": false,
+  "season_id": 1,
+  "successful_round_count": 1,
+  "successful_wave_ids": [
+    1
+  ],
+  "max_supported_single_cell_leaves": 8,
+  "chain_id": "ton-mainnet",
+  "contracts": {
+    "token_address": "EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg",
+    "season_claim_address": "EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS",
+    "season_vault_address": "EQCdSSWPVbwh9zIzhF5pnxwRKw-I8xc4bS1iyiVcbXKfnWe-"
+  },
+  "pool_totals": {
+    "personal": "250000000000000000",
+    "team": "125000000000000000",
+    "referral": "75000000000000000",
+    "leaderboard": "50000000000000000"
+  },
+  "total_amount_raw": "500000000000000000",
+  "root": "0x7604928c5e3e17ccc14a9741dca5ba2dd847d41b5f07128a7d9c465c6852b880",
+  "evidence_hash": "0x513212978deb62599bfde97982c06745b782c2d1b868fd27f880b2c938a98647",
+  "counts": {
+    "leaves": 4,
+    "quarantine": 0
+  }
+}

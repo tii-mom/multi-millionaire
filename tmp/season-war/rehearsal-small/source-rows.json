@@ -1,0 +1,36 @@
+{
+  "rehearsal": true,
+  "production_root_publishable": false,
+  "note": "Synthetic <=8 wallet rehearsal artifact. It validates SeasonClaim leaf/proof shape only and is not sourced from production DB.",
+  "positions": [
+    {
+      "position_id": "rehearsal-position-1",
+      "user_id": "rehearsal-user-1",
+      "wave_id": 1,
+      "amount_raw": "275000000000000000",
+      "wallet": "0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "position_id": "rehearsal-position-2",
+      "user_id": "rehearsal-user-2",
+      "wave_id": 1,
+      "amount_raw": "165000000000000000",
+      "wallet": "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "position_id": "rehearsal-position-3",
+      "user_id": "rehearsal-user-3",
+      "wave_id": 1,
+      "amount_raw": "55000000000000000",
+      "wallet": "0:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "position_id": "rehearsal-position-4",
+      "user_id": "rehearsal-user-4",
+      "wave_id": 1,
+      "amount_raw": "5000000000000000",
+      "wallet": "0:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "contribution_formula": "current exporter: sum confirmed position amount_raw for positions in successfulWaveIds; production cross-round multiplier would be amount_raw x eligible_successful_round_count"
+}
