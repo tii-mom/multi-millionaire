@@ -1,7 +1,9 @@
 import type {
   ApiEnvelope,
   AdminDashboard,
+  AdminAuditLog,
   AdminOpsDiagnostics,
+  AdminPaginatedResult,
   AdminReward,
   AdminRiskFlag,
   AdminSquad,
@@ -10,16 +12,23 @@ import type {
   AppControlKey,
   AuthResult,
   BootstrapData,
+  ChainEvent,
   DepositReceiptResult,
   JettonWalletDerivation,
+  LeaderboardMe,
   MerkleRewardBatch,
   MerkleClaimReceiptResult,
   MerkleRewardProof,
   MerkleRewardProofWithBatch,
+  MySquadView,
   Position,
+  RewardEstimate,
   RewardLedger,
   RewardSummary,
+  CreateSquadResult,
+  SquadDetail,
   SquadLeaderboardRow,
+  SquadMember,
   Wave,
   WalletAuthIntent,
   WalletBindIntent,
@@ -30,6 +39,12 @@ type RequestOptions = {
   method?: string;
   token?: string | null;
   body?: unknown;
+};
+
+export type AdminListRequest = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
 };
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
@@ -68,6 +83,15 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
   }
 
   return (payload as ApiEnvelope<T>).data;
+}
+
+function adminListQuery(options: AdminListRequest = {}) {
+  const params = new URLSearchParams();
+  if (options.page) params.set("page", String(options.page));
+  if (options.pageSize) params.set("page_size", String(options.pageSize));
+  if (options.search?.trim()) params.set("search", options.search.trim());
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }
 
 export const api = {
@@ -155,7 +179,7 @@ export const api = {
   },
 
   createSquad(waveId: number, name: string, token: string) {
-    return requestJson(`/v1/waves/${waveId}/squads`, {
+    return requestJson<CreateSquadResult>(`/v1/waves/${waveId}/squads`, {
       method: "POST",
       token,
       body: { name },
@@ -166,11 +190,27 @@ export const api = {
     return requestJson<SquadLeaderboardRow[]>(`/v1/waves/${waveId}/squads`);
   },
 
+  mySquad(waveId: number, token: string) {
+    return requestJson<MySquadView | null>(`/v1/waves/${waveId}/squads/me`, { token });
+  },
+
+  squadDetail(waveId: number, squadId: number) {
+    return requestJson<SquadDetail>(`/v1/waves/${waveId}/squads/${squadId}`);
+  },
+
   joinSquad(waveId: number, squadId: number, token: string) {
-    return requestJson(`/v1/waves/${waveId}/squads/${squadId}/join`, {
+    return requestJson<SquadMember>(`/v1/waves/${waveId}/squads/${squadId}/join`, {
       method: "POST",
       token,
     });
+  },
+
+  leaderboardMe(waveId: number, token: string) {
+    return requestJson<LeaderboardMe>(`/v1/waves/${waveId}/leaderboard/me`, { token });
+  },
+
+  rewardEstimate(waveId: number, token: string) {
+    return requestJson<RewardEstimate>(`/v1/waves/${waveId}/reward-estimate`, { token });
   },
 
   rewardSummary(token: string) {
@@ -205,20 +245,20 @@ export const api = {
     return requestJson<AdminDashboard>("/v1/admin/dashboard", { token });
   },
 
-  adminWaves(token: string) {
-    return requestJson<AdminWave[]>("/v1/admin/waves", { token });
+  adminWaves(token: string, options?: AdminListRequest) {
+    return requestJson<AdminPaginatedResult<AdminWave>>(`/v1/admin/waves${adminListQuery(options)}`, { token });
   },
 
-  adminRiskFlags(token: string) {
-    return requestJson<AdminRiskFlag[]>("/v1/admin/risk/flags", { token });
+  adminRiskFlags(token: string, options?: AdminListRequest) {
+    return requestJson<AdminPaginatedResult<AdminRiskFlag>>(`/v1/admin/risk/flags${adminListQuery(options)}`, { token });
   },
 
-  adminRewards(token: string) {
-    return requestJson<AdminReward[]>("/v1/admin/rewards", { token });
+  adminRewards(token: string, options?: AdminListRequest) {
+    return requestJson<AdminPaginatedResult<AdminReward>>(`/v1/admin/rewards${adminListQuery(options)}`, { token });
   },
 
-  adminSquads(token: string) {
-    return requestJson<AdminSquad[]>("/v1/admin/squads", { token });
+  adminSquads(token: string, options?: AdminListRequest) {
+    return requestJson<AdminPaginatedResult<AdminSquad>>(`/v1/admin/squads${adminListQuery(options)}`, { token });
   },
 
   adminControls(token: string) {
@@ -227,6 +267,23 @@ export const api = {
 
   adminOps(token: string) {
     return requestJson<AdminOpsDiagnostics>("/v1/admin/ops", { token });
+  },
+
+  adminAuditLogs(token: string, limit = 50) {
+    return requestJson<AdminAuditLog[]>(`/v1/admin/audit-logs?limit=${encodeURIComponent(String(limit))}`, { token });
+  },
+
+  adminChainEvents(token: string, applyStatus?: string) {
+    const query = applyStatus ? `?apply_status=${encodeURIComponent(applyStatus)}` : "";
+    return requestJson<ChainEvent[]>(`/v1/admin/chain-events${query}`, { token });
+  },
+
+  updateRiskFlag(flagId: string, input: { status?: string; severity?: string; note?: string | null }, token: string) {
+    return requestJson<AdminRiskFlag>(`/v1/risk/flags/${encodeURIComponent(flagId)}`, {
+      method: "PATCH",
+      token,
+      body: input,
+    });
   },
 
   updateAdminControl(key: AppControlKey, input: { enabled: boolean; reason?: string | null }, token: string) {

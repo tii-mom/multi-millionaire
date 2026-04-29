@@ -573,9 +573,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   }, [authToken, chainMainlineEnabled]);
 
   return (
-    <div className="tab-content-safe flex flex-col gap-5 px-6">
+    <div className="tab-content-safe flex flex-col gap-4 px-6">
       {statusBannerMessage && (
-        <div className={`status-notice rounded-2xl px-4 py-3 ${
+        <div className={`status-notice rounded-[14px] px-4 py-2.5 ${
           backendUnavailable ? "" : "status-notice-caution"
         }`}>
           <div className="flex gap-3">
@@ -588,9 +588,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         </div>
       )}
 
-      <section className="financial-panel relative overflow-hidden rounded-[22px] p-5">
+      <section className="financial-panel relative overflow-hidden rounded-[16px] p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/35 to-transparent" />
-        <div className="relative z-10 flex flex-col gap-4">
+        <div className="relative z-10 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-white/[0.62]">
               <Wallet className="h-4 w-4 text-[#d7b46a]" />
@@ -603,7 +603,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
           {!tonSession ? (
             <div className="grid gap-3">
-              <div className="metric-card rounded-[16px] px-4 py-4">
+              <div className="metric-card rounded-[12px] px-4 py-3">
                 <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-white/90">
                   <ShieldCheck className="h-4 w-4 text-[#d7b46a]" />
                   {t("home.ton.title")}
@@ -616,7 +616,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
                 type="button"
                 onClick={openTonWallet}
                 disabled={!connectionRestored}
-                className="depth-button focus-ring flex items-center justify-center gap-2 rounded-[18px] bg-[#d7b46a] py-3 text-xs font-bold uppercase tracking-widest text-black hover:bg-[#e1c07b] disabled:cursor-wait disabled:opacity-60"
+                className="depth-button focus-ring flex items-center justify-center gap-2 rounded-[12px] bg-[#d7b46a] py-2.5 text-xs font-bold uppercase tracking-widest text-black hover:bg-[#e1c07b] disabled:cursor-wait disabled:opacity-60"
               >
                 {!connectionRestored ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
                 {connectionRestored ? t("home.ton.connect") : t("home.ton.restoring")}
@@ -624,7 +624,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             </div>
           ) : (
             <div className="grid gap-3">
-              <div className="flex items-center justify-between gap-3 rounded-[16px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.06] px-4 py-3">
+              <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.06] px-4 py-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d7b46a] text-black">
                     <ShieldCheck className="h-4 w-4" />
@@ -647,11 +647,11 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <div className="metric-card rounded-[14px] px-3 py-3">
+                <div className="metric-card rounded-[12px] px-3 py-3">
                   <div className="text-[9px] uppercase tracking-widest text-white/35">{t("home.account.currentWave")}</div>
                   <div className="mt-1 font-mono text-sm text-white/[0.82]">{waveId ? `#${waveId}` : t("home.account.loadingWave")}</div>
                 </div>
-                <div className="metric-card rounded-[14px] px-3 py-3">
+                <div className="metric-card rounded-[12px] px-3 py-3">
                   <div className="text-[9px] uppercase tracking-widest text-white/35">{t("home.ton.backend")}</div>
                   <div className={`mt-1 text-[10px] uppercase tracking-widest ${authToken ? "text-[#d7b46a]" : "text-amber-100/85"}`}>
                     {authToken ? t("home.ton.backendReady") : t("home.ton.backendPendingShort")}
@@ -668,90 +668,95 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           )}
 
           {showApiError && (
-            <div className="status-inline-error rounded-xl px-3 py-2 text-[10px] font-mono leading-relaxed">
+            <div className="status-inline-error rounded-[10px] px-3 py-2 text-[10px] font-mono leading-relaxed">
               {apiError}
             </div>
           )}
         </div>
       </section>
 
-      <section className="financial-panel relative overflow-hidden rounded-[22px] p-6">
+      <section className="financial-panel relative overflow-hidden rounded-[16px] p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="relative z-10">
-          <div className="mb-4 flex items-end justify-between">
-            <div className="flex items-center gap-2 text-white/[0.52]">
-              <Target className="h-5 w-5" />
-              <span className="text-[11px] uppercase tracking-widest">{t("home.goal.title")}</span>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2 text-white/[0.56]">
+              <Target className="h-4 w-4 text-[#d7b46a]" />
+              <span className="ui-label">{t("home.goal.title")}</span>
             </div>
-            <div className="font-mono text-lg font-semibold text-[#d7b46a] tabular-nums">
-              {formatNumber(progressPercent, locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
+            <div className="rounded-md border border-[#d7b46a]/20 bg-[#d7b46a]/[0.07] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#d7b46a] tabular-nums">
+              {formatNumber(progressPercent, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
             </div>
           </div>
 
-          <div className="relative flex h-2 w-full items-center overflow-hidden rounded-full border border-white/[0.05] bg-black/55 shadow-inner">
-            <div className="absolute inset-x-0 top-1/2 z-0 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            {goalMilestones.map((milestone) => (
+          <div className="grid grid-cols-[1.18fr_0.82fr] gap-3">
+            <div className="metric-card rounded-[12px] px-4 py-3">
+              <div className="ui-label">{t("home.need.label")}</div>
+              <motion.div
+                key={needed72H}
+                initial={{ opacity: 0.8, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-2 flex items-baseline gap-2 font-mono text-[1.8rem] font-semibold leading-none tracking-tight text-white"
+              >
+                <span className="tabular-nums">{formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}</span>
+                <span className="text-xs font-bold tracking-widest text-[#d7b46a]">72H</span>
+              </motion.div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.08em] text-white/[0.36]">
+                {t("home.need.basedOn")}
+                <motion.span
+                  key={tokenPrice}
+                  initial={{ color: "#ffffff" }}
+                  animate={{ color: "#d7b46a" }}
+                  className="ml-1 font-mono font-bold text-[#d7b46a] tabular-nums"
+                >
+                  ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                </motion.span>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="metric-card rounded-[12px] px-3 py-3">
+                <div className="ui-label text-[9px]">{t("common.display")}</div>
+                <div className="mt-1 truncate font-mono text-sm font-semibold text-white/85 tabular-nums">
+                  ${formatNumber(currentFiatValue, locale, { maximumFractionDigits: 0 })}
+                </div>
+              </div>
+              <div className="metric-card rounded-[12px] px-3 py-3">
+                <div className="ui-label text-[9px]">{t("common.goal")}</div>
+                <div className="mt-1 truncate font-mono text-sm font-semibold text-white/85 tabular-nums">
+                  ${formatNumber(targetValue, locale)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="relative flex h-2 w-full items-center overflow-hidden rounded-full border border-white/[0.055] bg-black/55 shadow-inner">
+              <div className="absolute inset-x-0 top-1/2 z-0 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              {goalMilestones.map((milestone) => (
+                <div
+                  key={milestone}
+                  className={`absolute top-1/2 z-10 h-3 w-px -translate-y-1/2 ${
+                    progressPercent >= milestone ? "bg-[#d7b46a]/80" : "bg-white/[0.18]"
+                  }`}
+                  style={{ left: `${milestone}%` }}
+                  aria-hidden="true"
+                />
+              ))}
               <div
-                key={milestone}
-                className={`absolute top-1/2 z-10 h-3 w-px -translate-y-1/2 ${
-                  progressPercent >= milestone ? "bg-[#d7b46a]/80" : "bg-white/[0.18]"
-                }`}
-                style={{ left: `${milestone}%` }}
-                aria-hidden="true"
-              />
-            ))}
-            <div
-              className="absolute left-0 top-0 z-20 flex h-full items-center justify-end bg-gradient-to-r from-transparent via-[#d7b46a]/80 to-[#d7b46a] transition-all duration-1000 ease-out"
-              style={{ width: `${Math.max(progressPercent, 2)}%` }}
-            >
-              <div className="mr-0.5 h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_2px_#d7b46a]" />
+                className="absolute left-0 top-0 z-20 flex h-full items-center justify-end bg-gradient-to-r from-[#6f5a2d] via-[#d7b46a]/80 to-[#f0ce83] transition-all duration-1000 ease-out"
+                style={{ width: `${Math.max(progressPercent, 2)}%` }}
+              >
+                <div className="mr-0.5 h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_2px_#d7b46a]" />
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-1 text-center font-mono text-[8px] uppercase tracking-widest text-white/[0.26]">
+              {goalMilestones.map((milestone) => (
+                <span key={milestone} className={progressPercent >= milestone ? "text-[#d7b46a]/70" : ""}>
+                  {milestone}%
+                </span>
+              ))}
             </div>
           </div>
-
-          <div className="mt-4 flex justify-between text-[11px] font-mono tracking-wider text-white/40">
-            <span className="text-white/[0.72] tabular-nums">
-              ${formatNumber(currentFiatValue, locale, { maximumFractionDigits: 2 })}
-            </span>
-            <span className="tabular-nums">${formatNumber(targetValue, locale)}</span>
-          </div>
-          <div className="mt-3 grid grid-cols-4 gap-1 text-center font-mono text-[8px] uppercase tracking-widest text-white/[0.26]">
-            {goalMilestones.map((milestone) => (
-              <span key={milestone} className={progressPercent >= milestone ? "text-[#d7b46a]/70" : ""}>
-                {milestone}%
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="financial-panel relative flex flex-col items-center justify-center overflow-hidden rounded-[22px] p-6 text-center">
-        <div className="absolute right-4 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/20 px-2 py-1">
-          <span className="relative h-[5px] w-[5px] rounded-full bg-[#8fd9ad]" />
-          <span className="text-[8px] uppercase tracking-widest text-white/38">{t("home.need.auto")}</span>
-        </div>
-
-        <h3 className="mb-1.5 mt-1 text-[11px] uppercase tracking-[0.2em] text-white/[0.52]">{t("home.need.label")}</h3>
-        <motion.div
-          key={needed72H}
-          initial={{ opacity: 0.8, scale: 0.99 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="mb-3 flex items-baseline gap-2 font-mono text-3xl font-semibold tracking-tight"
-        >
-          <span className="bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent tabular-nums">
-            {formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}
-          </span>
-        </motion.div>
-
-        <div className="text-[10px] uppercase tracking-widest text-white/[0.42]">
-          {t("home.need.basedOn")}
-          <motion.span
-            key={tokenPrice}
-            initial={{ color: "#ffffff" }}
-            animate={{ color: "#d7b46a" }}
-            className="ml-1 font-mono font-bold text-[#d7b46a] tabular-nums"
-          >
-            ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-          </motion.span>
         </div>
       </section>
 

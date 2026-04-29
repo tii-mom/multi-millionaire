@@ -124,10 +124,10 @@ export default function Share({ myDeposit }: ShareProps) {
 
   return (
     <div className="tab-content-safe perspective-1000 flex flex-col gap-4 px-6">
-      <section className="financial-panel group relative flex items-center justify-between overflow-hidden rounded-2xl p-5 text-white">
+      <section className="financial-panel group relative flex items-center justify-between overflow-hidden rounded-[16px] p-5 text-white">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/45 to-transparent" />
         <div className="relative z-10">
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/42">
+          <div className="mb-1 ui-label">
             {t("share.signal")}
           </div>
           <div className="flex items-baseline gap-1 font-mono text-3xl font-semibold tracking-tight tabular-nums">
@@ -139,12 +139,12 @@ export default function Share({ myDeposit }: ShareProps) {
             {t("share.estimate")}
           </div>
         </div>
-        <div className="z-10 flex h-11 w-11 items-center justify-center rounded-lg border border-[#d7b46a]/25 bg-[#d7b46a]/10 text-[#d7b46a]">
+        <div className="z-10 flex h-11 w-11 items-center justify-center rounded-[12px] border border-[#d7b46a]/25 bg-[#d7b46a]/10 text-[#d7b46a]">
           <Zap className="h-5 w-5" />
         </div>
       </section>
 
-      <p className="mx-auto max-w-[330px] text-center font-mono text-[10px] uppercase leading-5 tracking-widest text-white/[0.46]">
+      <p className="mx-auto max-w-[330px] text-center font-mono text-[10px] uppercase leading-5 tracking-[0.08em] text-white/[0.46]">
         {t("share.helper")}
       </p>
 
@@ -153,7 +153,7 @@ export default function Share({ myDeposit }: ShareProps) {
           type="button"
           onClick={handleShare}
           disabled={isGenerating}
-          className="depth-button focus-ring flex flex-1 items-center justify-center gap-2.5 rounded-xl border border-[#d7b46a]/30 bg-[#d7b46a]/[0.12] py-4 font-semibold text-[#e1c07b] hover:bg-[#d7b46a]/[0.18] disabled:cursor-not-allowed disabled:opacity-70"
+          className="depth-button focus-ring flex flex-1 items-center justify-center gap-2.5 rounded-[12px] border border-[#d7b46a]/30 bg-[#d7b46a]/[0.12] py-4 font-semibold text-[#e1c07b] hover:bg-[#d7b46a]/[0.18] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShareIcon className="h-4 w-4" />}
           <span className="text-sm tracking-wide">{isGenerating ? t("share.generating") : t("share.share")}</span>
@@ -162,7 +162,7 @@ export default function Share({ myDeposit }: ShareProps) {
           type="button"
           onClick={handleCopy}
           disabled={isGenerating}
-          className="depth-button focus-ring group flex w-[58px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] backdrop-blur-xl hover:border-[#d7b46a]/35 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+          className="depth-button focus-ring group flex w-[58px] shrink-0 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.035] backdrop-blur-xl hover:border-[#d7b46a]/35 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
           title={t("share.copy")}
           aria-label={t("share.copy")}
         >
@@ -172,7 +172,7 @@ export default function Share({ myDeposit }: ShareProps) {
           type="button"
           onClick={handleDownload}
           disabled={isGenerating}
-          className="depth-button focus-ring group flex w-[58px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] backdrop-blur-xl hover:border-[#d7b46a]/35 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+          className="depth-button focus-ring group flex w-[58px] shrink-0 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.035] backdrop-blur-xl hover:border-[#d7b46a]/35 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
           title={t("share.download")}
           aria-label={t("share.download")}
         >
@@ -181,7 +181,7 @@ export default function Share({ myDeposit }: ShareProps) {
       </div>
 
       <section
-        className="glass-panel relative mx-auto aspect-[3/4] w-full max-w-[300px] cursor-pointer overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090a] shadow-2xl transition-all ease-out sm:max-w-[340px]"
+        className="financial-panel relative mx-auto aspect-[3/4] w-full max-w-[300px] cursor-pointer overflow-hidden rounded-[16px] bg-[#07090a] shadow-2xl transition-all ease-out sm:max-w-[340px]"
         style={{ transformStyle: "preserve-3d", transitionDuration: "200ms" }}
         ref={posterRef}
         onMouseMove={handleMouseMove}
@@ -191,8 +191,9 @@ export default function Share({ myDeposit }: ShareProps) {
         <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-tr from-white/[0.03] via-transparent to-[#d7b46a]/[0.08]" />
 
         <div className="absolute inset-0 z-0 bg-[#07090a]" />
-        <div className="absolute inset-0 z-0 bg-[linear-gradient(135deg,_rgba(200,162,74,0.12),_transparent_34%,_rgba(159,216,74,0.08)_100%)]" />
-        <div className="absolute inset-x-8 top-24 z-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+        <div className="absolute inset-0 z-0 bg-[linear-gradient(135deg,_rgba(200,162,74,0.12),_transparent_34%,_rgba(65,138,151,0.08)_100%)]" />
+        <div className="absolute inset-0 z-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[length:42px_42px] opacity-20" />
+        <div className="absolute inset-x-8 top-24 z-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/35 to-transparent" />
         <div className="absolute inset-x-8 bottom-24 z-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
         <div className="absolute inset-0 z-10 flex flex-col p-7">
@@ -223,7 +224,7 @@ export default function Share({ myDeposit }: ShareProps) {
               {t("share.poster.line3")}
             </h2>
 
-            <div className="relative mt-8 rounded-xl border border-white/10 bg-black/25 p-4">
+            <div className="relative mt-8 rounded-[12px] border border-white/10 bg-black/25 p-4">
               <div className="absolute bottom-3 left-0 top-3 w-[2px] bg-gradient-to-b from-[#d7b46a] via-[#8fd9ad] to-transparent" />
               <div className="pl-3">
                 <div className="mb-1.5 font-mono text-[9px] uppercase tracking-widest text-[#d7b46a]">
@@ -244,7 +245,7 @@ export default function Share({ myDeposit }: ShareProps) {
               <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-white/30">{t("share.poster.scan")}</span>
               <span className="font-mono text-[10px] tracking-widest text-[#d7b46a]">72H.LOL</span>
             </div>
-            <div className="h-14 w-14 rounded-lg border border-white/10 bg-white/90 p-1.5">
+            <div className="h-14 w-14 rounded-[10px] border border-white/10 bg-white/90 p-1.5">
               <div className="h-full w-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHBhdGggZD0iTTAgMGg4djhIMHptMTAgMGg4djhIMTB6TTAgMTBoOHY4SDB6bTEwIDEwaDh2OEgxMHoiIGZpbGw9IiMwMDAiLz48L3N2Zz4=')] bg-cover bg-repeat opacity-80 mix-blend-multiply" />
             </div>
           </div>

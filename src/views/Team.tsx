@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Crown, Loader2, Plus, RefreshCw, Sparkles, Target, UserPlus, Users } from "lucide-react";
+import { Copy, Loader2, Plus, Share2, Sparkles, Target, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
 import { readBackendAuthToken, readTonWalletSession } from "@/src/lib/tonSession";
-import type { SquadLeaderboardRow } from "@/src/lib/types";
+import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
+import type { MySquadView, SquadLeaderboardRow } from "@/src/lib/types";
 
 interface TeamProps {
   tokenPrice: number;
@@ -14,19 +15,25 @@ interface TeamProps {
   setSquadGoal?: (goal: number) => void;
 }
 
+function displayRaw72h(value: string | number | null | undefined, decimals = 9) {
+  try {
+    return rawTokenAmountToDisplayNumber(String(value ?? "0"), decimals);
+  } catch {
+    return 0;
+  }
+}
+
 export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps) {
   const { formatError, locale, t } = useI18n();
   const [goalInput, setGoalInput] = useState("");
   const [squadName, setSquadName] = useState("");
   const [waveId, setWaveId] = useState<number | null>(null);
   const [squads, setSquads] = useState<SquadLeaderboardRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [mySquad, setMySquad] = useState<MySquadView | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [tokenDecimals, setTokenDecimals] = useState(9);
 
   const loadSquads = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
     try {
       const wave = await api.currentWave();
       if (!wave?.wave_id) {
@@ -35,25 +42,33 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
         return;
       }
       setWaveId(Number(wave.wave_id));
-      const rows = await api.listSquads(Number(wave.wave_id));
+      const token = readBackendAuthToken();
+      const [rows, mySquadView, bootstrap] = await Promise.all([
+        api.listSquads(Number(wave.wave_id)),
+        token ? api.mySquad(Number(wave.wave_id), token).catch(() => null) : Promise.resolve(null),
+        api.bootstrap().catch(() => null),
+      ]);
       setSquads(rows);
-    } catch (error) {
-      const message = formatError(error, "team.loadFailed");
-      setLoadError(message);
+      setMySquad(mySquadView);
+      const decimals = Number(bootstrap?.contracts?.token_decimals || 9);
+      setTokenDecimals(Number.isFinite(decimals) && decimals >= 0 ? decimals : 9);
+    } catch {
       setSquads([]);
-    } finally {
-      setIsLoading(false);
+      setMySquad(null);
     }
-  }, [formatError]);
+  }, []);
 
   useEffect(() => {
     loadSquads();
   }, [loadSquads]);
 
   const topSquad = squads[0] || null;
-  const squadTotalLocked = useMemo(() => Number(topSquad?.total_locked || 0), [topSquad]);
+  const squadTotalLocked = useMemo(() => displayRaw72h(topSquad?.total_locked, tokenDecimals), [topSquad, tokenDecimals]);
   const squadMarketValue = squadTotalLocked * tokenPrice;
   const progressPercent = Math.min((squadMarketValue / squadGoal) * 100, 100);
+  const inviteLink = mySquad
+    ? `${window.location.origin}/?squad=${encodeURIComponent(mySquad.squad.invite_code || String(mySquad.squad.id))}`
+    : "";
 
   const requireToken = () => {
     const walletSession = readTonWalletSession();
@@ -91,35 +106,49 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
     }
   };
 
-  const handleJoinSquad = async (squadId: number) => {
-    const token = requireToken();
-    if (!token || !waveId) return;
-
-    setIsSubmitting(true);
+  const copyInvite = async () => {
+    if (!mySquad || !inviteLink) return;
     try {
-      await api.joinSquad(waveId, squadId, token);
-      toast.success(t("team.joined"));
-      await loadSquads();
-    } catch (error) {
-      toast.error(formatError(error, "team.joinFailed"));
-    } finally {
-      setIsSubmitting(false);
+      await navigator.clipboard.writeText(`${mySquad.squad.name} ${inviteLink}`);
+      toast.success(t("team.mine.inviteCopied"));
+    } catch {
+      toast.error(t("team.mine.inviteCopyFailed"));
+    }
+  };
+
+  const shareInvite = async () => {
+    if (!mySquad || !inviteLink) return;
+    const text = t("team.mine.shareText", { name: mySquad.squad.name, link: inviteLink });
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: mySquad.squad.name, text, url: inviteLink });
+        toast.success(t("share.shared"));
+        return;
+      } catch {
+        // Fall through to clipboard copy when native share is cancelled or unavailable.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("team.mine.inviteCopied"));
+    } catch {
+      toast.error(t("team.mine.inviteCopyFailed"));
     }
   };
 
   return (
     <div className="tab-content-safe flex flex-col gap-4 px-6">
-      <section className="glass-panel relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080b0c]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+      <section className="financial-panel relative overflow-hidden rounded-[16px] p-5">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/45 to-transparent" />
 
         <div className="relative z-10 mb-4 flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-2 text-white/[0.52]">
             <Users className="h-4 w-4 text-[#d7b46a]/80" />
-            <span className="truncate text-[10px] uppercase tracking-[0.18em]">
+            <span className="ui-label truncate">
               {topSquad ? topSquad.name : t("team.header.fallback")}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-md border border-[#d7b46a]/25 bg-[#d7b46a]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#d7b46a]">
+          <div className="flex items-center gap-1.5 rounded-md border border-[#d7b46a]/25 bg-[#d7b46a]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#d7b46a]">
             <Sparkles className="h-3 w-3" />
             {topSquad ? t("team.rank.value", { rank: topSquad.rank }) : t("team.rank.none")}
           </div>
@@ -127,7 +156,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
 
         <div className="relative z-10">
           <div className="mb-1.5 mt-5 flex items-end justify-between">
-            <div className="text-[10px] uppercase tracking-widest text-white/[0.52]">
+            <div className="ui-label">
               {t("team.marketValue")}
             </div>
             <div className="flex items-center gap-1.5">
@@ -158,7 +187,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
               value={goalInput}
               onChange={(e) => setGoalInput(e.target.value)}
               placeholder={t("team.goal.placeholder")}
-              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/35 px-3.5 py-2.5 font-mono text-xs tabular-nums outline-none transition-colors placeholder:text-white/[0.24] focus:border-[#8fd9ad]/45 focus:bg-black/55"
+              className="min-w-0 flex-1 rounded-[10px] border border-white/10 bg-black/35 px-3.5 py-2.5 font-mono text-xs tabular-nums outline-none transition-colors placeholder:text-white/[0.24] focus:border-[#8fd9ad]/45 focus:bg-black/55"
             />
             <button
               type="button"
@@ -172,7 +201,7 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
                   toast.error(t("team.goal.invalid"));
                 }
               }}
-              className="depth-button focus-ring rounded-lg border border-[#d7b46a]/30 bg-[#d7b46a]/10 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#e1c07b] hover:border-[#e1c07b]/60 hover:bg-[#d7b46a]/18"
+              className="depth-button focus-ring rounded-[10px] border border-[#d7b46a]/30 bg-[#d7b46a]/10 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#e1c07b] hover:border-[#e1c07b]/60 hover:bg-[#d7b46a]/18"
             >
               {t("common.set")}
             </button>
@@ -200,111 +229,136 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
         </div>
       </section>
 
-      <section className="glass-panel w-full rounded-2xl border border-white/[0.08] bg-[#080b0c]/80 p-3.5 backdrop-blur-xl">
+      <section className="financial-panel rounded-[14px] p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="ui-label">{t("team.mine.title")}</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-white/[0.48]">
+            {mySquad ? t("team.mine.detail") : t("team.mine.empty")}
+          </p>
+          </div>
+          <div className="shrink-0 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white/50">
+            {mySquad?.rank ? t("team.rank.value", { rank: mySquad.rank }) : t("team.rank.none")}
+          </div>
+        </div>
+
+        {mySquad ? (
+          <div className="grid gap-3">
+            <div className="grid grid-cols-[1fr_auto] gap-3">
+              <div className="metric-card min-w-0 rounded-[12px] px-3 py-3">
+                <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{t("team.squadColumn")}</div>
+                <div className="mt-1.5 truncate text-base font-semibold text-white">{mySquad.squad.name}</div>
+              </div>
+              <div className="metric-card min-w-[104px] rounded-[12px] px-3 py-3 text-right">
+                <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{t("team.mine.status")}</div>
+                <div className="mt-1.5 font-mono text-xs font-semibold uppercase tracking-widest text-[#8fd9ad]">{mySquad.membership.status}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="metric-card rounded-[12px] px-3 py-3">
+                <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{t("team.activated", { count: mySquad.activated_member_count })}</div>
+                <div className="mt-1.5 font-mono text-xs font-semibold text-[#8fd9ad] tabular-nums">
+                  {formatNumber(displayRaw72h(mySquad.total_locked_raw, tokenDecimals), locale, { maximumFractionDigits: 0 })} 72H
+                </div>
+              </div>
+              <div className="metric-card rounded-[12px] px-3 py-3">
+                <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{t("team.mine.memberList")}</div>
+                <div className="mt-1.5 truncate font-mono text-xs font-semibold text-white/75">
+                  {mySquad.member_count} · {t("team.mine.memberSelf", { role: mySquad.membership.role })}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[12px] border border-white/10 bg-black/20 px-3 py-2">
+              {mySquad.members.slice(0, 4).map((member) => (
+                <div key={member.id} className="flex items-center justify-between gap-3 border-b border-white/[0.06] py-2 last:border-b-0">
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-medium text-white/80">{member.email || member.user_id}</div>
+                    <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-white/[0.34]">#{member.rank} / {member.status}</div>
+                  </div>
+                  <div className="shrink-0 font-mono text-[11px] font-semibold text-[#8fd9ad] tabular-nums">
+                    {formatNumber(displayRaw72h(member.total_locked_raw, tokenDecimals), locale, { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={copyInvite}
+                className="depth-button focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.06] text-[10px] font-bold uppercase tracking-widest text-white/80 hover:bg-white/[0.11]"
+              >
+                <Copy className="h-4 w-4" />
+                {t("team.mine.copyInvite")}
+              </button>
+              <button
+                type="button"
+                onClick={shareInvite}
+                className="depth-button focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#8fd9ad]/30 bg-[#8fd9ad]/12 text-[10px] font-bold uppercase tracking-widest text-[#b7f3cc] hover:bg-[#8fd9ad]/20"
+              >
+                <Share2 className="h-4 w-4" />
+                {t("team.mine.shareInvite")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[12px] border border-white/10 bg-black/25 px-4 py-4 text-[11px] leading-relaxed text-white/[0.46]">
+            {t("team.mine.joinHint")}
+          </div>
+        )}
+      </section>
+
+      <section className="financial-panel rounded-[14px] p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="ui-label">{t("team.pool.title")}</div>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/[0.48]">
+              {t("team.pool.detail")}
+            </p>
+          </div>
+          <div className="shrink-0 rounded-md border border-[#d7b46a]/25 bg-[#d7b46a]/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#d7b46a]">
+            {t("team.pool.vault")}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            [t("team.pool.team"), t("team.pool.teamValue")],
+            [t("team.pool.leaderboard"), t("team.pool.leaderboardValue")],
+          ].map(([label, value]) => (
+            <div key={label} className="metric-card rounded-[12px] px-3 py-3">
+              <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{label}</div>
+              <div className="mt-1.5 font-mono text-xs font-semibold text-[#8fd9ad] tabular-nums">
+                {value}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="financial-panel w-full rounded-[14px] p-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
             <Plus className="h-4 w-4 text-[#d7b46a]" />
           </div>
           <input
             value={squadName}
             onChange={(event) => setSquadName(event.target.value)}
             placeholder={t("team.create.placeholder")}
-            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/35 px-3.5 py-2.5 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.24] focus:border-[#8fd9ad]/45"
+            className="min-w-0 flex-1 rounded-[10px] border border-white/10 bg-black/35 px-3.5 py-2.5 font-mono text-xs outline-none transition-colors placeholder:text-white/[0.24] focus:border-[#8fd9ad]/45"
           />
           <button
             type="button"
             onClick={handleCreateSquad}
             disabled={isSubmitting || !waveId}
-            className="depth-button focus-ring flex min-w-[76px] items-center justify-center rounded-lg border border-[#8fd9ad]/35 bg-[#8fd9ad]/15 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#b7f3cc] hover:bg-[#8fd9ad]/25 disabled:opacity-60"
+            className="depth-button focus-ring flex min-w-[76px] items-center justify-center rounded-[10px] border border-[#8fd9ad]/35 bg-[#8fd9ad]/15 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-[#b7f3cc] hover:bg-[#8fd9ad]/25 disabled:opacity-60"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.create")}
           </button>
         </div>
       </section>
 
-      <section className="glass-panel rounded-2xl border border-white/[0.08] bg-[#080b0c]/80 p-2 backdrop-blur-2xl">
-        <h3 className="flex items-center gap-2 px-3 py-3 text-[10px] uppercase tracking-[0.2em] text-white/[0.52]">
-          <Crown className="h-4 w-4 text-[#d7b46a]/85" />
-          {t("team.leaderboard")}
-        </h3>
-
-        <div className="flex flex-col gap-1">
-          {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-8 font-mono text-xs text-white/[0.42]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t("team.loading")}
-            </div>
-          ) : loadError ? (
-            <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
-              <div className="font-mono text-xs uppercase tracking-widest text-white/[0.58]">
-                {t("team.unavailable")}
-              </div>
-              <div className="max-w-[280px] font-mono text-[11px] leading-5 text-white/[0.38]">
-                {loadError}
-              </div>
-              <button
-                type="button"
-                onClick={loadSquads}
-                className="depth-button focus-ring mt-1 inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:border-[#8fd9ad]/40 hover:bg-[#8fd9ad]/10 hover:text-[#b7f3cc]"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                {t("common.retry")}
-              </button>
-            </div>
-          ) : squads.length === 0 ? (
-            <div className="py-8 text-center font-mono text-xs uppercase tracking-widest text-white/[0.42]">
-              {t("team.empty")}
-            </div>
-          ) : (
-            squads.map((squad, i) => {
-              const locked = Number(squad.total_locked || 0);
-              return (
-                <div
-                  key={squad.id}
-                  className={`flex items-center justify-between rounded-xl border px-3 py-3 transition-colors ${
-                    i === 0
-                      ? "border-[#d7b46a]/25 bg-[#d7b46a]/[0.07]"
-                      : "border-transparent hover:bg-white/[0.035]"
-                  }`}
-                >
-                  <div className="flex min-w-0 items-center gap-3.5">
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold shadow-inner ${
-                      i === 0 ? "border border-[#d7b46a]/35 bg-[#d7b46a]/15 text-[#e1c07b]" : "border border-white/10 bg-white/5 text-white/50"
-                    }`}>
-                      #{squad.rank}
-                    </div>
-                    <div className="min-w-0">
-                      <div className={`truncate text-sm font-medium tracking-wide ${i === 0 ? "text-[#e1c07b]" : "text-white/90"}`}>
-                        {squad.name}
-                      </div>
-                      <div className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42]">
-                        {t("team.activated", { count: squad.activated_member_count })}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col items-end text-right font-mono text-sm">
-                      <span className="font-semibold tracking-tight tabular-nums">${formatNumber(locked * tokenPrice, locale, { maximumFractionDigits: 0 })}</span>
-                      <span className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42] tabular-nums">
-                        ~{formatNumber(locked, locale, { maximumFractionDigits: 0 })} 72H
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleJoinSquad(squad.id)}
-                      disabled={isSubmitting}
-                      className="depth-button focus-ring flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/[0.52] hover:border-[#8fd9ad]/45 hover:bg-[#8fd9ad]/15 hover:text-[#b7f3cc] disabled:opacity-50"
-                      aria-label={t("team.joinAria", { name: squad.name })}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </section>
     </div>
   );
 }

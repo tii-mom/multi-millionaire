@@ -17,6 +17,7 @@ import type { BootstrapData } from "@/src/lib/types";
 const BRAND_LOGO_SRC = "/logo-mark-transparent.png";
 const Admin = lazy(() => import("./views/Admin"));
 const Team = lazy(() => import("./views/Team"));
+const Leaderboard = lazy(() => import("./views/Leaderboard"));
 const Rewards = lazy(() => import("./views/Rewards"));
 const Share = lazy(() => import("./views/Share"));
 
@@ -162,7 +163,7 @@ function MainApp() {
   }, [activeTab]);
 
   const handleSetTab = (newTab: string) => {
-    const tabs = ["home", "team", "rewards", "share"];
+    const tabs = ["team", "leaderboard", "home", "rewards", "share"];
     const currIndex = tabs.indexOf(activeTab);
     const newIndex = tabs.indexOf(newTab);
     setDirection(newIndex > currIndex ? 1 : -1);
@@ -201,6 +202,12 @@ function MainApp() {
             <Team tokenPrice={tokenPrice} myDeposit={myDeposit} squadGoal={squadGoal} setSquadGoal={setSquadGoal} />
           </Suspense>
         );
+      case "leaderboard":
+        return (
+          <Suspense fallback={<TabLoading />}>
+            <Leaderboard tokenPrice={tokenPrice} />
+          </Suspense>
+        );
       case "rewards":
         return (
           <Suspense fallback={<TabLoading />}>
@@ -228,7 +235,7 @@ function MainApp() {
           shellRef.current?.style.setProperty("--pointer-x", "50%");
           shellRef.current?.style.setProperty("--pointer-y", "18%");
         }}
-        className="app-shell relative flex h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#06080a] shadow-[0_40px_120px_rgba(0,0,0,0.72)] sm:border-x sm:border-white/[0.06]"
+        className="app-shell relative flex h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#05080a] shadow-[0_40px_120px_rgba(0,0,0,0.72)] sm:border-x sm:border-white/[0.06]"
       >
         <div className="grain-overlay" />
         <div className="scanlines" />
@@ -243,10 +250,10 @@ function MainApp() {
           </div>
         </div>
 
-        <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-5 pt-20">
+        <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-3 pt-16">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="relative flex h-[64px] w-[68px] shrink-0 items-center justify-center">
-              <div className="absolute inset-1 rounded-[22px] bg-[#d7b46a]/10 blur-xl" />
+            <div className="relative flex h-[50px] w-[54px] shrink-0 items-center justify-center">
+              <div className="absolute inset-2 rounded-[16px] bg-[#d7b46a]/10 blur-xl" />
               <img
                 src={BRAND_LOGO_SRC}
                 alt={t("app.brand.name")}
@@ -256,11 +263,11 @@ function MainApp() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-[#d7b46a] shadow-[0_0_10px_rgba(215,180,106,0.45)]" />
-                <h1 className="truncate text-[10px] font-medium uppercase tracking-[0.22em] text-white/[0.48]">
+                <h1 className="ui-label truncate">
                   {t("app.brand.kicker")}
                 </h1>
               </div>
-              <div className={`mt-2 truncate font-semibold tracking-tight text-white/95 ${locale.startsWith("zh") ? "text-[21px]" : "text-[17px]"}`}>
+              <div className={`mt-1.5 truncate font-semibold tracking-tight text-white/95 ${locale.startsWith("zh") ? "text-[21px]" : "text-[17px]"}`}>
                 {t("app.brand.name")}
               </div>
             </div>
@@ -268,7 +275,7 @@ function MainApp() {
 
           <div className="top-terminal-panel flex shrink-0 flex-col items-end gap-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-white/[0.38]">{t("app.price.label")}</span>
+              <span className="ui-label text-[9px]">{t("app.price.label")}</span>
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/85" />
             </div>
             <div className="flex items-center gap-2 font-mono text-[17px] font-semibold text-[#d7b46a] tabular-nums">
@@ -280,10 +287,11 @@ function MainApp() {
               >
                 ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </motion.span>
-              <span className="rounded-full bg-white/[0.055] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white/55">
+              <span className="rounded-md border border-white/[0.06] bg-white/[0.045] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white/55">
                 {t("app.price.offChain")}
               </span>
             </div>
+            <div className="mt-1 h-5 w-[116px] rounded-md border border-white/[0.06] bg-black/20 market-line" aria-hidden="true" />
           </div>
         </header>
 

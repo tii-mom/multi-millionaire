@@ -30,10 +30,10 @@ export default function DepositFlow({
   t,
 }: DepositFlowProps) {
   return (
-    <section className="financial-panel overflow-hidden rounded-[22px]">
-      <div className="flex items-center justify-between border-b border-white/[0.07] bg-white/[0.025] px-6 py-5">
+    <section className="financial-panel overflow-hidden rounded-[16px]">
+      <div className="flex items-center justify-between border-b border-white/[0.07] bg-white/[0.022] px-5 py-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/25">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-black/25">
             <Wallet className="h-4 w-4 text-[#d7b46a]" />
           </div>
           <span className="text-sm font-semibold tracking-tight text-white/90">{t("home.deposit.title")}</span>
@@ -53,13 +53,13 @@ export default function DepositFlow({
         </div>
       </div>
 
-      <div className="flex flex-col gap-5 p-6">
+      <div className="flex flex-col gap-5 p-5">
         <div className="group relative flex flex-col gap-2">
           <div className="absolute right-5 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2">
             <button
               type="button"
               onClick={() => onInputChange(availableBalance.toString())}
-              className="depth-button focus-ring rounded border border-[#d7b46a]/25 bg-[#d7b46a]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-[#d7b46a] hover:bg-[#d7b46a] hover:text-black"
+              className="depth-button focus-ring rounded-md border border-[#d7b46a]/25 bg-[#d7b46a]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-[#d7b46a] hover:bg-[#d7b46a] hover:text-black"
             >
               {t("common.max")}
             </button>
@@ -74,7 +74,7 @@ export default function DepositFlow({
             onChange={(e) => onInputChange(e.target.value)}
             placeholder="0"
             disabled={isConfirming || backendUnavailable}
-            className="w-full rounded-[16px] border border-white/[0.08] bg-[#030405]/[0.72] py-6 pl-6 pr-[120px] font-mono text-[2rem] tabular-nums shadow-[inset_0_2px_10px_rgba(0,0,0,0.55)] outline-none ring-[#d7b46a]/5 transition-colors placeholder:text-white/[0.08] hover:bg-[#030405]/[0.88] focus:border-[#d7b46a]/[0.44] focus:bg-black/75 focus:ring-2 disabled:opacity-50"
+            className="w-full rounded-[12px] border border-white/[0.08] bg-[#030405]/[0.72] py-6 pl-5 pr-[120px] font-mono text-[2rem] tabular-nums shadow-[inset_0_2px_10px_rgba(0,0,0,0.55)] outline-none ring-[#d7b46a]/5 transition-colors placeholder:text-white/[0.08] hover:bg-[#030405]/[0.88] focus:border-[#d7b46a]/[0.44] focus:bg-black/75 focus:ring-2 disabled:opacity-50"
           />
 
           <div className="absolute -top-3 right-2 z-30 flex items-center gap-1 bg-[#080a0c] px-2 text-[9px] uppercase tracking-widest text-white/34">
@@ -100,7 +100,7 @@ export default function DepositFlow({
           type="button"
           onClick={onDeposit}
           disabled={isConfirming || backendUnavailable || !inputValue || Number(inputValue) <= 0 || (chainMainlineEnabled && chainActionDisabled)}
-          className="depth-button focus-ring group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-[16px] bg-[#d7b46a] py-4 font-semibold tracking-wide text-black shadow-[0_16px_32px_rgba(0,0,0,0.26)] hover:bg-[#e1c07b] disabled:cursor-not-allowed disabled:opacity-70"
+            className="depth-button focus-ring group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-[12px] bg-[#d7b46a] py-4 font-semibold tracking-wide text-black shadow-[0_16px_32px_rgba(0,0,0,0.26)] hover:bg-[#e1c07b] disabled:cursor-not-allowed disabled:opacity-70"
         >
           <div className="absolute inset-0 h-full w-full -translate-x-[150%] skew-x-[30deg] bg-gradient-to-r from-transparent via-white/24 to-transparent group-hover:animate-[shine_1s_ease-out]" />
           {isConfirming ? (

@@ -13,11 +13,13 @@ type AdminMerkleSectionProps = {
   isCreating: boolean;
   isLoading: boolean;
   merkleDraftWritesDisabled: boolean;
+  onBatchChange: (batchId: string) => void;
   onChainIdChange: (value: string) => void;
   onCreateDraft: () => void;
   onReload: () => void;
   onTokenAddressChange: (value: string) => void;
   proofs: MerkleRewardProof[];
+  selectedBatchId: string;
   tokenAddress: string;
   writesDisabled: boolean;
 };
@@ -29,11 +31,13 @@ export function AdminMerkleSection({
   isCreating,
   isLoading,
   merkleDraftWritesDisabled,
+  onBatchChange,
   onChainIdChange,
   onCreateDraft,
   onReload,
   onTokenAddressChange,
   proofs,
+  selectedBatchId,
   tokenAddress,
   writesDisabled,
 }: AdminMerkleSectionProps) {
@@ -41,7 +45,7 @@ export function AdminMerkleSection({
   const draftDisabled = writesDisabled || merkleDraftWritesDisabled || isCreating;
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-950/75 p-4 shadow-lg shadow-black/20 sm:p-5">
+    <section className="admin-panel rounded-[14px] p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">{t("admin.merkle.title")}</h2>
@@ -52,7 +56,7 @@ export function AdminMerkleSection({
             type="button"
             onClick={onReload}
             disabled={isLoading || isCreating}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 text-xs font-medium uppercase tracking-widest text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="admin-action inline-flex h-9 items-center justify-center gap-2 rounded-[10px] px-3 text-xs font-medium uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             {t("common.refresh")}
@@ -61,7 +65,7 @@ export function AdminMerkleSection({
             type="button"
             onClick={onCreateDraft}
             disabled={draftDisabled || isLoading}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-3 text-xs font-semibold uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            className="admin-primary inline-flex h-9 items-center justify-center gap-2 rounded-[10px] px-3 text-xs font-semibold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {t("admin.merkle.createDraft")}
@@ -70,13 +74,13 @@ export function AdminMerkleSection({
       </div>
 
       {error ? (
-        <div className="mt-3 rounded-lg border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100/85">
+        <div className="mt-3 rounded-[12px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100/85">
           {error}
         </div>
       ) : null}
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-800 bg-slate-900/55 p-4 lg:col-span-2">
+        <div className="admin-panel-quiet rounded-[12px] p-4 lg:col-span-2">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-[10px] font-medium uppercase tracking-widest text-slate-500">{t("admin.merkle.chainId")}</span>
@@ -84,7 +88,7 @@ export function AdminMerkleSection({
                 value={chainId}
                 onChange={(event) => onChainIdChange(event.target.value)}
                 disabled={draftDisabled}
-                className="mt-2 h-10 w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 font-mono text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-2 h-10 w-full rounded-[10px] border border-slate-700 bg-slate-950/70 px-3 font-mono text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#d7b46a]/50 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="ton-mainnet"
               />
             </label>
@@ -94,10 +98,38 @@ export function AdminMerkleSection({
                 value={tokenAddress}
                 onChange={(event) => onTokenAddressChange(event.target.value)}
                 disabled={draftDisabled}
-                className="mt-2 h-10 w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 font-mono text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-2 h-10 w-full rounded-[10px] border border-slate-700 bg-slate-950/70 px-3 font-mono text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#d7b46a]/50 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder={t("admin.merkle.tokenPlaceholder")}
               />
             </label>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onBatchChange("")}
+              className={`h-8 rounded-[9px] border px-3 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                selectedBatchId
+                  ? "border-slate-800 bg-slate-950/70 text-slate-500 hover:text-slate-200"
+                  : "border-[#d7b46a]/25 bg-[#d7b46a]/10 text-[#f5deb3]"
+              }`}
+            >
+              {t("admin.merkle.latest")}
+            </button>
+            {batches.slice(0, 5).map((batch) => (
+              <button
+                key={batch.id}
+                type="button"
+                onClick={() => onBatchChange(batch.id)}
+                className={`h-8 max-w-[180px] truncate rounded-[9px] border px-3 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                  selectedBatchId === batch.id
+                    ? "border-[#d7b46a]/25 bg-[#d7b46a]/10 text-[#f5deb3]"
+                    : "border-slate-800 bg-slate-950/70 text-slate-500 hover:text-slate-200"
+                }`}
+                title={batch.id}
+              >
+                {batch.id.slice(0, 8)}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -155,14 +187,14 @@ function MerkleRows({
   title: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/55 p-4">
+    <div className="admin-panel-quiet rounded-[12px] p-4">
       <div className="mb-3 text-[10px] font-medium uppercase tracking-widest text-slate-500">{title}</div>
       {isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
       ) : empty ? (
         <EmptyRows />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/70">{children}</div>
+        <div className="overflow-hidden rounded-[12px] border border-slate-800 bg-slate-950/70">{children}</div>
       )}
     </div>
   );

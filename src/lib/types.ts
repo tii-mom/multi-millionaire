@@ -85,6 +85,16 @@ export interface AppControl {
 export interface AdminOpsDiagnostics {
   runtime_path?: 'production-chain' | 'staging-mvp' | 'future-disabled';
   merkle_draft_writes_enabled?: boolean;
+  season_vault?: string;
+  season_claim?: string;
+  contract_integration?: {
+    readyForReads?: boolean;
+    readyForIndexer?: boolean;
+    readyForWrites?: boolean;
+    issues?: Array<{ severity: string; key: string; message: string }>;
+    abiArtifacts?: Array<{ role: string; path: string; resolvedPath: string; exists: boolean }>;
+  };
+  v2_tokenomics?: Record<string, unknown>;
 }
 
 export interface Position {
@@ -167,6 +177,103 @@ export interface SquadLeaderboardRow {
   activated_member_count: number;
   total_locked: string;
   rank: number;
+}
+
+export interface Squad {
+  id: number;
+  wave_id: number;
+  name: string;
+  captain_user_id: string;
+  status: string;
+  invite_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SquadMember {
+  id: number;
+  wave_id: number;
+  squad_id: number;
+  user_id: string;
+  role: string;
+  status: string;
+  joined_at: string;
+  activated_at: string | null;
+}
+
+export interface CreateSquadResult {
+  squad: Squad;
+  member: SquadMember;
+}
+
+export interface SquadMemberSummary {
+  id: number;
+  user_id: string;
+  email: string | null;
+  role: string;
+  status: string;
+  joined_at: string;
+  activated_at: string | null;
+  total_locked_raw: string;
+  rank: number;
+}
+
+export interface SquadDetail {
+  squad: Squad;
+  rank: number | null;
+  member_count: number;
+  activated_member_count: number;
+  total_locked_raw: string;
+  members: SquadMemberSummary[];
+}
+
+export interface MySquadView extends SquadDetail {
+  membership: SquadMember;
+}
+
+export interface PersonalLeaderboardRow {
+  user_id: string;
+  email: string | null;
+  total_locked_raw: string;
+  qualifying_position_count: number;
+  first_qualified_at: string | null;
+  rank: number;
+}
+
+export interface LeaderboardMe {
+  wave_id: number;
+  personal: PersonalLeaderboardRow | null;
+  squad: MySquadView | null;
+}
+
+export type RewardEstimateCategoryKey = 'personal' | 'team' | 'referral' | 'leaderboard';
+
+export interface RewardEstimateCategory {
+  category: RewardEstimateCategoryKey;
+  bps: number;
+  pool_amount_raw: string;
+  estimate_amount_raw: string;
+  basis: string;
+}
+
+export interface RewardEstimate {
+  wave_id: number;
+  token_decimals: number;
+  release_amount_raw: string;
+  categories: RewardEstimateCategory[];
+  total_estimate_raw: string;
+  ledger_totals: {
+    pending_amount_raw: string;
+    approved_amount_raw: string;
+    claimed_amount_raw: string;
+  };
+  context: {
+    user_locked_raw: string;
+    wave_locked_raw: string;
+    squad_locked_raw: string;
+    ranked_squad_count: number;
+    squad_rank: number | null;
+  };
 }
 
 export interface RewardSummary {
@@ -262,6 +369,15 @@ export interface AdminDashboard {
   open_risk_flags: number;
 }
 
+export interface AdminPaginatedResult<T> {
+  rows: T[];
+  page: number;
+  page_size: number;
+  total: number;
+  page_count: number;
+  search: string;
+}
+
 export interface AdminRiskFlag {
   id: string;
   entity_type: string;
@@ -301,6 +417,18 @@ export interface AdminSquad {
   member_count: number;
   activated_member_count: number;
   total_locked: string;
+  rank: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
