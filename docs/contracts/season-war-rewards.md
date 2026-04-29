@@ -1,6 +1,6 @@
 # Season War reward Merkle preparation
 
-This document describes the server-side preparation for the 90B Season War reward integration. The source of truth is `multi-millionaire`: verified wallets, lock positions, referrals, squads, and leaderboard data live here. `/Desktop/72` is only a display and navigation surface and must not be used as an allocation source.
+This document describes the server-side preparation for the 90B Season War reward integration. The source of truth is `multi-millionaire`: verified wallets, lock positions, referrals, squads, leaderboard data, and proof inputs live here. `/Users/yudeyou/Desktop/72` is only a display and navigation surface and must not be used as an allocation source or proof source.
 
 ## Mainnet contract facts
 
@@ -8,9 +8,13 @@ The Season War exporter targets the audited 72H V2 mainnet deployment:
 
 - Jetton Master: `EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`
 - SeasonVault: `EQCdSSWPVbwh9zIzhF5pnxwRKw-I8xc4bS1iyiVcbXKfnWe-`
-- SeasonClaim: `EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`
+- SeasonClaim v1: `EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`
 
-The legacy `MerkleClaim` reward path remains separate and must not be used for 900B Season War leaves.
+The deployed mainnet `SeasonClaim` is only suitable for small-scale rehearsal exports because its proof format is a single cell. The legacy `MerkleClaim` reward path remains separate and must not be used for 900B Season War leaves.
+
+`SeasonClaimV2` is an undeployed candidate as of April 28, 2026. It must pass audit, testnet rehearsal, and mainnet deployment before any real production Season War root is publishable. Do not write a `SeasonClaimV2` address into `.env` unless a concrete deployment address is explicitly confirmed.
+
+As of contract repository commit `a98841f`, the active candidate set also includes `SeasonClaimV2LegacyBridge`, and `SeasonClaimV2` has a changed code hash because of the `ConfirmSeasonClaimFunding` receipt. Any old standalone testnet `SeasonClaimV2` address or evidence, including `deployments/season-claim-v2.testnet.plan.json`, is historical only and must not be treated as a final address.
 
 ## Round budget
 
@@ -38,7 +42,7 @@ The constants are defined in `server/src/services/seasonRewards.ts`:
 
 1. Season War app id, currently `1` for `multi-millionaire`
 2. token address
-3. SeasonClaim contract address
+3. selected claim contract address
 4. `seasonId` as `uint8`, valid range `1..10`
 5. recipient wallet
 6. personal amount
@@ -91,13 +95,29 @@ user_contribution = sum(position_contribution)
 
 That change needs an explicit source of `eligible_successful_round_count` per position. The current database does not store season round success metadata, so v1 intentionally requires `--successful-wave-ids` and does not infer cross-round multipliers.
 
+## Claim Versions
+
+The exporter supports explicit claim contract modes:
+
+- `--claim-version season-claim-v1`: current deployed SeasonClaim single-cell proof encoder. It fail-fast rejects trees above 8 leaves and should only be used for small rehearsal artifacts.
+- `--claim-version season-claim-v2`: SeasonClaimV2 ref-chain proof encoder. It keeps the same leaf schema and Merkle hash pair, stores each proof entry as `siblingOnLeft bool + sibling uint256`, and continues through at most one reference per cell.
+
+The v2 mode allows large trees, but current v2 manifests remain `production_root_publishable: false` until an audited SeasonClaimV2 is deployed and the exact address is passed intentionally. The v2 default address is only a placeholder for rehearsal leaf hashing; it does not replace the deployed SeasonClaim v1 mainnet address.
+
+Proof cell fields are versioned conservatively:
+
+- `proofCellBase64` is the canonical field for both v1 and v2.
+- `seasonClaimProofCellBase64` is a v1-only legacy alias and must equal `proofCellBase64` when present.
+- v2 exports must not emit `seasonClaimProofCellBase64`.
+- v1 manifests include `max_supported_single_cell_leaves` for the deployed single-cell limit; v2 manifests omit that legacy limit.
+
 ## Export command
 
 The v1 exporter requires the operator to provide successful wave ids because the current `waves` table does not yet store season or round success metadata:
 
 ```bash
 cd /Users/yudeyou/Desktop/multi-millionaire/server
-npm run season-war:export -- --season-id 1 --successful-round-count 18 --successful-wave-ids 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 --out ../tmp/season-war/season-1
+npm run season-war:export -- --claim-version season-claim-v1 --season-id 1 --successful-round-count 18 --successful-wave-ids 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 --out ../tmp/season-war/season-1
 ```
 
 The command writes:
@@ -110,7 +130,24 @@ The command writes:
 
 If a non-empty budget pool has no qualified contribution, successful wave count mismatches, required addresses are missing, proof encoding cannot match the deployed SeasonClaim schema, or pool totals drift, the exporter fails before writing a publishable manifest.
 
-Current deployed `SeasonClaim.tact` reads proof data from one cell as consecutive `siblingOnLeft bool + sibling uint256` entries. That caps publishable trees at 8 leaves. If production eligibility produces more than 8 recipient wallets, do not register the root against this SeasonClaim; the claim contract needs a ref-based proof migration or replacement first.
+Current deployed `SeasonClaim.tact` reads proof data from one cell as consecutive `siblingOnLeft bool + sibling uint256` entries. That caps v1 rehearsal trees at 8 leaves. If production eligibility produces more than 8 recipient wallets, do not register the root against this SeasonClaim.
+
+`SeasonClaimV2` reads the same proof entries but can continue through a single reference chain. After the new bridge-focused testnet `SeasonClaimV2` address is confirmed, 128+ leaf dry-runs can be generated with:
+
+```bash
+cd /Users/yudeyou/Desktop/multi-millionaire/server
+npm run season-war:rehearsal:v2-large -- \
+  --season-claim-address <confirmed-season-claim-v2-address> \
+  --season-claim-v2-legacy-bridge-address <confirmed-bridge-address> \
+  --chain-id ton-testnet \
+  --token-address <testnet-jetton-master> \
+  --evidence deployments/season-claim-v2-legacy-bridge.testnet.latest.json \
+  --evidence-status bridge-forward-complete-pending-legacy-settle
+```
+
+Only after `SeasonClaimV2` has audit signoff, bridge-focused testnet evidence, and a confirmed mainnet deployment should a real production export pass the deployed v2 address with `--season-claim-address`. Until then v2 manifests must stay `production_root_publishable: false`.
+
+When the new testnet `SeasonClaimV2` and `SeasonClaimV2LegacyBridge` addresses are confirmed, regenerate the v2 large rehearsal artifact with the new `SeasonClaimV2` address and confirm the leaf hashes bind to that address. Do not use the old testnet plan address for this step.
 
 ## Anti-abuse rules
 
@@ -133,5 +170,6 @@ The allocation export must apply these checks before generating a publishable tr
 3. Count successful rounds in the finalized season and pass that value as `successfulRoundCount`.
 4. Generate leaves with `buildSeasonRewardMerkleTree`.
 5. Confirm pool totals equal `successfulRoundCount × 500000000000000000` split by 50/25/15/10.
-6. Compare the Merkle root against the SeasonClaim publish transaction payload.
-7. Archive the source export and generated proof artifact before enabling claims.
+6. Confirm `claim_contract_version`, `proof_format`, and `production_root_publishable` in the manifest.
+7. Compare the Merkle root against the SeasonClaim publish transaction payload.
+8. Archive the source export and generated proof artifact before enabling claims.

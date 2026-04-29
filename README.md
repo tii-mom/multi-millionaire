@@ -89,7 +89,7 @@ Backend:
 - `JWT_SECRET`: JWT signing secret for email/password auth.
 - `PORT`: API port, default `4000`.
 - `CHAIN_ID`: display/config value for future chain integration.
-- `TOKEN_ADDRESS`: 72H token address placeholder.
+- `TOKEN_ADDRESS`: 72H V2 Jetton Master for Season War exports, currently `EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`.
 - `LOCK_VAULT_ADDRESS`: future lock contract address.
 - `ORACLE_ADDRESS`: future price/oracle contract address.
 - `REWARD_DISTRIBUTOR_ADDRESS`: future reward distributor contract address.
@@ -112,6 +112,12 @@ Backend:
 - Automatic risk flags for self-referral attempts, rapid deposit bursts, and high-value first locks.
 - Fail-closed wallet binding and deposit receipt endpoints for production chain readiness.
 - Admin operations endpoints for emergency controls, audit logs, chain events, and receipt verifier diagnostics.
+
+## Season War Allocation Source
+
+- `multi-millionaire` is the Season War allocation data source: verified wallets, lock positions, referrals, squads, leaderboard data, and risk-review state should be exported from this repository's production data.
+- `/Users/yudeyou/Desktop/72` is not an allocation source and not a proof source; treat it only as a display/navigation surface unless a future decision explicitly changes that.
+- SeasonClaimV2 is not yet deployed, audited, and evidence-complete. Until those gates are complete, Season War manifests must remain `production_root_publishable=false`.
 
 ## Not Yet Implemented
 
