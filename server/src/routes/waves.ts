@@ -1,5 +1,5 @@
 import express from 'express';
-import { getCurrent, getById } from '../controllers/waveController';
+import { getCurrent, getById, getLeaderboardMe, getRewardEstimate } from '../controllers/waveController';
 import { claimPass } from '../controllers/passController';
 import { depositPrecheck, deposit } from '../controllers/positionController';
 import { depositReceipt, deriveJettonWallet } from '../controllers/chainController';
@@ -16,6 +16,12 @@ router.get('/current', getCurrent);
 
 // GET /v1/waves/chain/jetton-wallet?owner=<wallet>
 router.get('/chain/jetton-wallet', requireAuth, deriveJettonWallet);
+
+// GET /v1/waves/:waveId/leaderboard/me
+router.get('/:waveId/leaderboard/me', requireAuth, requirePositiveIntParam('waveId'), getLeaderboardMe);
+
+// GET /v1/waves/:waveId/reward-estimate
+router.get('/:waveId/reward-estimate', requireAuth, requirePositiveIntParam('waveId'), getRewardEstimate);
 
 // GET /v1/waves/:waveId
 router.get('/:waveId', requirePositiveIntParam('waveId'), getById);

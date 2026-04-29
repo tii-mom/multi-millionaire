@@ -355,6 +355,8 @@ describe('Production readiness gates', () => {
 
   it('treats NODE_ENV=prod as production for legacy off-chain deposit and claim stubs', async () => {
     process.env.NODE_ENV = 'prod';
+    process.env.JWT_SECRET = 'production-readiness-secret';
+    const prodToken = jwt.sign({ userId, email: 'user@example.com' }, process.env.JWT_SECRET);
     getRewardLedgerByIdMock.mockResolvedValue({
       id: 'ledger-1',
       beneficiary_user_id: userId,
@@ -363,11 +365,11 @@ describe('Production readiness gates', () => {
 
     const deposit = await request(app)
       .post('/v1/waves/1/deposit')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${prodToken}`)
       .send({ amount: '1000' });
     const claim = await request(app)
       .post('/v1/rewards/ledger-1/claim')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${prodToken}`)
       .send();
 
     expect(deposit.status).toBe(409);

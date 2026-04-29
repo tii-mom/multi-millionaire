@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { AuthSecretConfigurationError, getJwtSecret } from '../services/authSecrets';
 
 /**
  * Simple JWT authentication middleware. If a valid token is present in the
@@ -17,10 +18,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Invalid Authorization header' } });
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { userId: string; email?: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; email?: string };
     req.user = { id: decoded.userId, email: decoded.email || '' };
     return next();
   } catch (err) {
+    if (err instanceof AuthSecretConfigurationError) {
+      return res.status(err.status).json({ request_id: req.id || '', error: { code: err.code, message: err.message } });
+    }
     return res.status(401).json({ request_id: req.id || '', error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' } });
   }
 }

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import {
+  AdminListOptions,
   getAdminDashboard,
   listAdminRewards,
   listAdminRiskFlags,
@@ -20,6 +21,23 @@ import {
 import { readPublicV2Tokenomics } from '../services/contracts/v2Tokenomics';
 import { currentRuntimePath, merkleDraftWritesEnabled } from '../services/runtimeModes';
 
+function readAdminListOptions(req: Request): AdminListOptions {
+  const pageSizeInput = typeof req.query.page_size === 'string'
+    ? req.query.page_size
+    : typeof req.query.pageSize === 'string'
+      ? req.query.pageSize
+      : undefined;
+  return {
+    page: typeof req.query.page === 'string' ? Number(req.query.page) : undefined,
+    pageSize: pageSizeInput ? Number(pageSizeInput) : undefined,
+    search: typeof req.query.search === 'string'
+      ? req.query.search
+      : typeof req.query.q === 'string'
+        ? req.query.q
+        : undefined,
+  };
+}
+
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
     const dashboard = await getAdminDashboard();
@@ -31,7 +49,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
 
 export async function getWaves(req: Request, res: Response, next: NextFunction) {
   try {
-    const waves = await listAdminWaves();
+    const waves = await listAdminWaves(readAdminListOptions(req));
     return res.json({ request_id: req.id || '', data: waves });
   } catch (err) {
     return next(err);
@@ -40,7 +58,7 @@ export async function getWaves(req: Request, res: Response, next: NextFunction) 
 
 export async function getRiskFlags(req: Request, res: Response, next: NextFunction) {
   try {
-    const flags = await listAdminRiskFlags();
+    const flags = await listAdminRiskFlags(readAdminListOptions(req));
     return res.json({ request_id: req.id || '', data: flags });
   } catch (err) {
     return next(err);
@@ -49,7 +67,7 @@ export async function getRiskFlags(req: Request, res: Response, next: NextFuncti
 
 export async function getRewards(req: Request, res: Response, next: NextFunction) {
   try {
-    const rewards = await listAdminRewards();
+    const rewards = await listAdminRewards(readAdminListOptions(req));
     return res.json({ request_id: req.id || '', data: rewards });
   } catch (err) {
     return next(err);
@@ -58,7 +76,7 @@ export async function getRewards(req: Request, res: Response, next: NextFunction
 
 export async function getSquads(req: Request, res: Response, next: NextFunction) {
   try {
-    const squads = await listAdminSquads();
+    const squads = await listAdminSquads(readAdminListOptions(req));
     return res.json({ request_id: req.id || '', data: squads });
   } catch (err) {
     return next(err);

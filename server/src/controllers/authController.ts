@@ -6,12 +6,13 @@ import { createUser, findByEmail } from '../models/userModel';
 import { loadContractIntegrationConfig } from '../services/contracts/config';
 import { isPlausibleWalletAddress, verifyWalletSignature, WalletSignatureVerificationError } from '../services/walletSignatureVerifier';
 import { normalizeWalletAddress, upsertVerifiedWalletBinding } from '../models/walletBindingModel';
+import { getJwtSecret } from '../services/authSecrets';
 
 const SALT_ROUNDS = 10;
 const WALLET_AUTH_INTENT_TTL_SECONDS = 300;
 
 function signUserToken(user: { id: string; email: string }) {
-  return jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+  return jwt.sign({ userId: user.id, email: user.email }, getJwtSecret(), { expiresIn: '7d' });
 }
 
 function walletBindingEnabled(): boolean {
@@ -90,7 +91,7 @@ export async function createWalletAuthIntent(req: Request, res: Response, next: 
         normalizedAddress: walletAddress ? normalizeWalletAddress(walletAddress) : null,
         nonce,
       },
-      process.env.JWT_SECRET || 'secret',
+      getJwtSecret(),
       { expiresIn: WALLET_AUTH_INTENT_TTL_SECONDS }
     );
     return res.status(201).json({
@@ -126,7 +127,7 @@ export async function walletLogin(req: Request, res: Response, next: NextFunctio
       return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_WALLET_ADDRESS', message: 'walletAddress is not valid for the configured chain' } });
     }
 
-    const decoded = jwt.verify(intentToken, process.env.JWT_SECRET || 'secret') as {
+    const decoded = jwt.verify(intentToken, getJwtSecret()) as {
       type?: string;
       chainId?: string;
       walletAddress?: string;

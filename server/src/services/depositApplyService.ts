@@ -34,6 +34,48 @@ function calculateDirectReward(amountRaw: string, rewardRateBps: number, perInvi
   return { grossAmount: grossAmount.toString(), finalAmount: finalAmount.toString() };
 }
 
+async function calculateCappedDirectReward(input: {
+  executor: QueryExecutor;
+  wave: Wave;
+  inviterUserId: string;
+  grossAmount: string;
+  perInviteFinalAmount: string;
+}): Promise<string> {
+  let finalAmount = BigInt(input.perInviteFinalAmount);
+  const inviterWaveCap = BigInt(input.wave.inviter_wave_cap || '0');
+  if (inviterWaveCap > BigInt(0)) {
+    const inviterAllocated = await input.executor.query<{ allocated_amount_raw: string }>(
+      `SELECT COALESCE(SUM(final_amount), 0)::text AS allocated_amount_raw
+       FROM reward_ledgers
+       WHERE wave_id = $1
+         AND beneficiary_user_id = $2
+         AND reward_type = 'direct_referral'
+         AND status <> 'rejected'`,
+      [input.wave.wave_id, input.inviterUserId]
+    );
+    const used = BigInt(inviterAllocated.rows[0]?.allocated_amount_raw || '0');
+    const remaining = inviterWaveCap > used ? inviterWaveCap - used : BigInt(0);
+    finalAmount = finalAmount > remaining ? remaining : finalAmount;
+  }
+
+  const rewardBudget = BigInt(input.wave.reward_budget || '0');
+  if (rewardBudget > BigInt(0)) {
+    const waveAllocated = await input.executor.query<{ allocated_amount_raw: string }>(
+      `SELECT COALESCE(SUM(final_amount), 0)::text AS allocated_amount_raw
+       FROM reward_ledgers
+       WHERE wave_id = $1
+         AND reward_type = 'direct_referral'
+         AND status <> 'rejected'`,
+      [input.wave.wave_id]
+    );
+    const used = BigInt(waveAllocated.rows[0]?.allocated_amount_raw || '0');
+    const remaining = rewardBudget > used ? rewardBudget - used : BigInt(0);
+    finalAmount = finalAmount > remaining ? remaining : finalAmount;
+  }
+
+  return finalAmount.toString();
+}
+
 function getHighRiskDepositThreshold(): bigint | null {
   const raw = process.env.HIGH_RISK_DEPOSIT_THRESHOLD;
   if (!raw) return null;
@@ -75,15 +117,24 @@ export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepos
     const referral = await getReferral(input.userId, input.executor);
     if (referral?.inviter_user_id && referral.inviter_user_id !== input.userId) {
       const rewardAmounts = calculateDirectReward(input.amountRaw, input.wave.direct_reward_rate_bps, input.wave.per_invite_cap);
-      await createRewardLedger({
-        beneficiaryUserId: referral.inviter_user_id,
-        sourceUserId: input.userId,
-        sourcePositionId: position.id,
-        waveId: input.wave.wave_id,
+      const finalAmount = await calculateCappedDirectReward({
+        executor: input.executor,
+        wave: input.wave,
+        inviterUserId: referral.inviter_user_id,
         grossAmount: rewardAmounts.grossAmount,
-        finalAmount: rewardAmounts.finalAmount,
-        status: 'approved',
-      }, input.executor);
+        perInviteFinalAmount: rewardAmounts.finalAmount,
+      });
+      if (BigInt(finalAmount) > BigInt(0)) {
+        await createRewardLedger({
+          beneficiaryUserId: referral.inviter_user_id,
+          sourceUserId: input.userId,
+          sourcePositionId: position.id,
+          waveId: input.wave.wave_id,
+          grossAmount: rewardAmounts.grossAmount,
+          finalAmount,
+          status: 'approved',
+        }, input.executor);
+      }
     }
   }
 

@@ -1,7 +1,10 @@
 import app from './app';
 import { closePool } from './db';
+import { assertServerStartupConfig } from './services/startupConfig';
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
+
+assertServerStartupConfig();
 
 const server = app.listen(port, () => {
   // eslint-disable-next-line no-console

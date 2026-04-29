@@ -165,24 +165,33 @@ async function main() {
       const contracts = objectValue(data.contracts, 'bootstrap response.data.contracts');
       const ops = objectValue(data.ops, 'bootstrap response.data.ops');
       const receiptVerifier = objectValue(ops.receipt_verifier, 'bootstrap response.data.ops.receipt_verifier');
+      const merkleClaimVerifier = objectValue(ops.merkle_claim_verifier, 'bootstrap response.data.ops.merkle_claim_verifier');
       const chainId = String(contracts.chain_id || '');
       const chainWritesEnabled = featureFlags.chain_mainline_writes_enabled === true;
+      const receiptVerificationEnabled = featureFlags.receipt_verification_enabled === true;
       const receiptStatus = String(receiptVerifier.status || '');
+      const merkleClaimStatus = String(merkleClaimVerifier.status || '');
 
       assert(chainId !== 'ton-testnet', 'Production bootstrap must not point at ton-testnet');
       assert(receiptStatus !== 'test', 'Production bootstrap must not expose test receipt verifier');
+      assert(merkleClaimStatus !== 'test', 'Production bootstrap must not expose test MerkleClaim verifier');
+      if (receiptVerificationEnabled) {
+        assert(receiptStatus === 'ton_rpc', `Production receipt verification must use ton_rpc; got ${receiptStatus}`);
+      }
+      if (merkleClaimStatus && merkleClaimStatus !== 'not_configured') {
+        assert(merkleClaimStatus === 'ton_rpc', `Production MerkleClaim verification must use ton_rpc; got ${merkleClaimStatus}`);
+      }
       assert(
         !chainWritesEnabled || config.allowChainWrites,
         'Production non-mutating smoke refuses chain_mainline_writes_enabled=true unless ALLOW_PRODUCTION_SMOKE_CHAIN_WRITES=true'
       );
-      if (!config.allowChainWrites) {
-        assert(featureFlags.receipt_verification_enabled !== true, 'Default production smoke expects receipt verification disabled until canary approval');
-      }
       return {
         status_code: response.status,
         chain_id: chainId,
         chain_mainline_writes_enabled: chainWritesEnabled,
+        receipt_verification_enabled: receiptVerificationEnabled,
         receipt_verifier_status: receiptStatus,
+        merkle_claim_verifier_status: merkleClaimStatus,
       };
     });
 

@@ -137,4 +137,185 @@ describe('Squad API', () => {
     expect(leaderboardSql).toContain('total_locked::numeric, 0) DESC');
     expect(leaderboardSql).toContain('s.created_at ASC');
   });
+
+  it('returns the authenticated user squad view from backend membership', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM waves WHERE wave_id')) {
+        return { rows: [wave] };
+      }
+      if (sql.includes('FROM squad_members') && sql.includes('WHERE wave_id = $1 AND user_id = $2')) {
+        return {
+          rows: [{
+            id: 11,
+            wave_id: 1,
+            squad_id: 7,
+            user_id: userId,
+            role: 'captain',
+            status: 'activated',
+            joined_at: new Date(),
+            activated_at: new Date(),
+          }],
+        };
+      }
+      if (sql.includes('FROM squads') && sql.includes('WHERE wave_id = $1 AND id = $2')) {
+        return {
+          rows: [{
+            id: 7,
+            wave_id: 1,
+            name: 'Alpha',
+            captain_user_id: userId,
+            status: 'open',
+            invite_code: 'ABC12345',
+            created_at: new Date(),
+            updated_at: new Date(),
+          }],
+        };
+      }
+      if (sql.includes('sm.squad_id = $2')) {
+        return {
+          rows: [{
+            id: 11,
+            user_id: userId,
+            email: 'user@example.com',
+            role: 'captain',
+            status: 'activated',
+            joined_at: new Date(),
+            activated_at: new Date(),
+            total_locked_raw: '1000000000',
+            rank: 1,
+          }],
+        };
+      }
+      if (sql.includes('ROW_NUMBER() OVER')) {
+        return {
+          rows: [{ id: 7, name: 'Alpha', captain_user_id: userId, activated_member_count: 1, total_locked: '1000000000', rank: 3 }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const res = await request(app)
+      .get('/v1/waves/1/squads/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.squad.name).toBe('Alpha');
+    expect(res.body.data.membership.role).toBe('captain');
+    expect(res.body.data.rank).toBe(3);
+    expect(res.body.data.members[0].total_locked_raw).toBe('1000000000');
+  });
+
+  it('returns public squad detail with ranked members', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM waves WHERE wave_id')) {
+        return { rows: [wave] };
+      }
+      if (sql.includes('FROM squads') && sql.includes('WHERE wave_id = $1 AND id = $2')) {
+        return {
+          rows: [{
+            id: 7,
+            wave_id: 1,
+            name: 'Alpha',
+            captain_user_id: userId,
+            status: 'open',
+            invite_code: 'ABC12345',
+            created_at: new Date(),
+            updated_at: new Date(),
+          }],
+        };
+      }
+      if (sql.includes('sm.squad_id = $2')) {
+        return {
+          rows: [
+            { id: 11, user_id: userId, email: 'user@example.com', role: 'captain', status: 'activated', joined_at: new Date(), activated_at: new Date(), total_locked_raw: '1000000000', rank: 1 },
+            { id: 12, user_id: '00000000-0000-0000-0000-000000000002', email: 'mate@example.com', role: 'member', status: 'joined_pending', joined_at: new Date(), activated_at: null, total_locked_raw: '0', rank: 2 },
+          ],
+        };
+      }
+      if (sql.includes('ROW_NUMBER() OVER')) {
+        return {
+          rows: [{ id: 7, name: 'Alpha', captain_user_id: userId, activated_member_count: 1, total_locked: '1000000000', rank: 1 }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const res = await request(app).get('/v1/waves/1/squads/7');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.member_count).toBe(2);
+    expect(res.body.data.members.map((member: any) => member.rank)).toEqual([1, 2]);
+  });
+
+  it('returns current user leaderboard position', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM waves WHERE wave_id')) {
+        return { rows: [wave] };
+      }
+      if (sql.includes('WHERE user_id = $2') && sql.includes('qualifying_position_count')) {
+        return {
+          rows: [{
+            user_id: userId,
+            email: 'user@example.com',
+            total_locked_raw: '2000000000',
+            qualifying_position_count: 1,
+            first_qualified_at: new Date(),
+            rank: 4,
+          }],
+        };
+      }
+      if (sql.includes('FROM squad_members') && sql.includes('WHERE wave_id = $1 AND user_id = $2')) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    });
+
+    const res = await request(app)
+      .get('/v1/waves/1/leaderboard/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.personal.rank).toBe(4);
+    expect(res.body.data.squad).toBeNull();
+  });
+
+  it('returns reward estimate using Season War pool raw amounts', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM waves WHERE wave_id')) {
+        return { rows: [wave] };
+      }
+      if (sql.includes('AS wave_locked_raw')) {
+        return { rows: [{ wave_locked_raw: '10000000000' }] };
+      }
+      if (sql.includes('AS user_locked_raw')) {
+        return { rows: [{ user_locked_raw: '1000000000' }] };
+      }
+      if (sql.includes('approved_referral_amount_raw')) {
+        return {
+          rows: [{
+            pending_amount_raw: '0',
+            approved_amount_raw: '500000000',
+            claimed_amount_raw: '0',
+            approved_referral_amount_raw: '500000000',
+          }],
+        };
+      }
+      if (sql.includes('FROM squad_members') && sql.includes('WHERE wave_id = $1 AND user_id = $2')) {
+        return { rows: [] };
+      }
+      if (sql.includes('ROW_NUMBER() OVER')) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    });
+
+    const res = await request(app)
+      .get('/v1/waves/1/reward-estimate')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.release_amount_raw).toBe('500000000000000000');
+    expect(res.body.data.categories.find((category: any) => category.category === 'personal').estimate_amount_raw).toBe('25000000000000000');
+    expect(res.body.data.categories.find((category: any) => category.category === 'referral').estimate_amount_raw).toBe('500000000');
+  });
 });

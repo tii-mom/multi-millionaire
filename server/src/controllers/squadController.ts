@@ -3,7 +3,9 @@ import { getWaveById } from '../models/waveModel';
 import {
   createSquadWithCaptain,
   getMembershipForWave,
+  getMySquadView,
   getSquadById,
+  getSquadDetail,
   joinSquad,
   listSquadsForWave,
 } from '../models/squadModel';
@@ -59,6 +61,54 @@ export async function listSquads(req: Request, res: Response, next: NextFunction
 
     const squads = await listSquadsForWave(waveId);
     return res.json({ request_id: req.id || '', data: squads });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMySquad(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
+    }
+
+    const waveId = Number(req.params.waveId);
+    if (!Number.isInteger(waveId) || waveId <= 0) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'Valid waveId is required' } });
+    }
+
+    const wave = await getWaveById(waveId);
+    if (!wave) {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'WAVE_NOT_FOUND', message: 'Wave not found' } });
+    }
+
+    const view = await getMySquadView(waveId, user.id);
+    return res.json({ request_id: req.id || '', data: view });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getSquad(req: Request, res: Response, next: NextFunction) {
+  try {
+    const waveId = Number(req.params.waveId);
+    const squadId = Number(req.params.squadId);
+    if (!Number.isInteger(waveId) || waveId <= 0 || !Number.isInteger(squadId) || squadId <= 0) {
+      return res.status(400).json({ request_id: req.id || '', error: { code: 'INVALID_INPUT', message: 'Valid waveId and squadId are required' } });
+    }
+
+    const wave = await getWaveById(waveId);
+    if (!wave) {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'WAVE_NOT_FOUND', message: 'Wave not found' } });
+    }
+
+    const detail = await getSquadDetail(waveId, squadId);
+    if (!detail) {
+      return res.status(404).json({ request_id: req.id || '', error: { code: 'SQUAD_NOT_FOUND', message: 'Squad not found' } });
+    }
+
+    return res.json({ request_id: req.id || '', data: detail });
   } catch (err) {
     return next(err);
   }

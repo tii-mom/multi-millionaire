@@ -99,6 +99,7 @@ export async function hasBlockingRiskForRewardClaim(ledgerId: string, beneficiar
          ON (
            (rf.entity_type = 'position' AND rf.entity_id = rl.source_position_id::text)
            OR (rf.entity_type = 'user' AND rf.entity_id = rl.beneficiary_user_id::text)
+           OR (rf.entity_type = 'reward_ledger' AND rf.entity_id = rl.id::text)
          )
        WHERE rl.id = $1
          AND rl.beneficiary_user_id = $2

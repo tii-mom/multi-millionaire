@@ -110,6 +110,7 @@ const getMerkleProofForLedgerMock = getMerkleProofForLedger as jest.Mock;
 const markMerkleClaimVerifiedMock = markMerkleClaimVerified as jest.Mock;
 const insertChainEventMock = insertChainEvent as jest.Mock;
 const verifyMerkleClaimReceiptMock = verifyMerkleClaimReceipt as jest.Mock;
+const getWaveByIdMock = jest.requireMock('../src/models/waveModel').getWaveById as jest.Mock;
 
 const inviteeUserId = '00000000-0000-0000-0000-000000000101';
 const inviterUserId = '00000000-0000-0000-0000-000000000202';
@@ -134,6 +135,29 @@ function mockDepositPosition(isFirst: boolean) {
   });
 }
 
+function mockWave(overrides: Record<string, unknown>) {
+  getWaveByIdMock.mockResolvedValueOnce({
+    wave_id: 1,
+    code: 'W001',
+    name: 'Test Wave',
+    status: 'live',
+    start_time: new Date(),
+    end_time: new Date(),
+    min_lock_amount: '100',
+    unlock_multiplier_bps: 15000,
+    price_freshness_ttl_seconds: 3600,
+    reward_budget: '0',
+    direct_reward_rate_bps: 1000,
+    per_invite_cap: '80',
+    inviter_wave_cap: '0',
+    claim_min_amount: '0',
+    counted_member_cap: null,
+    settle_delay_seconds: 0,
+    deposits_disabled: false,
+    ...overrides,
+  });
+}
+
 describe('Reward API and generation', () => {
   const originalEnv = { ...process.env };
 
@@ -150,6 +174,7 @@ describe('Reward API and generation', () => {
     markMerkleClaimVerifiedMock.mockReset();
     insertChainEventMock.mockReset();
     verifyMerkleClaimReceiptMock.mockReset();
+    getWaveByIdMock.mockClear();
     verifyMerkleClaimReceiptMock.mockImplementation(jest.requireActual('../src/services/merkleRewards').verifyMerkleClaimReceipt);
   });
 
@@ -188,6 +213,72 @@ describe('Reward API and generation', () => {
 
     expect(res.status).toBe(201);
     expect(createRewardLedgerMock).not.toHaveBeenCalled();
+  });
+
+  it('caps direct referral rewards by inviter wave cap', async () => {
+    mockWave({ inviter_wave_cap: '50' });
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [{ allocated_amount_raw: '40' }] })
+      .mockResolvedValue({ rows: [{ count: '0' }] });
+    createPositionMock.mockResolvedValue({
+      id: '00000000-0000-0000-0000-000000000303',
+      user_id: inviteeUserId,
+      wave_id: 1,
+      amount_raw: '1000',
+      onchain_position_id: '123',
+      entry_price: '100',
+      unlock_multiplier_bps: 15000,
+      qualifies_for_activation: true,
+      is_first_qualifying_for_user: true,
+      withdrawn: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    getReferralMock.mockResolvedValue({ invitee_user_id: inviteeUserId, inviter_user_id: inviterUserId, status: 'pending' });
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: '1000' });
+
+    expect(res.status).toBe(201);
+    expect(createRewardLedgerMock).toHaveBeenCalledWith(expect.objectContaining({
+      grossAmount: '100',
+      finalAmount: '10',
+    }), expect.objectContaining({ query: expect.any(Function) }));
+  });
+
+  it('skips direct referral rewards when the wave reward budget is exhausted', async () => {
+    mockWave({ reward_budget: '100' });
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [{ allocated_amount_raw: '100' }] })
+      .mockResolvedValue({ rows: [{ count: '0' }] });
+    createPositionMock.mockResolvedValue({
+      id: '00000000-0000-0000-0000-000000000303',
+      user_id: inviteeUserId,
+      wave_id: 1,
+      amount_raw: '1000',
+      onchain_position_id: '123',
+      entry_price: '100',
+      unlock_multiplier_bps: 15000,
+      qualifies_for_activation: true,
+      is_first_qualifying_for_user: true,
+      withdrawn: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    getReferralMock.mockResolvedValue({ invitee_user_id: inviteeUserId, inviter_user_id: inviterUserId, status: 'pending' });
+
+    const res = await request(app)
+      .post('/v1/waves/1/deposit')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: '1000' });
+
+    expect(res.status).toBe(201);
+    expect(createRewardLedgerMock).not.toHaveBeenCalled();
+    expect(lockReferralMock).toHaveBeenCalledWith(inviteeUserId, expect.objectContaining({ query: expect.any(Function) }));
   });
 
   it('does not create rewards for self referral data', async () => {
