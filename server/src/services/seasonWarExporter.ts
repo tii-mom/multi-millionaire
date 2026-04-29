@@ -4,16 +4,21 @@ import path from 'path';
 import { Address } from '@ton/core';
 import { query } from '../db';
 import {
-  assertSeasonClaimProofCapacity,
+  assertSeasonClaimProofCapacityForVersion,
   buildSeasonRewardMerkleTree,
   calculateSeasonWarPoolAmountsForRounds,
-  encodeSeasonClaimProofCell,
+  encodeSeasonClaimProofCellForVersion,
+  getSeasonClaimProofFormat,
+  normalizeSeasonClaimVersion,
+  SEASON_CLAIM_SINGLE_CELL_MAX_LEAVES,
+  SeasonClaimVersion,
   SeasonRewardLeafInput,
   SeasonRewardPool,
 } from './seasonRewards';
 import { readPublicV2Tokenomics } from './contracts/v2Tokenomics';
 
 const LEADERBOARD_WEIGHTS = [30, 20, 15, 10, 7, 5, 4, 3, 3, 3];
+export const SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS = '0:2222222222222222222222222222222222222222222222222222222222222222';
 
 export interface SeasonWarExportInput {
   seasonId: number;
@@ -23,6 +28,8 @@ export interface SeasonWarExportInput {
   chainId?: string;
   tokenAddress?: string;
   seasonClaimAddress?: string;
+  claimVersion?: SeasonClaimVersion;
+  rehearsal?: boolean;
   openAt?: number;
 }
 
@@ -264,6 +271,19 @@ function sha256Hex(value: string): string {
   return `0x${crypto.createHash('sha256').update(value).digest('hex')}`;
 }
 
+function resolveSeasonClaimAddress(
+  claimVersion: SeasonClaimVersion,
+  inputAddress: string | undefined,
+  deployedSeasonClaimAddress: string
+): string {
+  if (inputAddress) {
+    return inputAddress;
+  }
+  return claimVersion === 'season-claim-v2'
+    ? SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS
+    : deployedSeasonClaimAddress;
+}
+
 function summarizeQuarantine(rows: QuarantineRow[]) {
   const byReason: Record<string, number> = {};
   for (const row of rows) {
@@ -486,6 +506,10 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
   const seasonId = normalizePositiveInteger(input.seasonId, 'seasonId', 10);
   const successfulRoundCount = normalizePositiveInteger(input.successfulRoundCount, 'successfulRoundCount', 18);
   const successfulWaveIds = normalizeWaveIds(input.successfulWaveIds);
+  const claimVersion = normalizeSeasonClaimVersion(input.claimVersion);
+  const proofFormat = getSeasonClaimProofFormat(claimVersion);
+  const rehearsal = input.rehearsal === true;
+  const productionRootPublishable = false;
   if (successfulWaveIds.length !== successfulRoundCount) {
     throw new Error('successful-wave-ids count must equal successfulRoundCount');
   }
@@ -493,7 +517,7 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
   const publicTokenomics = readPublicV2Tokenomics();
   const chainId = input.chainId || publicTokenomics.chain_id;
   const tokenAddress = input.tokenAddress || publicTokenomics.token_address;
-  const seasonClaimAddress = input.seasonClaimAddress || publicTokenomics.season_claim_address;
+  const seasonClaimAddress = resolveSeasonClaimAddress(claimVersion, input.seasonClaimAddress, publicTokenomics.season_claim_address);
   if (!tokenAddress || !seasonClaimAddress) {
     throw new Error('Season War export requires tokenAddress and seasonClaimAddress');
   }
@@ -721,7 +745,7 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
   }
 
   const leafInputs = buildLeafInputs(userAmounts, walletByUser, seasonId);
-  assertSeasonClaimProofCapacity(leafInputs.length);
+  assertSeasonClaimProofCapacityForVersion(leafInputs.length, claimVersion);
   const tree = buildSeasonRewardMerkleTree(leafInputs, {
     tokenAddress,
     contractAddress: seasonClaimAddress,
@@ -730,8 +754,12 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
 
   const leaves = tree.leaves.map((leaf) => ({
     ...leaf,
-    seasonClaimProofCellBase64: encodeSeasonClaimProofCell(leaf.proof),
-  }));
+    proofCellBase64: encodeSeasonClaimProofCellForVersion(leaf.proof, claimVersion),
+  })).map((leaf) => (
+    claimVersion === 'season-claim-v1'
+      ? { ...leaf, seasonClaimProofCellBase64: leaf.proofCellBase64 }
+      : leaf
+  ));
 
   const sourceRows = {
     positions: includedPositions.map((position) => ({
@@ -771,7 +799,11 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
     successful_wave_ids: successfulWaveIds,
     chain_id: chainId,
     token_address: tokenAddress,
-    season_claim_address: seasonClaimAddress,
+    claim_contract_version: claimVersion,
+    proof_format: proofFormat,
+    claim_contract_address: seasonClaimAddress,
+    season_claim_address: claimVersion === 'season-claim-v1' ? seasonClaimAddress : publicTokenomics.season_claim_address,
+    ...(claimVersion === 'season-claim-v2' ? { season_claim_v2_address: seasonClaimAddress } : {}),
     source_rows: sourceRows,
     quarantine_rows: quarantineRows,
   };
@@ -780,19 +812,28 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
 
   const manifest = {
     generated_at: new Date().toISOString(),
+    rehearsal,
+    production_root_publishable: productionRootPublishable,
+    claim_contract_version: claimVersion,
+    proof_format: proofFormat,
+    claim_contract_address: seasonClaimAddress,
+    ...(claimVersion === 'season-claim-v1' ? { max_supported_single_cell_leaves: SEASON_CLAIM_SINGLE_CELL_MAX_LEAVES } : {}),
     season_id: seasonId,
     successful_round_count: successfulRoundCount,
     successful_wave_ids: successfulWaveIds,
     chain_id: chainId,
     contracts: {
       token_address: tokenAddress,
-      season_claim_address: seasonClaimAddress,
+      season_claim_address: claimVersion === 'season-claim-v1' ? seasonClaimAddress : publicTokenomics.season_claim_address,
+      ...(claimVersion === 'season-claim-v2' ? { season_claim_v2_address: seasonClaimAddress } : {}),
+      selected_claim_contract_address: seasonClaimAddress,
       season_vault_address: publicTokenomics.season_vault_address,
     },
     pool_totals: tree.poolTotals,
     total_amount_raw: tree.totalAmountRaw,
     root: tree.root,
     evidence_hash: evidenceHash,
+    leafCount: leaves.length,
     counts: {
       candidate_positions: positionRows.length,
       included_positions: includedPositions.length,
@@ -804,6 +845,10 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
   };
 
   const operatorRegisterSeasonClaim = {
+    rehearsal,
+    production_root_publishable: productionRootPublishable,
+    claim_contract_version: claimVersion,
+    proof_format: proofFormat,
     contract_address: seasonClaimAddress,
     message: 'RegisterSeasonClaim',
     params: {

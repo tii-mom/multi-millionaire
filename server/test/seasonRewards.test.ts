@@ -1,3 +1,4 @@
+import { Cell } from '@ton/core';
 import {
   assertSeasonWarPoolTotals,
   assertSeasonClaimProofCapacity,
@@ -7,10 +8,38 @@ import {
   calculateSeasonWarPoolAmountsForRounds,
   calculateSeasonRewardRootFromProof,
   encodeSeasonClaimProofCell,
+  encodeSeasonClaimV1ProofCell,
+  encodeSeasonClaimV2ProofCell,
+  getSeasonClaimProofFormat,
   hashSeasonRewardSourceId,
   SEASON_WAR_POOL_AMOUNTS_RAW,
   SEASON_WAR_ROUND_REWARD_RAW,
 } from '../src/services/seasonRewards';
+
+function decodeSeasonClaimProofCellBase64(encoded: string): string[] {
+  const proof: string[] = [];
+  let cursor = Cell.fromBase64(encoded).beginParse();
+  let done = false;
+  while (!done) {
+    while (cursor.remainingBits >= 257) {
+      const siblingOnLeft = cursor.loadBit();
+      const sibling = `0x${cursor.loadUintBig(256).toString(16).padStart(64, '0')}`;
+      proof.push(`${siblingOnLeft ? 'left' : 'right'}:${sibling}`);
+    }
+    if (cursor.remainingBits !== 0) {
+      throw new Error('invalid proof bits');
+    }
+    if (cursor.remainingRefs === 0) {
+      done = true;
+    } else {
+      if (cursor.remainingRefs !== 1) {
+        throw new Error('invalid proof refs');
+      }
+      cursor = cursor.loadRef().beginParse();
+    }
+  }
+  return proof;
+}
 
 describe('Season War reward helpers', () => {
   const recipientWallet = 'kQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQRIl';
@@ -125,6 +154,58 @@ describe('Season War reward helpers', () => {
     expect(() => encodeSeasonClaimProofCell(proof)).toThrow('single-cell proof format capacity');
     expect(() => assertSeasonClaimProofCapacity(8)).not.toThrow();
     expect(() => assertSeasonClaimProofCapacity(9)).toThrow('supports at most 8 leaves');
+  });
+
+  it('encodes SeasonClaimV2 ref-chain proofs and recomputes the same root', () => {
+    const leaves = Array.from({ length: 128 }, (_, index) => ({
+      seasonId: 1,
+      beneficiaryUserId: `user-${index + 1}`,
+      recipientWallet: `0:${(index + 1).toString(16).padStart(64, '0')}`,
+      personalAmountRaw: String(index + 1),
+      teamAmountRaw: String(index + 2),
+      referralAmountRaw: String(index + 3),
+      leaderboardAmountRaw: String(index + 4),
+    }));
+    const tree = buildSeasonRewardMerkleTree(leaves, {
+      ...options,
+      requireFullRoundAllocation: false,
+    });
+    const targetLeaf = tree.leaves[85];
+    const encoded = encodeSeasonClaimV2ProofCell(targetLeaf.proof);
+    const decodedProof = decodeSeasonClaimProofCellBase64(encoded);
+
+    expect(tree.leaves).toHaveLength(128);
+    expect(targetLeaf.proof).toHaveLength(7);
+    expect(Cell.fromBase64(encoded).beginParse().remainingRefs).toBe(1);
+    expect(decodedProof).toEqual(targetLeaf.proof);
+    expect(calculateSeasonRewardRootFromProof(targetLeaf.leafHash, decodedProof)).toBe(tree.root);
+  });
+
+  it('keeps SeasonClaimV2 proof encoding separate without changing leaf hashes', () => {
+    const input = {
+      seasonId: 1,
+      beneficiaryUserId: 'user-1',
+      recipientWallet,
+      personalAmountRaw: '100',
+      teamAmountRaw: '200',
+      referralAmountRaw: '300',
+      leaderboardAmountRaw: '400',
+    };
+    const leafHashBeforeEncoding = buildSeasonRewardLeaf(input, options).leafHash;
+    const proof = [
+      `left:${'0x'.padEnd(66, '1')}`,
+      `right:${'0x'.padEnd(66, '2')}`,
+      `left:${'0x'.padEnd(66, '3')}`,
+      `right:${'0x'.padEnd(66, '4')}`,
+    ];
+
+    expect(getSeasonClaimProofFormat('season-claim-v1')).toBe('single-cell:siblingOnLeft-bool+sibling-uint256');
+    expect(getSeasonClaimProofFormat('season-claim-v2')).toBe('ref-chain:siblingOnLeft-bool+sibling-uint256');
+    expect(getSeasonClaimProofFormat('season-claim-v1')).not.toContain('MerkleClaim');
+    expect(getSeasonClaimProofFormat('season-claim-v2')).not.toContain('MerkleClaim');
+    expect(() => encodeSeasonClaimV1ProofCell(proof)).toThrow('single-cell proof format capacity');
+    expect(decodeSeasonClaimProofCellBase64(encodeSeasonClaimV2ProofCell(proof))).toEqual(proof);
+    expect(buildSeasonRewardLeaf(input, options).leafHash).toBe(leafHashBeforeEncoding);
   });
 
   it('validates full season pool totals by successful round count', () => {

@@ -1,6 +1,13 @@
+import { Cell } from '@ton/core';
 import { query } from '../src/db';
-import { buildSeasonWarExport } from '../src/services/seasonWarExporter';
-import { calculateSeasonWarPoolAmountsForRounds } from '../src/services/seasonRewards';
+import {
+  buildSeasonWarExport,
+  SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS,
+} from '../src/services/seasonWarExporter';
+import {
+  calculateSeasonRewardRootFromProof,
+  calculateSeasonWarPoolAmountsForRounds,
+} from '../src/services/seasonRewards';
 
 jest.mock('../src/db', () => ({
   query: jest.fn(),
@@ -93,6 +100,58 @@ function baseRows() {
   };
 }
 
+function largeRows(leafCount = 128): ReturnType<typeof baseRows> {
+  const rows = baseRows();
+  const createdAt = new Date('2026-04-28T00:00:00Z');
+  rows.positions = Array.from({ length: leafCount }, (_, index) => {
+    const id = index + 1;
+    const wallet = `0:${id.toString(16).padStart(64, '0')}`;
+    return {
+      position_id: `large-position-${id}`,
+      user_id: `large-user-${id}`,
+      wave_id: 1,
+      amount_raw: String(1_000 + id),
+      onchain_position_id: String(10_000 + id),
+      qualifies_for_activation: true,
+      withdrawn: false,
+      is_first_qualifying_for_user: true,
+      position_created_at: new Date(createdAt.getTime() + index * 1000),
+      wallet_address: wallet,
+      normalized_address: wallet,
+      chain_event_id: `large-event-${id}`,
+      tx_hash: `large-tx-${id}`,
+      log_index: 0,
+      block_number: String(id),
+      block_time: createdAt,
+      chain_payload: { positionId: String(10_000 + id), amountRaw: String(1_000 + id), waveId: 1 },
+    };
+  }) as any;
+  rows.referrals = [{
+    id: 'large-referral-1',
+    invitee_user_id: 'large-user-1',
+    inviter_user_id: 'large-user-2',
+    status: 'locked',
+    locked_at: createdAt,
+    created_at: createdAt,
+    inviter_wallet: rows.positions[1].wallet_address,
+    inviter_normalized_address: rows.positions[1].normalized_address,
+    invitee_wallet: rows.positions[0].wallet_address,
+    invitee_normalized_address: rows.positions[0].normalized_address,
+  }] as any;
+  rows.squads = rows.positions.map((position) => ({
+    wave_id: 1,
+    squad_id: 1,
+    squad_name: 'Large Fixture Squad',
+    squad_created_at: createdAt,
+    user_id: position.user_id,
+    role: position.user_id === 'large-user-1' ? 'captain' : 'member',
+    status: 'activated',
+  })) as any;
+  rows.risks = [];
+  rows.rewardLedgerRisks = [];
+  return rows;
+}
+
 function mockExporterQueries(rows: ReturnType<typeof baseRows>) {
   queryMock.mockImplementation((sql: string) => {
     if (sql.includes('FROM positions p')) return Promise.resolve({ rows: rows.positions });
@@ -125,9 +184,18 @@ describe('Season War exporter', () => {
 
     const totals = calculateSeasonWarPoolAmountsForRounds(1);
     expect(result.manifest.pool_totals).toEqual(totals);
+    expect(result.manifest).toMatchObject({
+      rehearsal: false,
+      production_root_publishable: false,
+      claim_contract_version: 'season-claim-v1',
+      proof_format: 'single-cell:siblingOnLeft-bool+sibling-uint256',
+      max_supported_single_cell_leaves: 8,
+    });
     expect(result.manifest.root).toMatch(/^0x[0-9a-f]{64}$/);
     expect(result.leaves).toHaveLength(3);
+    expect(result.leaves.every((leaf) => typeof leaf.proofCellBase64 === 'string')).toBe(true);
     expect(result.leaves.every((leaf) => typeof leaf.seasonClaimProofCellBase64 === 'string')).toBe(true);
+    expect(result.leaves.every((leaf) => leaf.seasonClaimProofCellBase64 === leaf.proofCellBase64)).toBe(true);
     const operatorPayload = result.operatorRegisterSeasonClaim as any;
     expect(operatorPayload.params).toMatchObject({
       seasonId: 1,
@@ -206,5 +274,94 @@ describe('Season War exporter', () => {
     })).rejects.toThrow('successful-wave-ids count must equal successfulRoundCount');
 
     expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('fails v1 exports above the deployed single-cell proof capacity', async () => {
+    mockExporterQueries(largeRows(128));
+
+    await expect(buildSeasonWarExport({
+      seasonId: 1,
+      successfulRoundCount: 1,
+      successfulWaveIds: [1],
+      outDir: '/tmp/season-war-test',
+      chainId: 'ton-mainnet',
+      tokenAddress,
+      seasonClaimAddress,
+      claimVersion: 'season-claim-v1',
+    })).rejects.toThrow('supports at most 8 leaves');
+  });
+
+  it('emits v2 ref-chain proof cells for 128-leaf exports', async () => {
+    mockExporterQueries(largeRows(128));
+
+    const result = await buildSeasonWarExport({
+      seasonId: 1,
+      successfulRoundCount: 1,
+      successfulWaveIds: [1],
+      outDir: '/tmp/season-war-test',
+      chainId: 'ton-mainnet',
+      tokenAddress,
+      claimVersion: 'season-claim-v2',
+      rehearsal: true,
+      openAt: 1_800_000_000,
+    });
+
+    expect(result.manifest).toMatchObject({
+      rehearsal: true,
+      production_root_publishable: false,
+      claim_contract_version: 'season-claim-v2',
+      proof_format: 'ref-chain:siblingOnLeft-bool+sibling-uint256',
+      claim_contract_address: SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS,
+    });
+    expect((result.manifest.contracts as any).season_claim_address).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
+    expect((result.manifest.contracts as any).season_claim_v2_address).toBe(SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS);
+    expect((result.manifest.contracts as any).selected_claim_contract_address).toBe(SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS);
+    expect(result.manifest).not.toHaveProperty('max_supported_single_cell_leaves');
+    expect(result.leaves).toHaveLength(128);
+    expect(result.leaves.every((leaf) => typeof leaf.proofCellBase64 === 'string')).toBe(true);
+    expect(result.leaves.some((leaf) => Cell.fromBase64(leaf.proofCellBase64 as string).beginParse().remainingRefs === 1)).toBe(true);
+    expect(result.leaves.some((leaf) => Object.prototype.hasOwnProperty.call(leaf, 'seasonClaimProofCellBase64'))).toBe(false);
+
+    const firstLeaf = result.leaves[0];
+    expect(calculateSeasonRewardRootFromProof(firstLeaf.leafHash as string, firstLeaf.proof as string[])).toBe(result.manifest.root);
+  });
+
+  it('binds v2 leaf hashes to an explicitly supplied SeasonClaimV2 address', async () => {
+    mockExporterQueries(largeRows(128));
+    const explicitSeasonClaimV2Address = '0:3333333333333333333333333333333333333333333333333333333333333333';
+
+    const explicitResult = await buildSeasonWarExport({
+      seasonId: 1,
+      successfulRoundCount: 1,
+      successfulWaveIds: [1],
+      outDir: '/tmp/season-war-test',
+      chainId: 'ton-mainnet',
+      tokenAddress,
+      seasonClaimAddress: explicitSeasonClaimV2Address,
+      claimVersion: 'season-claim-v2',
+      rehearsal: true,
+      openAt: 1_800_000_000,
+    });
+
+    queryMock.mockReset();
+    mockExporterQueries(largeRows(128));
+    const placeholderResult = await buildSeasonWarExport({
+      seasonId: 1,
+      successfulRoundCount: 1,
+      successfulWaveIds: [1],
+      outDir: '/tmp/season-war-test',
+      chainId: 'ton-mainnet',
+      tokenAddress,
+      claimVersion: 'season-claim-v2',
+      rehearsal: true,
+      openAt: 1_800_000_000,
+    });
+
+    expect(explicitResult.manifest.claim_contract_address).toBe(explicitSeasonClaimV2Address);
+    expect((explicitResult.manifest.contracts as any).season_claim_v2_address).toBe(explicitSeasonClaimV2Address);
+    expect((explicitResult.manifest.contracts as any).selected_claim_contract_address).toBe(explicitSeasonClaimV2Address);
+    expect((explicitResult.manifest.contracts as any).season_claim_address).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
+    expect(explicitResult.leaves[0].leafHash).not.toBe(placeholderResult.leaves[0].leafHash);
+    expect(explicitResult.manifest.root).not.toBe(placeholderResult.manifest.root);
   });
 });

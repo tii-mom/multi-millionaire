@@ -18,7 +18,11 @@ export const SEASON_WAR_POOL_AMOUNTS_RAW = {
 } as const;
 
 export type SeasonRewardPool = keyof typeof SEASON_WAR_POOL_AMOUNTS_RAW;
-export const SEASON_CLAIM_SINGLE_CELL_PROOF_MAX_DEPTH = Math.floor(1023 / 257);
+export type SeasonClaimVersion = 'season-claim-v1' | 'season-claim-v2';
+export const SEASON_CLAIM_V1_PROOF_FORMAT = 'single-cell:siblingOnLeft-bool+sibling-uint256';
+export const SEASON_CLAIM_V2_PROOF_FORMAT = 'ref-chain:siblingOnLeft-bool+sibling-uint256';
+export const SEASON_CLAIM_PROOF_ENTRY_BITS = 257;
+export const SEASON_CLAIM_SINGLE_CELL_PROOF_MAX_DEPTH = Math.floor(1023 / SEASON_CLAIM_PROOF_ENTRY_BITS);
 export const SEASON_CLAIM_SINGLE_CELL_MAX_LEAVES = 2 ** SEASON_CLAIM_SINGLE_CELL_PROOF_MAX_DEPTH;
 
 export interface SeasonRewardLeafInput {
@@ -261,8 +265,34 @@ export function assertSeasonClaimProofCapacity(leafCount: number) {
   }
 }
 
-export function encodeSeasonClaimProofCell(proof: string[]): string {
-  if (proof.length * 257 > 1023) {
+export function normalizeSeasonClaimVersion(value: string | undefined | null): SeasonClaimVersion {
+  if (!value || value === 'season-claim-v1') {
+    return 'season-claim-v1';
+  }
+  if (value === 'season-claim-v2') {
+    return value;
+  }
+  throw new Error(`Unsupported SeasonClaim claim version: ${value}`);
+}
+
+export function getSeasonClaimProofFormat(version: SeasonClaimVersion): string {
+  return version === 'season-claim-v2'
+    ? SEASON_CLAIM_V2_PROOF_FORMAT
+    : SEASON_CLAIM_V1_PROOF_FORMAT;
+}
+
+export function assertSeasonClaimProofCapacityForVersion(leafCount: number, version: SeasonClaimVersion) {
+  if (version === 'season-claim-v1') {
+    assertSeasonClaimProofCapacity(leafCount);
+    return;
+  }
+  if (!Number.isInteger(leafCount) || leafCount < 0) {
+    throw new Error('SeasonClaim leaf count must be a non-negative integer');
+  }
+}
+
+export function encodeSeasonClaimV1ProofCell(proof: string[]): string {
+  if (proof.length * SEASON_CLAIM_PROOF_ENTRY_BITS > 1023) {
     throw new Error('SeasonClaim proof exceeds the deployed single-cell proof format capacity');
   }
   const builder = beginCell();
@@ -273,6 +303,35 @@ export function encodeSeasonClaimProofCell(proof: string[]): string {
       .storeUint(normalizeUint256Hex(parsed.hash), 256);
   }
   return builder.endCell().toBoc().toString('base64');
+}
+
+export function encodeSeasonClaimV2ProofCell(proof: string[]): string {
+  let next: Cell | null = null;
+  for (let offset = proof.length; offset > 0; offset -= SEASON_CLAIM_SINGLE_CELL_PROOF_MAX_DEPTH) {
+    const start = Math.max(0, offset - SEASON_CLAIM_SINGLE_CELL_PROOF_MAX_DEPTH);
+    const builder = beginCell();
+    for (const item of proof.slice(start, offset)) {
+      const parsed = parseProofItem(item);
+      builder
+        .storeBit(parsed.siblingOnLeft)
+        .storeUint(normalizeUint256Hex(parsed.hash), 256);
+    }
+    if (next) {
+      builder.storeRef(next);
+    }
+    next = builder.endCell();
+  }
+  return (next || beginCell().endCell()).toBoc().toString('base64');
+}
+
+export function encodeSeasonClaimProofCell(proof: string[]): string {
+  return encodeSeasonClaimV1ProofCell(proof);
+}
+
+export function encodeSeasonClaimProofCellForVersion(proof: string[], version: SeasonClaimVersion): string {
+  return version === 'season-claim-v2'
+    ? encodeSeasonClaimV2ProofCell(proof)
+    : encodeSeasonClaimV1ProofCell(proof);
 }
 
 export function hashSeasonRewardSourceId(seasonId: string | number, recipientWallet: string): string {

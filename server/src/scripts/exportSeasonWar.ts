@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { exportSeasonWar } from '../services/seasonWarExporter';
+import { normalizeSeasonClaimVersion } from '../services/seasonRewards';
 
 dotenv.config();
 
@@ -24,6 +25,10 @@ function requireArg(name: string): string {
   return value;
 }
 
+function readFlag(name: string): boolean {
+  return process.argv.includes(`--${name}`);
+}
+
 function parseInteger(value: string, name: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -46,6 +51,7 @@ async function main() {
   const successfulWaveIds = parseIntegerList(requireArg('successful-wave-ids'), 'successful-wave-ids');
   const outDir = requireArg('out');
   const openAt = readArg('open-at');
+  const claimVersion = normalizeSeasonClaimVersion(readArg('claim-version'));
 
   const result = await exportSeasonWar({
     seasonId,
@@ -55,12 +61,17 @@ async function main() {
     chainId: readArg('chain-id') || undefined,
     tokenAddress: readArg('token-address') || undefined,
     seasonClaimAddress: readArg('season-claim-address') || undefined,
+    claimVersion,
+    rehearsal: readFlag('rehearsal'),
     openAt: openAt ? parseInteger(openAt, 'open-at') : undefined,
   });
 
   // eslint-disable-next-line no-console
   console.log(JSON.stringify({
     outDir,
+    claimContractVersion: result.manifest.claim_contract_version,
+    proofFormat: result.manifest.proof_format,
+    productionRootPublishable: result.manifest.production_root_publishable,
     root: result.manifest.root,
     totalAmountRaw: result.manifest.total_amount_raw,
     leafCount: (result.manifest.counts as { leaves: number }).leaves,

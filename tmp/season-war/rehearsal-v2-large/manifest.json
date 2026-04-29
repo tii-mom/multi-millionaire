@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-04-28T00:00:00.000Z",
+  "rehearsal": true,
+  "synthetic_fixture": true,
+  "production_root_publishable": false,
+  "claim_contract_version": "season-claim-v2",
+  "proof_format": "ref-chain:siblingOnLeft-bool+sibling-uint256",
+  "claim_contract_address": "kQDEELj9KCzdqT07sVp4FRnbZRo-QhjS5ig0N6lcpJDGcn0H",
+  "season_id": 1,
+  "successful_round_count": 1,
+  "successful_wave_ids": [
+    1
+  ],
+  "chain_id": "ton-testnet",
+  "note": "Synthetic 128-wallet SeasonClaimV2 ref-chain rehearsal fixture. Not sourced from production DB and not publishable.",
+  "source_evidence": "deployments/season-claim-v2-legacy-bridge.testnet.latest.json",
+  "source_evidence_status": "bridge-forward-complete-pending-legacy-settle",
+  "contracts": {
+    "token_address": "kQDJqdAP9DR5NGV7EDg6T78EuNqmuKsbpEhQJSrFxTm8rjtK",
+    "season_claim_address": "EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS",
+    "season_claim_v2_address": "kQDEELj9KCzdqT07sVp4FRnbZRo-QhjS5ig0N6lcpJDGcn0H",
+    "season_claim_v2_legacy_bridge_address": "kQAXCCNSnY_MmBJwjrJi4zRIvli1p1zi1GtP7L0wf0WaP_l5",
+    "selected_claim_contract_address": "kQDEELj9KCzdqT07sVp4FRnbZRo-QhjS5ig0N6lcpJDGcn0H",
+    "season_vault_address": "EQCdSSWPVbwh9zIzhF5pnxwRKw-I8xc4bS1iyiVcbXKfnWe-"
+  },
+  "pool_totals": {
+    "personal": "250000000000000000",
+    "team": "125000000000000000",
+    "referral": "75000000000000000",
+    "leaderboard": "50000000000000000"
+  },
+  "total_amount_raw": "500000000000000000",
+  "root": "0x193640462ca21e8a3914908cc5f6d2dbc48a0284dba8113b1b6672733d434492",
+  "evidence_hash": "0x88b7019960e195cc6aaaf0838d51fbf706d8a91fb4717a452050a941a4c1bf44",
+  "leafCount": 128,
+  "counts": {
+    "leaves": 128,
+    "quarantine": 0
+  },
+  "quarantine_summary": {
+    "total": 0,
+    "by_reason": {}
+  }
+}
