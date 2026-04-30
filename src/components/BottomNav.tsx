@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { useI18n } from "@/src/lib/i18n";
 
 export default function BottomNav({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const tabs = [
     { id: "home", label: t("nav.deposit"), icon: Wallet },
     { id: "team", label: t("nav.squad"), icon: Users },
@@ -27,7 +27,7 @@ export default function BottomNav({ activeTab, setActiveTab }: { activeTab: stri
               onClick={() => setActiveTab(tab.id)}
               aria-label={tab.label}
               aria-current={isActive ? "page" : undefined}
-              className={`focus-ring relative flex h-12 items-center justify-center rounded-[14px] transition-colors duration-300 ${
+              className={`focus-ring relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-[14px] transition-colors duration-300 ${
                 isActive ? "text-[#d7b46a]" : "text-white/[0.38] hover:bg-white/[0.035] hover:text-white/[0.72]"
               } ${
                 isPrimary ? "h-[52px]" : ""
@@ -41,11 +41,18 @@ export default function BottomNav({ activeTab, setActiveTab }: { activeTab: stri
                 />
               )}
               <Icon
-                className={`relative z-10 transition-transform duration-300 ${isPrimary ? "h-[22px] w-[22px]" : "h-5 w-5"}`}
+                className={`relative z-10 transition-transform duration-300 ${isPrimary ? "h-[21px] w-[21px]" : "h-[19px] w-[19px]"}`}
                 strokeWidth={isActive ? 2.35 : 1.9}
                 style={{ transform: isActive ? "translateY(-1px)" : "translateY(0)" }}
               />
-              <span className="sr-only">{tab.label}</span>
+              <span
+                className={`relative z-10 max-w-[3.5rem] truncate text-[9px] font-semibold leading-none transition-all duration-300 ${
+                  locale.startsWith("zh") ? "tracking-normal" : "tracking-[0.08em]"
+                } ${isActive ? "opacity-100" : "opacity-0"}`}
+                aria-hidden={!isActive}
+              >
+                {tab.label}
+              </span>
             </button>
           );
         })}

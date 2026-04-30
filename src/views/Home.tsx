@@ -94,7 +94,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           ? t("home.banner.stagingTitle")
           : "";
   const statusBannerMessage = backendUnavailable
-    ? t("home.banner.backendUnavailableDetail", { error: localizedBootstrapError })
+    ? t("home.banner.backendUnavailableDetail")
     : maintenanceBanner?.enabled
       ? maintenanceBanner.reason || t("home.banner.maintenance")
       : depositsPaused
@@ -102,6 +102,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         : !chainMainlineEnabled
           ? t("home.banner.staging")
           : "";
+  const statusBannerTechnicalDetail = backendUnavailable ? localizedBootstrapError : "";
   const showApiError = !!apiError && apiError !== statusBannerMessage;
   const activeWalletLabel = tonSession?.walletName || t("home.ton.walletFallback");
   const chainDisabledReason = backendUnavailable
@@ -574,20 +575,6 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
   return (
     <div className="tab-content-safe flex flex-col gap-4 px-6">
-      {statusBannerMessage && (
-        <div className={`status-notice rounded-[14px] px-4 py-2.5 ${
-          backendUnavailable ? "" : "status-notice-caution"
-        }`}>
-          <div className="flex gap-3">
-            <span className={`status-dot mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${backendUnavailable ? "bg-white/42" : "bg-[#d7b46a]/80"}`} />
-            <div className="min-w-0">
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/38">{statusBannerTitle}</div>
-              <div className="mt-1 text-[11px] leading-relaxed text-white/68">{statusBannerMessage}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <section className="financial-panel relative overflow-hidden rounded-[16px] p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/35 to-transparent" />
         <div className="relative z-10 flex flex-col gap-3">
@@ -759,6 +746,27 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           </div>
         </div>
       </section>
+
+
+      {statusBannerMessage && (
+        <div className={`status-notice rounded-[14px] px-4 py-2.5 ${
+          backendUnavailable ? "" : "status-notice-caution"
+        }`}>
+          <div className="flex gap-3">
+            <span className={`status-dot mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${backendUnavailable ? "bg-white/42" : "bg-[#d7b46a]/80"}`} />
+            <div className="min-w-0">
+              <div className={`font-mono text-[9px] uppercase text-white/38 ${locale.startsWith("zh") ? "tracking-normal" : "tracking-[0.2em]"}`}>{statusBannerTitle}</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-white/68">{statusBannerMessage}</div>
+              {statusBannerTechnicalDetail && (
+                <details className="mt-1 text-[10px] text-white/38">
+                  <summary className="cursor-pointer select-none text-white/48">{t("home.banner.technicalDetail")}</summary>
+                  <div className="mt-1 break-words font-mono">{statusBannerTechnicalDetail}</div>
+                </details>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <DepositFlow
         availableBalance={availableBalance}

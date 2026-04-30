@@ -269,6 +269,27 @@ export default function Rewards() {
           </div>
         </div>
 
+        <div className="relative z-10 mb-2 text-[11px] font-semibold text-white/82">{t("rewards.myRewards")}</div>
+        <div className="relative z-10 mb-4 grid grid-cols-3 gap-2">
+          {[
+            [t("rewards.review"), summary.pending_amount],
+            [t("rewards.proofReady"), summary.approved_amount],
+            [t("rewards.recorded"), summary.claimed_amount],
+          ].map(([label, value]) => (
+            <div key={label} className="metric-card rounded-[12px] px-3 py-3">
+              <div className={`mb-2 text-[9px] uppercase text-white/35 ${locale.startsWith("zh") ? "tracking-normal" : "tracking-widest"}`}>{label}</div>
+              <motion.div
+                key={value}
+                initial={{ opacity: 0.6 }}
+                animate={{ opacity: 1 }}
+                className="font-mono text-lg font-semibold text-[#8fd9ad] tabular-nums"
+              >
+                {formatNumber(displayRaw(value), locale, { maximumFractionDigits: 0 })}
+              </motion.div>
+            </div>
+          ))}
+        </div>
+
         <div className="relative z-10 mb-4 rounded-[12px] border border-white/10 bg-black/30 px-4 py-3 font-mono text-[10px] uppercase leading-5 tracking-[0.08em] text-white/[0.46]">
           {t("rewards.notice")}
         </div>
@@ -286,7 +307,7 @@ export default function Rewards() {
               [t("rewards.pool.leaderboard"), categoryValue("leaderboard", "50000000000000000")],
             ].map(([label, value]) => (
               <div key={label} className="metric-card rounded-[10px] px-3 py-2.5">
-                <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{label}</div>
+                <div className={`text-[9px] uppercase text-white/[0.36] ${locale.startsWith("zh") ? "tracking-normal" : "tracking-widest"}`}>{label}</div>
                 <div className="mt-1.5 font-mono text-xs font-semibold text-[#8fd9ad] tabular-nums">
                   {formatNumber(displayRaw(value), locale, { maximumFractionDigits: 0 })} 72H
                 </div>
@@ -299,7 +320,7 @@ export default function Rewards() {
           <div className="relative z-10 mb-4 grid grid-cols-2 gap-2 rounded-[12px] border border-[#8fd9ad]/15 bg-[#8fd9ad]/[0.045] p-3">
             {rewardEstimate.categories.map((category) => (
               <div key={category.category} className="min-w-0">
-                <div className="text-[9px] uppercase tracking-widest text-white/[0.34]">
+                <div className={`text-[9px] uppercase text-white/[0.34] ${locale.startsWith("zh") ? "tracking-normal" : "tracking-widest"}`}>
                   {t(`rewards.estimate.${category.category}`)}
                 </div>
                 <div className="mt-1 truncate font-mono text-xs font-semibold text-[#8fd9ad] tabular-nums">
@@ -310,25 +331,6 @@ export default function Rewards() {
           </div>
         )}
 
-        <div className="relative z-10 grid grid-cols-3 gap-2">
-          {[
-            [t("rewards.review"), summary.pending_amount],
-            [t("rewards.proofReady"), summary.approved_amount],
-            [t("rewards.recorded"), summary.claimed_amount],
-          ].map(([label, value]) => (
-            <div key={label} className="metric-card rounded-[12px] px-3 py-3">
-              <div className="mb-2 text-[9px] uppercase tracking-widest text-white/35">{label}</div>
-              <motion.div
-                key={value}
-                initial={{ opacity: 0.6 }}
-                animate={{ opacity: 1 }}
-                className="font-mono text-lg font-semibold text-[#8fd9ad] tabular-nums"
-              >
-                {formatNumber(displayRaw(value), locale, { maximumFractionDigits: 0 })}
-              </motion.div>
-            </div>
-          ))}
-        </div>
       </section>
 
       <section className="financial-panel rounded-[16px] p-2">

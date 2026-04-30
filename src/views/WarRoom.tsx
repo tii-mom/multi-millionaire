@@ -52,21 +52,22 @@ function claimState(preview: SeasonWarClaimPreview | null, t: Translate) {
     return { label: t("warRoom.claim.open"), detail: t("warRoom.claim.previewOnly"), safe: true };
   }
   return {
-    label: t("warRoom.claim.disabled", { status: preview.proofStatus.replaceAll("_", " ") }),
+    label: t("warRoom.claim.unavailableTitle"),
     detail: preview.disabledReason || t("warRoom.claim.disabledDetail"),
     safe: false,
   };
 }
 
 export default function WarRoom() {
-  const { locale, t } = useI18n();
+  const { formatError, locale, t } = useI18n();
   const { data, error, refresh, status } = useSeasonWarReadModel();
   const { current, radar, squads, me, claimPreview, exportManifest, wallet, partialErrors } = data;
   const topSquad = squads?.squads?.[0] || null;
   const activeRound = radar?.rounds?.find((round) => round.status === "active") || radar?.rounds?.[0] || null;
   const claim = claimState(claimPreview, t);
   const isStale = (current?.sourceFreshnessSeconds ?? 0) > 300;
-  const partialErrorMessages = Object.entries(partialErrors).map(([source, message]) => `${source}: ${message}`);
+  const partialErrorMessages = Object.entries(partialErrors).map(([source, message]) => `${source}: ${formatError(new Error(message), "warRoom.status.sourceUnavailable")}`);
+  const sourceErrorMessage = error ? formatError(new Error(error), "warRoom.status.sourceUnavailable") : "";
 
   return (
     <div className="tab-content-safe flex flex-col gap-4 px-6">
@@ -112,7 +113,7 @@ export default function WarRoom() {
                 {status === "error" ? t("warRoom.status.sourceUnavailable") : partialErrorMessages.length > 0 ? t("warRoom.status.partialUnavailable") : isStale ? t("warRoom.status.stale") : t("warRoom.status.loading")}
               </div>
               <p className="mt-1 text-[11px] leading-5 text-white/48">
-                {error || partialErrorMessages.join(" · ") || t("warRoom.status.degraded")}
+                {sourceErrorMessage || partialErrorMessages.join(" · ") || t("warRoom.status.degraded")}
               </p>
             </div>
           </div>
@@ -136,8 +137,16 @@ export default function WarRoom() {
             <MiniAmount label={t("warRoom.amount.claimable")} value={claimPreview?.claimableAtomic} locale={locale} />
             <MiniAmount label={t("warRoom.amount.claimed")} value={claimPreview?.claimedAtomic} locale={locale} />
           </div>
-          <div className="mt-3 rounded-[12px] border border-white/10 bg-black/20 px-3.5 py-3 text-[11px] leading-5 text-white/48">
-            {t("warRoom.claim.contractLine", { version: claimPreview?.claimContractVersion || "none", window: claimPreview?.claimWindowStatus || "not_open" })}
+          <div className={`mt-3 rounded-[12px] border px-3.5 py-3 ${claim.safe ? "border-emerald-300/20 bg-emerald-300/10" : "border-[#d7b46a]/20 bg-[#d7b46a]/10"}`}>
+            <div className="text-[11px] font-semibold text-white/82">
+              {claim.safe ? t("warRoom.claim.open") : t("warRoom.claim.unavailableTitle")}
+            </div>
+            <div className="mt-1 text-[11px] leading-5 text-white/58">
+              {t("warRoom.claim.reason", { reason: claim.detail })}
+            </div>
+            <div className="mt-1 text-[11px] leading-5 text-white/46">
+              {t("warRoom.claim.nextStep")}
+            </div>
           </div>
         </InfoCard>
 
