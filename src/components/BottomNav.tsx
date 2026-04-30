@@ -1,13 +1,13 @@
-import { Gift, Share2, Trophy, Users, Wallet } from "lucide-react";
+import { Gift, Radio, Share2, Users, Wallet } from "lucide-react";
 import { motion } from "motion/react";
 import { useI18n } from "@/src/lib/i18n";
 
 export default function BottomNav({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) {
   const { t } = useI18n();
   const tabs = [
-    { id: "team", label: t("nav.squad"), icon: Users },
-    { id: "leaderboard", label: t("nav.leaderboard"), icon: Trophy },
     { id: "home", label: t("nav.deposit"), icon: Wallet },
+    { id: "team", label: t("nav.squad"), icon: Users },
+    { id: "live", label: t("nav.live"), icon: Radio },
     { id: "rewards", label: t("nav.reward"), icon: Gift },
     { id: "share", label: t("nav.share"), icon: Share2 },
   ];

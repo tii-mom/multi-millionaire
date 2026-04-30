@@ -18,6 +18,7 @@ const BRAND_LOGO_SRC = "/logo-mark-transparent.png";
 const Admin = lazy(() => import("./views/Admin"));
 const Team = lazy(() => import("./views/Team"));
 const Leaderboard = lazy(() => import("./views/Leaderboard"));
+const WarRoom = lazy(() => import("./views/WarRoom"));
 const Rewards = lazy(() => import("./views/Rewards"));
 const Share = lazy(() => import("./views/Share"));
 
@@ -163,7 +164,7 @@ function MainApp() {
   }, [activeTab]);
 
   const handleSetTab = (newTab: string) => {
-    const tabs = ["team", "leaderboard", "home", "rewards", "share"];
+    const tabs = ["home", "team", "live", "rewards", "share"];
     const currIndex = tabs.indexOf(activeTab);
     const newIndex = tabs.indexOf(newTab);
     setDirection(newIndex > currIndex ? 1 : -1);
@@ -206,6 +207,12 @@ function MainApp() {
         return (
           <Suspense fallback={<TabLoading />}>
             <Leaderboard tokenPrice={tokenPrice} />
+          </Suspense>
+        );
+      case "live":
+        return (
+          <Suspense fallback={<TabLoading />}>
+            <WarRoom />
           </Suspense>
         );
       case "rewards":

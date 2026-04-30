@@ -29,6 +29,12 @@ import type {
   SquadDetail,
   SquadLeaderboardRow,
   SquadMember,
+  SeasonWarClaimPreview,
+  SeasonWarCurrent,
+  SeasonWarExportManifest,
+  SeasonWarMe,
+  SeasonWarRadar,
+  SeasonWarSquads,
   Wave,
   WalletAuthIntent,
   WalletBindIntent,
@@ -101,6 +107,30 @@ export const api = {
 
   currentWave() {
     return requestJson<Wave | null>("/v1/waves/current");
+  },
+
+  seasonWarCurrent() {
+    return requestJson<SeasonWarCurrent>("/v1/season-war/current");
+  },
+
+  seasonWarRadar(seasonId: string) {
+    return requestJson<SeasonWarRadar>(`/v1/season-war/seasons/${encodeURIComponent(seasonId)}/radar`);
+  },
+
+  seasonWarSquads(seasonId: string) {
+    return requestJson<SeasonWarSquads>(`/v1/season-war/seasons/${encodeURIComponent(seasonId)}/squads`);
+  },
+
+  seasonWarMe(wallet: string) {
+    return requestJson<SeasonWarMe>(`/v1/season-war/me?wallet=${encodeURIComponent(wallet)}`);
+  },
+
+  seasonWarClaimPreview(seasonId: string, wallet: string) {
+    return requestJson<SeasonWarClaimPreview>(`/v1/season-war/seasons/${encodeURIComponent(seasonId)}/claim-preview?wallet=${encodeURIComponent(wallet)}`);
+  },
+
+  seasonWarExportManifest(seasonId: string) {
+    return requestJson<SeasonWarExportManifest>(`/v1/season-war/seasons/${encodeURIComponent(seasonId)}/export-manifest`);
   },
 
   register(email: string, password: string) {

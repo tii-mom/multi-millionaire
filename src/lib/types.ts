@@ -68,6 +68,103 @@ export interface BootstrapData {
   };
 }
 
+export type SeasonWarRoundStatus = 'pending' | 'active' | 'success' | 'failed' | 'settling' | 'finalized';
+export type SeasonWarRouteTarget = 'SeasonClaim' | 'FundVesting' | 'pending';
+export type SeasonWarRiskStatus = 'clear' | 'review' | 'quarantined';
+export type SeasonWarProofStatus = 'not_ready' | 'ready' | 'submitted' | 'invalid' | 'disabled';
+export type SeasonWarClaimContractVersion = 'SeasonClaim' | 'SeasonClaimV2' | 'none';
+export type SeasonWarClaimWindowStatus = 'not_open' | 'open' | 'closed';
+
+export interface SeasonWarProvenance {
+  sourceFreshnessSeconds: number | null;
+  indexerWatermark: string | null;
+  updatedAt: string;
+}
+
+export interface SeasonWarCurrent extends SeasonWarProvenance {
+  seasonId: string;
+  waveId: string;
+  roundNumber: number;
+  chainRoundId: string | null;
+  status: SeasonWarRoundStatus;
+  timeLeftSeconds: number;
+}
+
+export interface SeasonWarRadarRound {
+  waveId: string;
+  roundNumber: number;
+  chainRoundId: string | null;
+  status: SeasonWarRoundStatus;
+  inventoryAtomic: string;
+  routeTarget: SeasonWarRouteTarget;
+  evidenceHash: string | null;
+}
+
+export interface SeasonWarRadar extends SeasonWarProvenance {
+  seasonId: string;
+  rounds: SeasonWarRadarRound[];
+}
+
+export interface SeasonWarSquadRow {
+  squadId: string;
+  name: string;
+  rank: number;
+  activatedMembers: number;
+  contributionAtomic: string;
+  riskSignal: SeasonWarRiskStatus;
+}
+
+export interface SeasonWarSquads extends SeasonWarProvenance {
+  seasonId: string;
+  squads: SeasonWarSquadRow[];
+}
+
+export interface SeasonWarMe extends SeasonWarProvenance {
+  wallet: string;
+  verifiedWalletBinding: boolean;
+  eligible: boolean;
+  eligibilityReason: string;
+  qualifyingPositions: Array<{ positionId: string; waveId: string; amountAtomic: string; createdAt: string }>;
+  myLockAtomic: string;
+  squadId: string | null;
+  squadRank: number | null;
+  referralContributionAtomic: string;
+  rewardEstimateAtomic: string;
+  riskStatus: SeasonWarRiskStatus;
+  riskReason: string | null;
+  nextAction: string;
+}
+
+export interface SeasonWarClaimPreview extends SeasonWarProvenance {
+  snapshotId: string | null;
+  merkleRoot: string | null;
+  rootPublishable: boolean;
+  proofStatus: SeasonWarProofStatus;
+  claimContractVersion: SeasonWarClaimContractVersion;
+  claimContractAddress: string | null;
+  claimWindowStatus: SeasonWarClaimWindowStatus;
+  unlockedBps: number;
+  pools: {
+    individualAtomic: string;
+    squadAtomic: string;
+    referralAtomic: string;
+    leaderboardAtomic: string;
+  };
+  pendingAtomic: string;
+  claimableAtomic: string;
+  claimedAtomic: string;
+  disabledReason: string;
+}
+
+export interface SeasonWarExportManifest extends SeasonWarProvenance {
+  manifestHash: string | null;
+  evidenceHash: string | null;
+  generatedAt: string | null;
+  successfulWaveIds: string[];
+  quarantineSummary: Record<string, unknown>;
+  rootPublishable: boolean;
+}
+
 export type AppControlKey =
   | 'pause_deposits'
   | 'pause_reward_claims'
