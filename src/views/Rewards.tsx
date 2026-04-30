@@ -124,7 +124,7 @@ export default function Rewards() {
   const bootstrapUnavailable = !!bootstrapError && !bootstrap;
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
   const merkleClaimVerifierConfigured = !!bootstrap?.ops?.merkle_claim_verifier?.configured;
-  const rewardClaimsPaused = !!bootstrap?.controls?.pause_reward_claims?.enabled;
+  const rewardClaimsPaused = true; // P0 safety: production claim route is not live; records-only UI.
   const merkleClaimAddress = bootstrap?.contracts?.merkle_claim || "";
   const categoryValue = (category: string, fallbackRaw: string) => (
     rewardEstimate?.categories.find((item) => item.category === category)?.pool_amount_raw || fallbackRaw
@@ -437,8 +437,8 @@ export default function Rewards() {
                     <button
                       type="button"
                       onClick={() => handleClaim(reward.id)}
-                      disabled={!!rewardClaimDisabledReason || reward.status !== "approved" || claimingId === reward.id}
-                      title={rewardClaimDisabledReason || undefined}
+                      disabled={true}
+                      title={rewardClaimDisabledReason || t("rewards.claimsPaused")}
                       className="depth-button focus-ring min-w-[68px] rounded-[10px] border border-white/10 bg-white/[0.07] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/85 hover:bg-white/[0.12] disabled:opacity-40"
                     >
                       {claimingId === reward.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("rewards.claim")}
