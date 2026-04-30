@@ -257,9 +257,9 @@ function MainApp() {
           </div>
         </div>
 
-        <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-3 pt-16">
+        <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-2 pt-14">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="relative flex h-[50px] w-[54px] shrink-0 items-center justify-center">
+            <div className="relative flex h-11 w-12 shrink-0 items-center justify-center">
               <div className="absolute inset-2 rounded-[16px] bg-[#d7b46a]/10 blur-xl" />
               <img
                 src={BRAND_LOGO_SRC}
@@ -274,7 +274,7 @@ function MainApp() {
                   {t("app.brand.kicker")}
                 </h1>
               </div>
-              <div className={`mt-1.5 truncate font-semibold tracking-tight text-white/95 ${locale.startsWith("zh") ? "text-[21px]" : "text-[17px]"}`}>
+              <div className={`mt-1 truncate font-semibold tracking-tight text-white/95 ${locale.startsWith("zh") ? "text-[20px]" : "text-[16px]"}`}>
                 {t("app.brand.name")}
               </div>
             </div>
@@ -285,7 +285,7 @@ function MainApp() {
               <span className="ui-label text-[9px]">{t("app.price.label")}</span>
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/85" />
             </div>
-            <div className="flex items-center gap-2 font-mono text-[17px] font-semibold text-[#d7b46a] tabular-nums">
+            <div className="flex items-center gap-1.5 font-mono text-[15px] font-semibold text-[#d7b46a] tabular-nums">
               <motion.span
                 key={tokenPrice}
                 initial={{ opacity: 0.5, color: "#fff" }}
@@ -298,7 +298,7 @@ function MainApp() {
                 {t("app.price.offChain")}
               </span>
             </div>
-            <div className="mt-1 h-5 w-[116px] rounded-md border border-white/[0.06] bg-black/20 market-line" aria-hidden="true" />
+            <div className="mt-1 h-4 w-[96px] rounded-md border border-white/[0.06] bg-black/20 market-line" aria-hidden="true" />
           </div>
         </header>
 

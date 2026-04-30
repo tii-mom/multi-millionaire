@@ -1,5 +1,5 @@
 import type React from "react";
-import { AlertTriangle, CheckCircle2, Clock3, Database, Loader2, Radio, RefreshCw, ShieldAlert, Trophy, WalletCards, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Clock3, Database, Eye, Loader2, Radio, RefreshCw, ShieldAlert, Trophy, WalletCards, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { formatNumber, useI18n, type Translate } from "@/src/lib/i18n";
 import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
@@ -30,7 +30,7 @@ function duration(seconds: number | null | undefined) {
 function statusTone(status?: SeasonWarRoundStatus | string | null) {
   if (status === "active" || status === "success" || status === "finalized") return "text-[#8fd9ad] border-emerald-300/20 bg-emerald-300/10";
   if (status === "settling" || status === "pending") return "text-[#d7b46a] border-[#d7b46a]/25 bg-[#d7b46a]/10";
-  return "text-rose-200 border-rose-300/20 bg-rose-300/10";
+  return "text-white/62 border-white/10 bg-white/[0.045]";
 }
 
 function freshnessLabel(source: SeasonWarProvenance | null | undefined, t: Translate) {
@@ -66,23 +66,24 @@ export default function WarRoom() {
   const activeRound = radar?.rounds?.find((round) => round.status === "active") || radar?.rounds?.[0] || null;
   const claim = claimState(claimPreview, t);
   const isStale = (current?.sourceFreshnessSeconds ?? 0) > 300;
+  const syncingPreview = status === "error" || status === "loading";
   const partialErrorMessages = Object.entries(partialErrors).map(([source, message]) => `${source}: ${formatError(new Error(message), "warRoom.status.sourceUnavailable")}`);
   const sourceErrorMessage = error ? formatError(new Error(error), "warRoom.status.sourceUnavailable") : "";
 
   return (
     <div className="tab-content-safe flex flex-col gap-4 px-6">
-      <section className="financial-panel relative overflow-hidden rounded-[16px] p-5">
+      <section className="financial-panel relative overflow-hidden rounded-[16px] p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/45 to-transparent" />
-        <div className="relative z-10 flex items-start justify-between gap-4">
+        <div className="relative z-10 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-white/[0.52]">
               <Radio className="h-4 w-4 text-[#d7b46a]/85" />
               <span className="ui-label">{t("warRoom.kicker")}</span>
             </div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+            <h2 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-white">
               {current ? t("warRoom.round", { round: current.roundNumber }) : t("warRoom.titleFallback")}
             </h2>
-            <p className="mt-2 max-w-[300px] text-[11px] leading-relaxed text-white/[0.48]">
+            <p className="mt-1.5 max-w-[295px] text-[11px] leading-relaxed text-white/[0.52]">
               {t("warRoom.description")}
             </p>
           </div>
@@ -96,8 +97,17 @@ export default function WarRoom() {
           </button>
         </div>
 
-        <div className="relative z-10 mt-4 grid grid-cols-2 gap-3">
-          <Metric icon={Clock3} label={t("warRoom.metric.timeLeft")} value={current ? duration(current.timeLeftSeconds) : "--"} detail={current?.status || t("common.loading")} tone={statusTone(current?.status)} />
+        <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
+          <span className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest ${syncingPreview ? "border-[#d7b46a]/22 bg-[#d7b46a]/10 text-[#d7b46a]" : statusTone(current?.status)}`}>
+            {syncingPreview ? t("warRoom.status.previewSync") : current?.status || t("warRoom.status.readOnly")}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-white/42">
+            {t("warRoom.status.readOnly")}
+          </span>
+        </div>
+
+        <div className="relative z-10 mt-3 grid grid-cols-2 gap-2.5">
+          <Metric icon={Clock3} label={t("warRoom.metric.timeLeft")} value={current ? duration(current.timeLeftSeconds) : t("warRoom.value.syncing")} detail={current?.status || t("warRoom.detail.previewOnly")} tone={statusTone(current?.status || "pending")} />
           <Metric icon={WalletCards} label={t("warRoom.metric.myLock")} value={me ? formatNumber(displayAtomic(me.myLockAtomic), locale, { maximumFractionDigits: 0 }) : wallet ? t("warRoom.value.review") : t("warRoom.value.connect")} detail={me?.eligible ? t("warRoom.detail.eligible") : me?.eligibilityReason || t("warRoom.detail.walletNeeded")} tone={me?.eligible ? statusTone("active") : statusTone("pending")} />
           <Metric icon={Trophy} label={t("warRoom.metric.squadRank")} value={me?.squadRank ? `#${me.squadRank}` : topSquad ? `#${topSquad.rank}` : "--"} detail={me?.squadId ? `squad ${me.squadId}` : topSquad?.name || t("warRoom.detail.noSquad")} tone={statusTone("active")} />
           <Metric icon={ShieldAlert} label={t("warRoom.metric.claimState")} value={claim.label} detail={claim.detail} tone={claim.safe ? statusTone("active") : statusTone("pending")} compact />
@@ -105,15 +115,15 @@ export default function WarRoom() {
       </section>
 
       {(status === "loading" || status === "error" || isStale || partialErrorMessages.length > 0) && (
-        <section className={`rounded-[16px] border p-4 ${status === "error" ? "border-rose-300/20 bg-rose-300/10" : "border-[#d7b46a]/20 bg-[#d7b46a]/10"}`}>
+        <section className="rounded-[16px] border border-[#d7b46a]/18 bg-[#d7b46a]/[0.055] p-3.5">
           <div className="flex items-start gap-3">
-            {status === "loading" ? <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-[#d7b46a]" /> : <AlertTriangle className="mt-0.5 h-4 w-4 text-[#d7b46a]" />}
+            {status === "loading" ? <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-[#d7b46a]" /> : <Eye className="mt-0.5 h-4 w-4 text-[#d7b46a]" />}
             <div>
               <div className="font-mono text-[11px] font-semibold uppercase tracking-widest text-white/75">
-                {status === "error" ? t("warRoom.status.sourceUnavailable") : partialErrorMessages.length > 0 ? t("warRoom.status.partialUnavailable") : isStale ? t("warRoom.status.stale") : t("warRoom.status.loading")}
+                {status === "error" ? t("warRoom.status.previewSync") : partialErrorMessages.length > 0 ? t("warRoom.status.partialPreview") : isStale ? t("warRoom.status.stale") : t("warRoom.status.loading")}
               </div>
               <p className="mt-1 text-[11px] leading-5 text-white/48">
-                {sourceErrorMessage || partialErrorMessages.join(" · ") || t("warRoom.status.degraded")}
+                {status === "error" ? t("warRoom.status.previewSyncDetail") : partialErrorMessages.length > 0 ? t("warRoom.status.partialPreviewDetail") : sourceErrorMessage || partialErrorMessages.join(" · ") || t("warRoom.status.degraded")}
               </p>
             </div>
           </div>

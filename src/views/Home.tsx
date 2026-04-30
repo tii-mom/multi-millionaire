@@ -589,26 +589,25 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           </div>
 
           {!tonSession ? (
-            <div className="grid gap-3">
-              <div className="metric-card rounded-[12px] px-4 py-3">
-                <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-white/90">
-                  <ShieldCheck className="h-4 w-4 text-[#d7b46a]" />
-                  {t("home.ton.title")}
-                </div>
-                <p className="text-[11px] leading-5 text-white/[0.42]">
-                  {t("home.ton.helper")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openTonWallet}
-                disabled={!connectionRestored}
-                className="depth-button focus-ring flex items-center justify-center gap-2 rounded-[12px] bg-[#d7b46a] py-2.5 text-xs font-bold uppercase tracking-widest text-black hover:bg-[#e1c07b] disabled:cursor-wait disabled:opacity-60"
-              >
-                {!connectionRestored ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
-                {connectionRestored ? t("home.ton.connect") : t("home.ton.restoring")}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={openTonWallet}
+              disabled={!connectionRestored}
+              className="depth-button focus-ring flex w-full items-center justify-between gap-3 rounded-[14px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.075] px-3.5 py-3 text-left disabled:cursor-wait disabled:opacity-60"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#d7b46a] text-black shadow-[0_10px_24px_rgba(215,180,106,0.12)]">
+                  {!connectionRestored ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-white/90">{t("home.ton.title")}</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-white/[0.44]">{t("home.ton.helperShort")}</span>
+                </span>
+              </span>
+              <span className="shrink-0 rounded-full border border-[#d7b46a]/25 bg-[#d7b46a]/12 px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-widest text-[#d7b46a]">
+                {connectionRestored ? t("home.ton.connectShort") : t("home.ton.restoring")}
+              </span>
+            </button>
           ) : (
             <div className="grid gap-3">
               <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.06] px-4 py-3">
