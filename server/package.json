@@ -10,6 +10,7 @@
     "test": "jest --runInBand",
     "check:env": "ts-node src/scripts/checkEnv.ts",
     "check:schema": "ts-node src/scripts/checkSchema.ts",
+    "preflight:migration:staging": "ts-node src/scripts/preflightStagingMigration.ts",
     "migrate:up": "ts-node src/scripts/migrate.ts up",
     "migrate:reset": "ts-node src/scripts/migrate.ts reset",
     "seed:dev": "ts-node src/scripts/seedDev.ts",
