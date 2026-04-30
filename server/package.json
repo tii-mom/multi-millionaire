@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "test": "jest --runInBand",
     "check:env": "ts-node src/scripts/checkEnv.ts",
+    "check:schema": "ts-node src/scripts/checkSchema.ts",
     "migrate:up": "ts-node src/scripts/migrate.ts up",
     "migrate:reset": "ts-node src/scripts/migrate.ts reset",
     "seed:dev": "ts-node src/scripts/seedDev.ts",
