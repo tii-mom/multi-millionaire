@@ -1,6 +1,6 @@
+import './lib/browserPolyfills';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import './lib/browserPolyfills';
 import App from './App.tsx';
 import './index.css';
 
