@@ -229,4 +229,16 @@ describe('Season War War Room routes', () => {
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('SEASON_WAR_NOT_FOUND');
   });
+
+  it('returns a clear fail-closed response when Season War reward tables are missing', async () => {
+    getCurrentWaveMock.mockResolvedValue(wave);
+    queryMock.mockRejectedValue(Object.assign(new Error('relation "merkle_reward_batches" does not exist'), { code: '42P01' }));
+
+    const res = await request(app).get('/v1/season-war/current');
+
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('SEASON_WAR_READ_MODEL_NOT_READY');
+    expect(res.body.error.message).toContain('006_merkle_rewards.sql');
+    expect(res.body.error.message).not.toContain('merkle_reward_batches');
+  });
 });
