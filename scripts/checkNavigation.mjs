@@ -207,10 +207,17 @@ try {
   const checks = [
     ["锁仓", "TON 钱包访问"],
     ["战队", "奖励池"],
-    ["排行", "排行榜"],
+    ["战况", "钱包："],
     ["奖励", "奖励账本"],
     ["分享", "邀请配额"],
   ];
+
+  const navOrder = await evaluate(client, `
+    Array.from(document.querySelectorAll('.bottom-nav-shell button')).map((button) => button.getAttribute('aria-label') || button.textContent?.trim()).filter(Boolean).join('/')
+  `);
+  if (navOrder !== "锁仓/战队/战况/奖励/分享") {
+    throw new Error(`Unexpected bottom nav order: ${navOrder}`);
+  }
 
   for (const [label, marker] of checks) {
     await clickTabAndAssert(client, label, marker);
