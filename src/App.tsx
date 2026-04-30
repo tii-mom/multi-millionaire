@@ -15,6 +15,35 @@ import { api } from "@/src/lib/api";
 import type { BootstrapData } from "@/src/lib/types";
 
 const BRAND_LOGO_SRC = "/logo-mark-transparent.png";
+const TAB_ORDER = ["home", "team", "live", "rewards", "share"];
+const TAB_PATHS: Record<string, string> = {
+  home: "/",
+  team: "/team",
+  leaderboard: "/leaderboard",
+  live: "/war-room",
+  rewards: "/rewards",
+  share: "/share",
+};
+
+function tabFromPathname(pathname: string) {
+  const normalized = pathname.replace(/\/+$/, "") || "/";
+  switch (normalized) {
+    case "/team":
+      return "team";
+    case "/leaderboard":
+      return "leaderboard";
+    case "/live":
+    case "/war-room":
+      return "live";
+    case "/rewards":
+      return "rewards";
+    case "/share":
+      return "share";
+    default:
+      return "home";
+  }
+}
+
 const Admin = lazy(() => import("./views/Admin"));
 const Team = lazy(() => import("./views/Team"));
 const Leaderboard = lazy(() => import("./views/Leaderboard"));
@@ -116,7 +145,7 @@ function MainApp() {
   const { locale, t } = useI18n();
   const shellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const [activeTab, setActiveTab] = useState("home");
+  const [activeTab, setActiveTab] = useState(() => tabFromPathname(window.location.pathname));
   const [direction, setDirection] = useState(0);
   const [tokenPrice] = useState(1.42);
   const [myDeposit, setMyDeposit] = useState(() => {
@@ -162,13 +191,32 @@ function MainApp() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [activeTab]);
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextTab = tabFromPathname(window.location.pathname);
+      const currIndex = TAB_ORDER.indexOf(activeTab);
+      const newIndex = TAB_ORDER.indexOf(nextTab);
+      if (currIndex !== -1 && newIndex !== -1) {
+        setDirection(newIndex > currIndex ? 1 : -1);
+      }
+      setActiveTab(nextTab);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [activeTab]);
 
   const handleSetTab = (newTab: string) => {
-    const tabs = ["home", "team", "live", "rewards", "share"];
-    const currIndex = tabs.indexOf(activeTab);
-    const newIndex = tabs.indexOf(newTab);
-    setDirection(newIndex > currIndex ? 1 : -1);
+    const currIndex = TAB_ORDER.indexOf(activeTab);
+    const newIndex = TAB_ORDER.indexOf(newTab);
+    if (currIndex !== -1 && newIndex !== -1) {
+      setDirection(newIndex > currIndex ? 1 : -1);
+    }
     setActiveTab(newTab);
+
+    const nextPath = TAB_PATHS[newTab] || "/";
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, "", nextPath + window.location.search + window.location.hash);
+    }
   };
 
   const handleShellPointerMove = (event: PointerEvent<HTMLDivElement>) => {

@@ -201,6 +201,14 @@ async function main() {
       assert(typeof data.wave_id === 'number' || typeof data.wave_id === 'string', 'Expected current wave data.wave_id');
       return { status_code: response.status, wave_id: data.wave_id, status: data.status };
     });
+
+    await runStep('season war current', async () => {
+      const response = await requestJson(config, '/v1/season-war/current');
+      const data = objectValue(objectValue(response.body, 'season war current response').data, 'season war current response.data');
+      assert(typeof data.seasonId === 'string' && data.seasonId.length > 0, 'Expected season war current data.seasonId');
+      assert(typeof data.waveId === 'string' && data.waveId.length > 0, 'Expected season war current data.waveId');
+      return { status_code: response.status, season_id: data.seasonId, wave_id: data.waveId, status: data.status };
+    });
   } catch {
     failed = true;
   } finally {
@@ -212,7 +220,7 @@ async function main() {
       started_at: startedAt.toISOString(),
       finished_at: finishedAt.toISOString(),
       duration_ms: finishedAt.getTime() - startedAt.getTime(),
-      checked_paths: ['/health', '/ready', '/v1/app/bootstrap', '/v1/waves/current'],
+      checked_paths: ['/health', '/ready', '/v1/app/bootstrap', '/v1/waves/current', '/v1/season-war/current'],
       mutation_guard: 'GET-only smoke; does not register, deposit, claim, or call admin endpoints',
       steps,
     };

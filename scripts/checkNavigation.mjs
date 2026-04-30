@@ -223,6 +223,16 @@ try {
     await clickTabAndAssert(client, label, marker);
   }
 
+  await client.send("Page.navigate", { url: new URL("war-room", appUrl).toString() });
+  await waitFor(client, "document.readyState === 'complete'", "war-room deep link load");
+  await waitFor(client, "document.body.innerText.includes('钱包：')", "war-room deep link content");
+  await waitFor(client, `
+    (() => {
+      const active = document.querySelector('button[aria-current="page"]');
+      return active?.textContent?.trim() === '战况';
+    })()
+  `, "war-room deep link active state");
+
   client.close();
   console.log(`Navigation smoke passed for ${appUrl}`);
 } finally {
