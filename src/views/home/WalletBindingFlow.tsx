@@ -46,16 +46,21 @@ export default function WalletBindingFlow({
       <summary className="cursor-pointer list-none">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">{t("home.wallet.title")}</div>
-            <div className="mt-1 text-[11px] text-white/35">{chainDisabledReason || t("home.deposit.walletFlowRequired")}</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">{t("home.wallet.advancedSummary")}</div>
+            <div className="mt-1 text-[11px] text-white/35">{t("home.wallet.advancedHelper")}</div>
           </div>
           <div className="shrink-0 text-[9px] uppercase tracking-widest text-[#d7b46a]">
-            {t("home.wallet.enabled")}
+            {t("home.wallet.title")}
           </div>
         </div>
       </summary>
 
       <div className="mt-4 flex flex-col gap-3">
+        {chainDisabledReason && (
+          <div className="rounded-[10px] border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] leading-relaxed text-white/45">
+            {chainDisabledReason}
+          </div>
+        )}
         <input
           type="text"
           value={walletAddress}

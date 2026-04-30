@@ -346,7 +346,7 @@ export default function Rewards() {
             </div>
             <div className="mb-3 grid gap-1 font-mono text-[10px] leading-5 text-white/50">
               <div>{t("rewards.claimReceiptLedger", { ledger: shortValue(pendingClaimReceipt.ledgerId) })}</div>
-              <div>{t("rewards.claimReceiptAmount", { amount: `${formatNumber(displayRaw(pendingClaimReceipt.amountRaw), locale, { maximumFractionDigits: 4 })} (${pendingClaimReceipt.amountRaw} raw)` })}</div>
+              <div>{t("rewards.claimReceiptAmount", { amount: formatNumber(displayRaw(pendingClaimReceipt.amountRaw), locale, { maximumFractionDigits: 4 }) })}</div>
               <div>{t("rewards.claimReceiptBatch", { batch: pendingClaimReceipt.batchId })}</div>
               <div>{t("rewards.claimReceiptQuery", { query: pendingClaimReceipt.queryId })}</div>
               <div>{t("rewards.claimReceiptContract", { contract: shortValue(pendingClaimReceipt.contractAddress) })}</div>

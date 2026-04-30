@@ -103,6 +103,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           ? t("home.banner.staging")
           : "";
   const statusBannerTechnicalDetail = backendUnavailable ? localizedBootstrapError : "";
+  const showStatusBannerTechnicalDetail = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV && statusBannerTechnicalDetail);
   const showApiError = !!apiError && apiError !== statusBannerMessage;
   const activeWalletLabel = tonSession?.walletName || t("home.ton.walletFallback");
   const chainDisabledReason = backendUnavailable
@@ -756,7 +757,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             <div className="min-w-0">
               <div className={`font-mono text-[9px] uppercase text-white/38 ${locale.startsWith("zh") ? "tracking-normal" : "tracking-[0.2em]"}`}>{statusBannerTitle}</div>
               <div className="mt-1 text-[11px] leading-relaxed text-white/68">{statusBannerMessage}</div>
-              {statusBannerTechnicalDetail && (
+              {showStatusBannerTechnicalDetail && (
                 <details className="mt-1 text-[10px] text-white/38">
                   <summary className="cursor-pointer select-none text-white/48">{t("home.banner.technicalDetail")}</summary>
                   <div className="mt-1 break-words font-mono">{statusBannerTechnicalDetail}</div>
