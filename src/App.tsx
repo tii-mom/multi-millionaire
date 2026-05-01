@@ -145,7 +145,7 @@ function MainApp() {
   const mainRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState(() => tabFromPathname(window.location.pathname));
   const [direction, setDirection] = useState(0);
-  const [tokenPrice] = useState(1.42);
+  const tokenPrice: number | null = null;
   const [myDeposit, setMyDeposit] = useState(0);
   const [squadGoal, setSquadGoal] = useState(() => {
     const saved = localStorage.getItem("72h_goal");
@@ -345,15 +345,14 @@ function MainApp() {
             </div>
             <div className="flex items-center gap-1.5 font-mono text-[15px] font-semibold text-[#d7b46a] tabular-nums">
               <motion.span
-                key={tokenPrice}
                 initial={{ opacity: 0.5, color: "#fff" }}
                 animate={{ opacity: 1, color: "#d7b46a" }}
                 transition={{ duration: 0.55 }}
               >
-                ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                --
               </motion.span>
               <span className="rounded-md border border-white/[0.06] bg-white/[0.045] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white/55">
-                {t("app.price.offChain")}
+                {t("app.price.unavailable")}
               </span>
             </div>
             <div className="mt-1 h-4 w-[96px] rounded-md border border-white/[0.06] bg-black/20 market-line" aria-hidden="true" />

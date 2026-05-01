@@ -9,7 +9,7 @@ import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
 import type { MySquadView, SquadLeaderboardRow } from "@/src/lib/types";
 
 interface TeamProps {
-  tokenPrice: number;
+  tokenPrice: number | null;
   myDeposit?: number;
   squadGoal: number;
   setSquadGoal?: (goal: number) => void;
@@ -64,8 +64,9 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
 
   const topSquad = squads[0] || null;
   const squadTotalLocked = useMemo(() => displayRaw72h(topSquad?.total_locked, tokenDecimals), [topSquad, tokenDecimals]);
-  const squadMarketValue = squadTotalLocked * tokenPrice;
-  const progressPercent = Math.min((squadMarketValue / squadGoal) * 100, 100);
+  const hasConfirmedPrice = typeof tokenPrice === "number" && Number.isFinite(tokenPrice) && tokenPrice > 0;
+  const squadMarketValue = hasConfirmedPrice ? squadTotalLocked * tokenPrice : null;
+  const progressPercent = squadMarketValue == null ? 0 : Math.min((squadMarketValue / squadGoal) * 100, 100);
   const inviteLink = mySquad
     ? `${window.location.origin}/?squad=${encodeURIComponent(mySquad.squad.invite_code || String(mySquad.squad.id))}`
     : "";
@@ -186,20 +187,20 @@ export default function Team({ tokenPrice, squadGoal, setSquadGoal }: TeamProps)
               </span>
               <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest text-[#8fd9ad]/75">
                 {t("common.rate")}:
-                <motion.span key={tokenPrice} initial={{ color: "#fff" }} animate={{ color: "#8fd9ad" }} className="font-mono font-bold tabular-nums">
-                  ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                <motion.span key={tokenPrice ?? "unavailable"} initial={{ color: "#fff" }} animate={{ color: "#8fd9ad" }} className="font-mono font-bold tabular-nums">
+                  {tokenPrice == null ? t("app.price.unavailable") : `$${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
                 </motion.span>
               </span>
             </div>
           </div>
 
           <motion.div
-            key={squadMarketValue}
+            key={squadMarketValue ?? "unavailable"}
             initial={{ opacity: 0.8 }}
             animate={{ opacity: 1 }}
             className="mb-6 font-mono text-4xl font-semibold tracking-tight text-white tabular-nums"
           >
-            ${formatNumber(squadMarketValue, locale, { maximumFractionDigits: 0 })}
+            {squadMarketValue == null ? "--" : `$${formatNumber(squadMarketValue, locale, { maximumFractionDigits: 0 })}`}
           </motion.div>
 
           <div className="mb-5 flex items-center gap-2">

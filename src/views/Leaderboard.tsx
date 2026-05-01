@@ -9,7 +9,7 @@ import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
 import type { LeaderboardMe, RewardEstimate, SquadLeaderboardRow } from "@/src/lib/types";
 
 interface LeaderboardProps {
-  tokenPrice: number;
+  tokenPrice: number | null;
 }
 
 export default function Leaderboard({ tokenPrice }: LeaderboardProps) {
@@ -72,6 +72,7 @@ export default function Leaderboard({ tokenPrice }: LeaderboardProps) {
 
   const topSquad = squads[0] || null;
   const totalLocked = useMemo(() => squads.reduce((sum, squad) => sum + displayRaw(squad.total_locked || "0"), 0), [displayRaw, squads]);
+  const hasConfirmedPrice = typeof tokenPrice === "number" && Number.isFinite(tokenPrice) && tokenPrice > 0;
   const currentSquad = leaderboardMe?.squad || null;
   const leaderboardPoolPerRound = displayRaw(rewardEstimate?.categories.find((category) => category.category === "leaderboard")?.pool_amount_raw || "50000000000000000");
 
@@ -171,7 +172,7 @@ export default function Leaderboard({ tokenPrice }: LeaderboardProps) {
           <div className="metric-card rounded-[12px] px-3.5 py-3 text-right">
             <div className="text-[9px] uppercase tracking-widest text-white/[0.36]">{t("team.aumColumn")}</div>
             <div className="mt-2 font-mono text-sm font-semibold text-[#8fd9ad] tabular-nums">
-              ${formatNumber(totalLocked * tokenPrice, locale, { maximumFractionDigits: 0 })}
+              {hasConfirmedPrice ? `$${formatNumber(totalLocked * tokenPrice, locale, { maximumFractionDigits: 0 })}` : "--"}
             </div>
           </div>
         </div>
@@ -264,7 +265,7 @@ export default function Leaderboard({ tokenPrice }: LeaderboardProps) {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end text-right font-mono text-sm">
-                      <span className="font-semibold tracking-tight tabular-nums">${formatNumber(lockedDisplay * tokenPrice, locale, { maximumFractionDigits: 0 })}</span>
+                      <span className="font-semibold tracking-tight tabular-nums">{hasConfirmedPrice ? `$${formatNumber(lockedDisplay * tokenPrice, locale, { maximumFractionDigits: 0 })}` : "--"}</span>
                       <span className="mt-0.5 text-[9px] uppercase tracking-widest text-white/[0.42] tabular-nums">
                         ~{formatNumber(lockedDisplay, locale, { maximumFractionDigits: 0 })} 72H
                       </span>

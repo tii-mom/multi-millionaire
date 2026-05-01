@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { toast } from "sonner";
-import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, Clock3, Database, Gauge, Radio, RefreshCw, Share2, ShieldAlert, Users, WalletCards } from "lucide-react";
+import { Activity, BarChart3, Clock3, Database, Gauge, Radio, RefreshCw, Share2, ShieldAlert, Users, WalletCards } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
@@ -28,46 +28,17 @@ function duration(seconds: number | null | undefined) {
   return `${minutes}m`;
 }
 
-const periodMoves = [
-  ["1m", 0.18],
-  ["5m", 0.42],
-  ["15m", -0.31],
-  ["30m", 0.74],
-  ["1h", 1.28],
-  ["4h", -0.86],
-  ["1d", 3.62],
-] as const;
-
-function buildSeries(tick: number) {
-  return Array.from({ length: 40 }, (_, index) => {
-    const drift = index * 0.011;
-    const wave = Math.sin((index + tick) / 3.8) * 0.045;
-    const pulse = Math.cos((index + tick) / 7.2) * 0.026;
-    return 1.27 + drift + wave + pulse;
-  });
-}
+const marketPeriods = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
 
 export default function WarRoom() {
   const { locale, t } = useI18n();
-  const { data, refresh, status } = useSeasonWarReadModel();
-  const { current, squads, claimPreview, partialErrors } = data;
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1600);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const priceSeries = useMemo(() => buildSeries(tick), [tick]);
-  const price = priceSeries[priceSeries.length - 1];
-  const previousPrice = priceSeries[priceSeries.length - 6] || price;
-  const priceMove = ((price - previousPrice) / previousPrice) * 100;
+  const { data, error, refresh, status } = useSeasonWarReadModel();
+  const { current, squads, partialErrors } = data;
+  const hasLiveSeason = Boolean(current);
   const topSquad = squads?.squads?.[0] || null;
   const locked72h = (squads?.squads || []).reduce((sum, squad) => sum + displayAtomic(squad.contributionAtomic), 0);
   const teamLocked72h = displayAtomic(topSquad?.contributionAtomic);
-  const buyPressure = Math.round(56 + Math.sin(tick / 2) * 7);
-  const sellPressure = 100 - buyPressure;
-  const turnover = Math.max(locked72h * price * 0.17, 7_200_000) + tick * 18_420;
-  const holders = Math.max((squads?.squads || []).reduce((sum, squad) => sum + squad.activatedMembers, 0), 1280) + Math.floor(tick / 3);
+  const activatedMembers = (squads?.squads || []).reduce((sum, squad) => sum + squad.activatedMembers, 0);
   const shareText = t("warRoom.shareText", { pool: formatNumber(TOTAL_REWARD_POOL, locale, { maximumFractionDigits: 0 }) });
 
   const copyShare = async () => {
@@ -95,12 +66,11 @@ export default function WarRoom() {
             <div className="min-w-0">
               <span className="ui-label">{t("warRoom.dashboard.kicker")}</span>
               <div className="mt-1 flex items-baseline gap-2">
-                <motion.span key={price.toFixed(3)} initial={{ opacity: 0.55, y: -4 }} animate={{ opacity: 1, y: 0 }} className="font-mono text-3xl font-semibold tracking-tight text-[#d7b46a]">
-                  ${formatNumber(price, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                <motion.span initial={{ opacity: 0.55, y: -4 }} animate={{ opacity: 1, y: 0 }} className="font-mono text-3xl font-semibold tracking-tight text-[#d7b46a]">
+                  --
                 </motion.span>
-                <span className={`flex items-center gap-0.5 font-mono text-xs font-semibold ${priceMove >= 0 ? "text-[#8fd9ad]" : "text-[#ff8f8f]"}`}>
-                  {priceMove >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-                  {priceMove >= 0 ? "+" : ""}{priceMove.toFixed(2)}%
+                <span className="flex items-center gap-0.5 font-mono text-xs font-semibold text-white/42">
+                  {t("warRoom.dashboard.noMarketData")}
                 </span>
               </div>
             </div>
@@ -116,13 +86,27 @@ export default function WarRoom() {
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <MarketTile icon={Clock3} label={t("warRoom.metric.timeLeft")} value={current ? duration(current.timeLeftSeconds) : "--"} detail={current?.status || t("warRoom.status.readOnly")} accent="green" />
-          <MarketTile icon={Database} label={t("warRoom.dashboard.turnover")} value={`$${formatNumber(turnover, locale, { maximumFractionDigits: 0 })}`} detail={t("warRoom.dashboard.network")} accent="blue" tickKey={tick} />
-          <MarketTile icon={Users} label={t("warRoom.dashboard.holders")} value={formatNumber(holders, locale, { maximumFractionDigits: 0 })} detail={t("warRoom.dashboard.liveWallets")} accent="white" tickKey={tick} />
+          <MarketTile icon={Clock3} label={t("warRoom.metric.timeLeft")} value={current ? duration(current.timeLeftSeconds) : "--"} detail={current?.status || t("warRoom.status.noActiveSeason")} accent="green" />
+          <MarketTile icon={Database} label={t("warRoom.dashboard.turnover")} value="--" detail={t("warRoom.dashboard.noMarketData")} accent="blue" />
+          <MarketTile icon={Users} label={t("warRoom.dashboard.holders")} value={hasLiveSeason && squads ? formatNumber(activatedMembers, locale, { maximumFractionDigits: 0 }) : "--"} detail={hasLiveSeason && squads ? t("warRoom.squad.active", { count: activatedMembers }) : t("warRoom.status.noActiveSeason")} accent="white" />
         </div>
       </section>
 
-      <PriceChart series={priceSeries} price={price} move={priceMove} volume={turnover} locale={locale} title={t("warRoom.dashboard.chartTitle")} subtitle={t("warRoom.dashboard.chartSubtitle")} />
+      <PriceChart title={t("warRoom.dashboard.chartTitle")} subtitle={t("warRoom.dashboard.chartUnavailable")} />
+
+      {!hasLiveSeason && (
+        <section className="financial-panel rounded-[16px] border-[#d7b46a]/20 bg-[#d7b46a]/[0.055] p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-[#d7b46a]/25 bg-[#d7b46a]/10">
+              <Database className="h-5 w-5 text-[#d7b46a]" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white">{t("warRoom.status.noActiveSeasonTitle")}</div>
+              <p className="mt-1 text-[11px] leading-5 text-white/55">{error || t("warRoom.status.noActiveSeasonDetail")}</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="financial-panel rounded-[16px] border-[#d7b46a]/20 bg-[#d7b46a]/[0.055] p-4">
         <div className="flex items-start gap-3">
@@ -138,12 +122,11 @@ export default function WarRoom() {
 
       <section className="financial-panel rounded-[16px] p-4">
         <div className="grid grid-cols-7 gap-1.5">
-          {periodMoves.map(([period, move]) => (
+          {marketPeriods.map((period) => (
             <div key={period} className="rounded-[10px] border border-white/10 bg-black/25 px-1.5 py-2 text-center">
               <div className="font-mono text-[10px] text-white/45">{period}</div>
-              <div className={`mt-1 flex items-center justify-center gap-0.5 font-mono text-[10px] font-semibold ${move >= 0 ? "text-[#8fd9ad]" : "text-[#ff8f8f]"}`}>
-                {move >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                {Math.abs(move).toFixed(2)}%
+              <div className="mt-1 flex items-center justify-center gap-0.5 font-mono text-[10px] font-semibold text-white/38">
+                --
               </div>
             </div>
           ))}
@@ -153,14 +136,14 @@ export default function WarRoom() {
       <section className="grid grid-cols-2 gap-3">
         <Panel title={t("warRoom.dashboard.flow")} icon={Gauge}>
           <div className="space-y-3">
-            <Pressure label={t("warRoom.dashboard.buy")} value={buyPressure} tone="buy" />
-            <Pressure label={t("warRoom.dashboard.sell")} value={sellPressure} tone="sell" />
+            <Pressure label={t("warRoom.dashboard.buy")} value={null} tone="buy" />
+            <Pressure label={t("warRoom.dashboard.sell")} value={null} tone="sell" />
           </div>
         </Panel>
         <Panel title={t("warRoom.dashboard.positions")} icon={WalletCards}>
           <div className="space-y-2 font-mono">
-            <KpiLine label={t("warRoom.dashboard.totalHold")} value={`${formatNumber(locked72h, locale, { maximumFractionDigits: 0 })} 72H`} />
-            <KpiLine label={t("warRoom.dashboard.teamHold")} value={`${formatNumber(teamLocked72h, locale, { maximumFractionDigits: 0 })} 72H`} />
+            <KpiLine label={t("warRoom.dashboard.totalHold")} value={hasLiveSeason && squads ? `${formatNumber(locked72h, locale, { maximumFractionDigits: 0 })} 72H` : "--"} />
+            <KpiLine label={t("warRoom.dashboard.teamHold")} value={hasLiveSeason && topSquad ? `${formatNumber(teamLocked72h, locale, { maximumFractionDigits: 0 })} 72H` : "--"} />
             <KpiLine label={t("warRoom.dashboard.topSquad")} value={topSquad?.name || "--"} />
           </div>
         </Panel>
@@ -207,21 +190,7 @@ export default function WarRoom() {
   );
 }
 
-function PriceChart({ series, price, move, volume, locale, title, subtitle }: { series: number[]; price: number; move: number; volume: number; locale: string; title: string; subtitle: string }) {
-  const width = 320;
-  const height = 150;
-  const min = Math.min(...series) * 0.992;
-  const max = Math.max(...series) * 1.008;
-  const points = series.map((value, index) => {
-    const x = (index / (series.length - 1)) * width;
-    const y = height - ((value - min) / (max - min || 1)) * height;
-    return { x, y, value };
-  });
-  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
-  const areaPath = `${linePath} L ${width} ${height} L 0 ${height} Z`;
-  const lastPoint = points[points.length - 1];
-  const positive = move >= 0;
-
+function PriceChart({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <section className="financial-panel overflow-hidden rounded-[16px] p-3.5">
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -229,48 +198,28 @@ function PriceChart({ series, price, move, volume, locale, title, subtitle }: { 
           <h3 className="flex items-center gap-2 ui-label"><BarChart3 className="h-4 w-4 text-[#d7b46a]" />{title}</h3>
         </div>
         <div className="text-right">
-          <motion.div key={price.toFixed(4)} initial={{ opacity: 0.55, y: -3 }} animate={{ opacity: 1, y: 0 }} className="font-mono text-2xl font-semibold text-[#d7b46a]">
-            ${formatNumber(price, locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+          <motion.div initial={{ opacity: 0.55, y: -3 }} animate={{ opacity: 1, y: 0 }} className="font-mono text-2xl font-semibold text-[#d7b46a]">
+            --
           </motion.div>
-          <div className={`mt-0.5 flex items-center justify-end gap-1 font-mono text-[10px] font-semibold ${positive ? "text-[#8fd9ad]" : "text-[#ff8f8f]"}`}>
-            {positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {positive ? "+" : ""}{move.toFixed(2)}%
-          </div>
         </div>
       </div>
 
       <div className="relative h-[188px] rounded-[14px] border border-white/10 bg-black/30 p-3">
-        <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/10 bg-black/35 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-white/38">
+        <div className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/35 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-white/38">
           {subtitle}
         </div>
         <div className="absolute inset-3 grid grid-rows-4">
           {Array.from({ length: 4 }).map((_, index) => <div key={index} className="border-t border-white/[0.055]" />)}
         </div>
-        <svg viewBox={`0 0 ${width} ${height}`} className="relative h-full w-full overflow-visible" preserveAspectRatio="none" role="img" aria-label={title}>
-          <defs>
-            <linearGradient id="war-room-chart-area" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor={positive ? "#8fd9ad" : "#ff8f8f"} stopOpacity="0.32" />
-              <stop offset="100%" stopColor={positive ? "#8fd9ad" : "#ff8f8f"} stopOpacity="0.02" />
-            </linearGradient>
-            <filter id="war-room-chart-glow">
-              <feGaussianBlur stdDeviation="2.2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <motion.path key={`area-${series[series.length - 1].toFixed(4)}`} d={areaPath} fill="url(#war-room-chart-area)" initial={{ opacity: 0.45 }} animate={{ opacity: 1 }} />
-          <motion.path key={`line-${series[series.length - 1].toFixed(4)}`} d={linePath} fill="none" stroke={positive ? "#8fd9ad" : "#ff8f8f"} strokeWidth="2.6" vectorEffect="non-scaling-stroke" filter="url(#war-room-chart-glow)" initial={{ pathLength: 0.82, opacity: 0.7 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 0.5 }} />
-          <motion.circle cx={lastPoint.x} cy={lastPoint.y} r="4.5" fill={positive ? "#8fd9ad" : "#ff8f8f"} animate={{ r: [4.2, 6.2, 4.2] }} transition={{ duration: 1.2, repeat: Infinity }} />
-          <motion.circle cx={lastPoint.x} cy={lastPoint.y} r="8" fill="none" stroke={positive ? "#8fd9ad" : "#ff8f8f"} opacity="0.28" animate={{ r: [7, 14, 7], opacity: [0.36, 0.08, 0.36] }} transition={{ duration: 1.2, repeat: Infinity }} />
-        </svg>
+        <div className="relative flex h-full items-center justify-center rounded-[12px] border border-dashed border-white/10 bg-black/15 px-6 text-center text-[11px] leading-5 text-white/45">
+          {subtitle}
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <TickerStat label="24H VOL" value={`$${formatNumber(volume, locale, { maximumFractionDigits: 0 })}`} />
-        <TickerStat label="HIGH" value={`$${formatNumber(max, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`} />
-        <TickerStat label="LOW" value={`$${formatNumber(min, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`} />
+        <TickerStat label="24H VOL" value="--" />
+        <TickerStat label="HIGH" value="--" />
+        <TickerStat label="LOW" value="--" />
       </div>
     </section>
   );
@@ -317,16 +266,17 @@ function Panel({ title, icon: Icon, children }: { title: string; icon: LucideIco
   );
 }
 
-function Pressure({ label, value, tone }: { label: string; value: number; tone: "buy" | "sell" }) {
+function Pressure({ label, value, tone }: { label: string; value: number | null; tone: "buy" | "sell" }) {
   const color = tone === "buy" ? "from-[#2f5f46] to-[#8fd9ad]" : "from-[#6a3030] to-[#ff8f8f]";
+  const width = value == null ? 0 : value;
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-widest text-white/42">
         <span>{label}</span>
-        <span className="font-mono">{value}%</span>
+        <span className="font-mono">{value == null ? "--" : `${value}%`}</span>
       </div>
       <div className="h-3 overflow-hidden rounded-full bg-black/45">
-        <motion.div className={`h-full rounded-full bg-gradient-to-r ${color}`} animate={{ width: `${value}%` }} transition={{ duration: 0.55 }} />
+        <motion.div className={`h-full rounded-full bg-gradient-to-r ${color}`} animate={{ width: `${width}%` }} transition={{ duration: 0.55 }} />
       </div>
     </div>
   );

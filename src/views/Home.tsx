@@ -22,7 +22,7 @@ import WalletBindingFlow from "./home/WalletBindingFlow";
 import type { PendingDepositReceipt } from "./home/types";
 
 interface HomeProps {
-  tokenPrice: number;
+  tokenPrice: number | null;
   myDeposit: number;
   setMyDeposit: Dispatch<SetStateAction<number>>;
   targetValue: number;
@@ -65,9 +65,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const walletAuthInFlightRef = useRef(false);
 
   const availableBalance = 2450000 - myDeposit;
-  const currentFiatValue = myDeposit * tokenPrice;
-  const progressPercent = Math.min((currentFiatValue / targetValue) * 100, 100);
-  const needed72H = Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
+  const hasConfirmedPrice = typeof tokenPrice === "number" && Number.isFinite(tokenPrice) && tokenPrice > 0;
+  const currentFiatValue = hasConfirmedPrice ? myDeposit * tokenPrice : null;
+  const progressPercent = currentFiatValue == null ? 0 : Math.min((currentFiatValue / targetValue) * 100, 100);
+  const needed72H = currentFiatValue == null ? null : Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
   const goalMilestones = [25, 50, 75, 100];
   const backendUnavailable = !!bootstrapError && !bootstrap;
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
@@ -690,23 +691,23 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             <div className="metric-card rounded-[12px] px-4 py-3">
               <div className="ui-label">{t("home.need.label")}</div>
               <motion.div
-                key={needed72H}
+                key={needed72H ?? "unavailable"}
                 initial={{ opacity: 0.8, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mt-2 flex items-baseline gap-2 font-mono text-[1.8rem] font-semibold leading-none tracking-tight text-white"
               >
-                <span className="tabular-nums">{formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}</span>
-                <span className="text-xs font-bold tracking-widest text-[#d7b46a]">72H</span>
+                <span className="tabular-nums">{needed72H == null ? "--" : formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}</span>
+                <span className="text-xs font-bold tracking-widest text-[#d7b46a]">{needed72H == null ? "" : "72H"}</span>
               </motion.div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.08em] text-white/[0.36]">
                 {t("home.need.basedOn")}
                 <motion.span
-                  key={tokenPrice}
+                  key={tokenPrice ?? "unavailable"}
                   initial={{ color: "#ffffff" }}
                   animate={{ color: "#d7b46a" }}
                   className="ml-1 font-mono font-bold text-[#d7b46a] tabular-nums"
                 >
-                  ${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                  {tokenPrice == null ? t("app.price.unavailable") : `$${formatNumber(tokenPrice, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
                 </motion.span>
               </div>
             </div>
@@ -715,7 +716,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               <div className="metric-card rounded-[12px] px-3 py-3">
                 <div className="ui-label text-[9px]">{t("common.display")}</div>
                 <div className="mt-1 truncate font-mono text-sm font-semibold text-white/85 tabular-nums">
-                  ${formatNumber(currentFiatValue, locale, { maximumFractionDigits: 0 })}
+                  {currentFiatValue == null ? "--" : `$${formatNumber(currentFiatValue, locale, { maximumFractionDigits: 0 })}`}
                 </div>
               </div>
               <div className="metric-card rounded-[12px] px-3 py-3">
