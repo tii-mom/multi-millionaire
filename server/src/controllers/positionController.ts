@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getLatestConfirmedPrice } from '../models/priceModel';
 import { getCurrentWave, getWaveById } from '../models/waveModel';
 import { withTransaction } from '../db';
+import { getUserWavePositionTotal } from '../models/positionModel';
 import { applyDeposit } from '../services/depositApplyService';
 import { isControlEnabled, productionChainRequired } from '../services/productionGuards';
 import { currentRuntimePath, stagingMvpEnabled } from '../services/runtimeModes';
@@ -45,6 +46,27 @@ export async function depositPrecheck(req: Request, res: Response, next: NextFun
         notes: productionChainRequired()
           ? ['Production deposits require wallet binding and a verified chain receipt.']
           : ['Current deposit endpoint records a staging-mvp off-chain deposit stub.'],
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function myWavePositionTotal(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ request_id: req.id || '', error: { code: 'UNAUTHENTICATED', message: 'Missing user' } });
+    }
+    const waveId = Number(req.params.waveId);
+    const total = await getUserWavePositionTotal(user.id, waveId);
+    return res.json({
+      request_id: req.id || '',
+      data: {
+        user_id: user.id,
+        wave_id: waveId,
+        ...total,
       },
     });
   } catch (err) {

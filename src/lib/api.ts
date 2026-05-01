@@ -22,6 +22,7 @@ import type {
   MerkleRewardProofWithBatch,
   MySquadView,
   Position,
+  UserWavePositionTotal,
   RewardEstimate,
   RewardLedger,
   RewardSummary,
@@ -174,6 +175,10 @@ export const api = {
       token,
       body: { amount },
     });
+  },
+
+  myWavePositionTotal(waveId: number, token: string) {
+    return requestJson<UserWavePositionTotal>(`/v1/waves/${waveId}/positions/me`, { token });
   },
 
   createWalletBindIntent(walletAddress: string, token: string) {

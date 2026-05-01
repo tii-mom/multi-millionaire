@@ -21,11 +21,13 @@ export interface Wave {
 }
 
 export async function getCurrentWave(): Promise<Wave | null> {
-  // Fetch the currently live wave. If none is live, return the first upcoming one.
+  // Fetch the currently active live wave. If none is active, return the first upcoming one.
   const liveResult = await query<Wave>(
     `SELECT *
      FROM waves
      WHERE status = 'live'
+       AND start_time <= NOW()
+       AND end_time > NOW()
      ORDER BY start_time ASC
      LIMIT 1`
   );

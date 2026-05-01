@@ -27,7 +27,21 @@ function isAllowedOrigin(origin: string | undefined) {
   if (allowedOrigins.size === 0) {
     return fallbackOrigins.has(origin);
   }
-  return allowedOrigins.has(origin);
+  if (allowedOrigins.has(origin)) return true;
+  // Allow Cloudflare Pages preview subdomains (hash.${project}.pages.dev) only.
+  try {
+    const { hostname } = new URL(origin);
+    return [...allowedOrigins].some((allowed) => {
+      try {
+        const allowedHost = new URL(allowed).hostname;
+        return allowedHost.endsWith('.pages.dev') && hostname.endsWith('.' + allowedHost);
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
 }
 
 app.disable('x-powered-by');

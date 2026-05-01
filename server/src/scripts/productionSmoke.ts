@@ -139,16 +139,24 @@ async function runStep<T>(name: string, fn: () => Promise<T>): Promise<T> {
 async function main() {
   const config = loadConfig();
   let failed = false;
+  const runRequiredStep = async <T>(name: string, fn: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await runStep(name, fn);
+    } catch {
+      failed = true;
+      return null;
+    }
+  };
 
   try {
-    await runStep('health', async () => {
+    await runRequiredStep('health', async () => {
       const response = await requestJson(config, '/health');
       const body = objectValue(response.body, 'health response');
       assert(body.status === 'ok', `Expected health status ok; got ${String(body.status)}`);
       return { status_code: response.status, status: body.status, service: body.service };
     });
 
-    await runStep('readiness', async () => {
+    await runRequiredStep('readiness', async () => {
       const response = await requestJson(config, '/ready');
       const body = objectValue(response.body, 'readiness response');
       assert(body.status === 'ready', `Expected readiness status ready; got ${String(body.status)}`);
@@ -156,7 +164,7 @@ async function main() {
       return { status_code: response.status, status: body.status, database: body.database };
     });
 
-    await runStep('app bootstrap', async () => {
+    await runRequiredStep('app bootstrap', async () => {
       const response = await requestJson(config, '/v1/app/bootstrap');
       const body = objectValue(response.body, 'bootstrap response');
       assert('data' in body, 'Expected bootstrap response to include data');
@@ -165,6 +173,10 @@ async function main() {
       const contracts = objectValue(data.contracts, 'bootstrap response.data.contracts');
       const ops = objectValue(data.ops, 'bootstrap response.data.ops');
       const receiptVerifier = objectValue(ops.receipt_verifier, 'bootstrap response.data.ops.receipt_verifier');
+      assert(
+        'merkle_claim_verifier' in ops,
+        'Production API deployment drift: bootstrap response.data.ops.merkle_claim_verifier is missing'
+      );
       const merkleClaimVerifier = objectValue(ops.merkle_claim_verifier, 'bootstrap response.data.ops.merkle_claim_verifier');
       const chainId = String(contracts.chain_id || '');
       const chainWritesEnabled = featureFlags.chain_mainline_writes_enabled === true;
@@ -195,22 +207,25 @@ async function main() {
       };
     });
 
-    await runStep('current wave', async () => {
+    await runRequiredStep('current wave', async () => {
       const response = await requestJson(config, '/v1/waves/current');
       const data = objectValue(objectValue(response.body, 'current wave response').data, 'current wave response.data');
       assert(typeof data.wave_id === 'number' || typeof data.wave_id === 'string', 'Expected current wave data.wave_id');
-      return { status_code: response.status, wave_id: data.wave_id, status: data.status };
+      if (data.status === 'live') {
+        const endTime = Date.parse(String(data.end_time || ''));
+        assert(Number.isFinite(endTime), 'Live current wave must include a valid end_time');
+        assert(endTime > Date.now(), `Live current wave is expired; end_time=${String(data.end_time)}`);
+      }
+      return { status_code: response.status, wave_id: data.wave_id, status: data.status, end_time: data.end_time };
     });
 
-    await runStep('season war current', async () => {
+    await runRequiredStep('season war current', async () => {
       const response = await requestJson(config, '/v1/season-war/current');
       const data = objectValue(objectValue(response.body, 'season war current response').data, 'season war current response.data');
       assert(typeof data.seasonId === 'string' && data.seasonId.length > 0, 'Expected season war current data.seasonId');
       assert(typeof data.waveId === 'string' && data.waveId.length > 0, 'Expected season war current data.waveId');
       return { status_code: response.status, season_id: data.seasonId, wave_id: data.waveId, status: data.status };
     });
-  } catch {
-    failed = true;
   } finally {
     const finishedAt = new Date();
     const report = {

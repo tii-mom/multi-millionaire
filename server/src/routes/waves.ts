@@ -1,7 +1,7 @@
 import express from 'express';
 import { getCurrent, getById, getLeaderboardMe, getRewardEstimate } from '../controllers/waveController';
 import { claimPass } from '../controllers/passController';
-import { depositPrecheck, deposit } from '../controllers/positionController';
+import { depositPrecheck, deposit, myWavePositionTotal } from '../controllers/positionController';
 import { depositReceipt, deriveJettonWallet } from '../controllers/chainController';
 import { requireAuth } from '../middlewares/auth';
 import squadsRouter from './squads';
@@ -22,6 +22,9 @@ router.get('/:waveId/leaderboard/me', requireAuth, requirePositiveIntParam('wave
 
 // GET /v1/waves/:waveId/reward-estimate
 router.get('/:waveId/reward-estimate', requireAuth, requirePositiveIntParam('waveId'), getRewardEstimate);
+
+// GET /v1/waves/:waveId/positions/me
+router.get('/:waveId/positions/me', requireAuth, requirePositiveIntParam('waveId'), myWavePositionTotal);
 
 // GET /v1/waves/:waveId
 router.get('/:waveId', requirePositiveIntParam('waveId'), getById);

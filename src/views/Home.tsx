@@ -70,7 +70,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const needed72H = Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
   const goalMilestones = [25, 50, 75, 100];
   const backendUnavailable = !!bootstrapError && !bootstrap;
-  const chainMainlineEnabled = bootstrap?.ops?.runtime_path === "production-chain" || !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
+  const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
   const depositsPaused = !!bootstrap?.controls?.pause_deposits?.enabled;
   const maintenanceBanner = bootstrap?.controls?.maintenance_banner;
   const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;

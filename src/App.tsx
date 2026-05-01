@@ -13,6 +13,8 @@ import { Toaster } from "@/src/components/ui/sonner";
 import { LanguageProvider, formatNumber, useI18n } from "@/src/lib/i18n";
 import { api } from "@/src/lib/api";
 import type { BootstrapData } from "@/src/lib/types";
+import { readBackendAuthToken } from "@/src/lib/tonSession";
+import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
 
 const BRAND_LOGO_SRC = "/logo-mark-transparent.png";
 const TAB_ORDER = ["home", "team", "live", "rewards", "share"];
@@ -148,10 +150,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState(() => tabFromPathname(window.location.pathname));
   const [direction, setDirection] = useState(0);
   const [tokenPrice] = useState(1.42);
-  const [myDeposit, setMyDeposit] = useState(() => {
-    const saved = localStorage.getItem("72h_deposit");
-    return saved ? Number(saved) : 0;
-  });
+  const [myDeposit, setMyDeposit] = useState(0);
   const [squadGoal, setSquadGoal] = useState(() => {
     const saved = localStorage.getItem("72h_goal");
     return saved ? Number(saved) : 5000000;
@@ -167,7 +166,6 @@ function MainApp() {
         ? t("app.env.unavailable")
         : t("app.env.loading");
 
-  useEffect(() => localStorage.setItem("72h_deposit", myDeposit.toString()), [myDeposit]);
   useEffect(() => localStorage.setItem("72h_goal", squadGoal.toString()), [squadGoal]);
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +186,28 @@ function MainApp() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    const waveId = bootstrap?.current_wave?.wave_id;
+    const token = readBackendAuthToken();
+    if (!waveId || !token) return;
+
+    let cancelled = false;
+    api.myWavePositionTotal(waveId, token)
+      .then((total) => {
+        if (cancelled) return;
+        const decimals = Number(bootstrap?.contracts?.token_decimals || 9);
+        const displayAmount = total.total_locked_raw === "0"
+          ? 0
+          : rawTokenAmountToDisplayNumber(total.total_locked_raw, decimals);
+        setMyDeposit(displayAmount);
+      })
+      .catch(() => {
+        if (!cancelled) setMyDeposit(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrap?.contracts?.token_decimals, bootstrap?.current_wave?.wave_id]);
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [activeTab]);

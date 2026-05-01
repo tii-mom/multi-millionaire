@@ -204,6 +204,13 @@ export interface Position {
   is_first_qualifying_for_user: boolean;
 }
 
+export interface UserWavePositionTotal {
+  user_id: string;
+  wave_id: number;
+  total_locked_raw: string;
+  position_count: number;
+}
+
 export type WalletBindingStatus = 'pending' | 'verified' | 'revoked';
 export type WalletBindIntentStatus = 'pending' | 'verified' | 'expired' | 'cancelled';
 
