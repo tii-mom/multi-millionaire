@@ -7,6 +7,7 @@ type DepositFlowProps = {
   backendUnavailable: boolean;
   chainActionDisabled: boolean;
   chainMainlineEnabled: boolean;
+  depositRuntimeEnabled: boolean;
   inputValue: string;
   isConfirming: boolean;
   myDeposit: number;
@@ -21,6 +22,7 @@ export default function DepositFlow({
   backendUnavailable,
   chainActionDisabled,
   chainMainlineEnabled,
+  depositRuntimeEnabled,
   inputValue,
   isConfirming,
   myDeposit,
@@ -73,7 +75,7 @@ export default function DepositFlow({
             value={inputValue}
             onChange={(e) => onInputChange(e.target.value)}
             placeholder="0"
-            disabled={isConfirming || backendUnavailable}
+            disabled={isConfirming || backendUnavailable || !depositRuntimeEnabled}
             className="w-full rounded-[12px] border border-white/[0.08] bg-[#030405]/[0.72] py-6 pl-5 pr-[120px] font-mono text-[2rem] tabular-nums shadow-[inset_0_2px_10px_rgba(0,0,0,0.55)] outline-none ring-[#d7b46a]/5 transition-colors placeholder:text-white/[0.08] hover:bg-[#030405]/[0.88] focus:border-[#d7b46a]/[0.44] focus:bg-black/75 focus:ring-2 disabled:opacity-50"
           />
 
@@ -99,7 +101,7 @@ export default function DepositFlow({
         <button
           type="button"
           onClick={onDeposit}
-          disabled={isConfirming || backendUnavailable || !inputValue || Number(inputValue) <= 0 || (chainMainlineEnabled && chainActionDisabled)}
+          disabled={isConfirming || backendUnavailable || !depositRuntimeEnabled || !inputValue || Number(inputValue) <= 0 || (chainMainlineEnabled && chainActionDisabled)}
             className="depth-button focus-ring group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-[12px] bg-[#d7b46a] py-4 font-semibold tracking-wide text-black shadow-[0_16px_32px_rgba(0,0,0,0.26)] hover:bg-[#e1c07b] disabled:cursor-not-allowed disabled:opacity-70"
         >
           <div className="absolute inset-0 h-full w-full -translate-x-[150%] skew-x-[30deg] bg-gradient-to-r from-transparent via-white/24 to-transparent group-hover:animate-[shine_1s_ease-out]" />
@@ -110,7 +112,7 @@ export default function DepositFlow({
             </>
           ) : (
             <>
-              <span>{backendUnavailable ? t("home.deposit.backendUnavailable") : chainMainlineEnabled ? t("home.deposit.sendChainTx") : t("home.deposit.recordStaging")}</span>
+              <span>{backendUnavailable ? t("home.deposit.backendUnavailable") : !depositRuntimeEnabled ? t("home.deposit.readOnlyCta") : chainMainlineEnabled ? t("home.deposit.sendChainTx") : t("home.deposit.recordStaging")}</span>
               <ArrowRight className="h-5 w-5" />
             </>
           )}
@@ -119,13 +121,13 @@ export default function DepositFlow({
         <div className="mt-1 flex w-full items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-white/[0.32]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-            {chainMainlineEnabled ? t("home.deposit.chainReceiptRequired") : t("home.deposit.offChainRecord")}
+            {chainMainlineEnabled ? t("home.deposit.chainReceiptRequired") : depositRuntimeEnabled ? t("home.deposit.offChainRecord") : t("home.deposit.readOnly")}
           </p>
           <div className="flex items-center gap-1.5 text-white/45">
             <div className="h-2 w-0.5 animate-[pulse_1s_ease-in-out_infinite] rounded-full bg-white/36" />
             <div className="h-3 w-0.5 animate-[pulse_1.5s_ease-in-out_infinite_0.2s] rounded-full bg-white/36" />
             <div className="h-1.5 w-0.5 animate-[pulse_0.8s_ease-in-out_infinite_0.4s] rounded-full bg-white/36" />
-            <span className="ml-1 text-[8px] uppercase tracking-widest">{chainMainlineEnabled ? t("home.deposit.receiptMode") : t("home.deposit.stagingMode")}</span>
+            <span className="ml-1 text-[8px] uppercase tracking-widest">{chainMainlineEnabled ? t("home.deposit.receiptMode") : depositRuntimeEnabled ? t("home.deposit.stagingMode") : t("home.deposit.readOnlyMode")}</span>
           </div>
         </div>
       </div>

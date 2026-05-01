@@ -71,6 +71,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const goalMilestones = [25, 50, 75, 100];
   const backendUnavailable = !!bootstrapError && !bootstrap;
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
+  const stagingMvpEnabled = !!bootstrap?.feature_flags?.staging_mvp_enabled;
+  const depositRuntimeEnabled = chainMainlineEnabled || stagingMvpEnabled;
   const depositsPaused = !!bootstrap?.controls?.pause_deposits?.enabled;
   const maintenanceBanner = bootstrap?.controls?.maintenance_banner;
   const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;
@@ -90,7 +92,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       ? t("home.banner.maintenanceTitle")
       : depositsPaused
         ? t("home.banner.depositsPausedTitle")
-        : !chainMainlineEnabled
+        : !depositRuntimeEnabled
+          ? t("home.banner.readOnlyTitle")
+        : stagingMvpEnabled
           ? t("home.banner.stagingTitle")
           : "";
   const statusBannerMessage = backendUnavailable
@@ -99,7 +103,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       ? maintenanceBanner.reason || t("home.banner.maintenance")
       : depositsPaused
         ? bootstrap?.controls?.pause_deposits?.reason || t("home.banner.depositsPaused")
-        : !chainMainlineEnabled
+        : !depositRuntimeEnabled
+          ? t("home.banner.readOnly")
+        : stagingMvpEnabled
           ? t("home.banner.staging")
           : "";
   const statusBannerTechnicalDetail = backendUnavailable ? localizedBootstrapError : "";
@@ -298,6 +304,11 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     }
     if (bootstrap?.controls?.pause_deposits?.enabled) {
       toast.error(bootstrap.controls.pause_deposits.reason || t("home.banner.depositsPaused"));
+      return;
+    }
+    if (!depositRuntimeEnabled) {
+      setApiError(t("home.deposit.readOnly"));
+      toast.error(t("home.deposit.readOnly"));
       return;
     }
     const val = Number(inputValue);
@@ -773,6 +784,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         backendUnavailable={backendUnavailable}
         chainActionDisabled={chainActionDisabled}
         chainMainlineEnabled={chainMainlineEnabled}
+        depositRuntimeEnabled={depositRuntimeEnabled}
         inputValue={inputValue}
         isConfirming={isConfirming}
         myDeposit={myDeposit}
