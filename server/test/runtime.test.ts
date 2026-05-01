@@ -1,5 +1,6 @@
-import { setRuntimeBindings } from '../src/runtime';
+import { getRuntimeEnv, getRuntimeEnvValue, setRuntimeBindings } from '../src/runtime';
 import { currentRuntimePath } from '../src/services/runtimeModes';
+import { loadContractIntegrationConfig } from '../src/services/contracts/config';
 
 describe('Worker runtime bindings', () => {
   const originalEnv = { ...process.env };
@@ -17,6 +18,9 @@ describe('Worker runtime bindings', () => {
     });
 
     expect(process.env.NODE_ENV).toBe('staging');
+    expect(getRuntimeEnvValue('NODE_ENV')).toBe('staging');
+    expect(getRuntimeEnv().NODE_ENV).toBe('staging');
     expect(currentRuntimePath()).toBe('staging-mvp');
+    expect(loadContractIntegrationConfig().mainlineWritesEnabled).toBe(false);
   });
 });

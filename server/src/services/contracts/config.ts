@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { getRuntimeEnv } from '../../runtime';
 
 export type ContractRole = 'token' | 'lock_vault' | 'merkle_claim' | 'oracle' | 'reward_distributor';
 
@@ -176,7 +177,7 @@ function buildResolvedPath(pathValue: string): string {
   return path.isAbsolute(pathValue) ? pathValue : path.resolve(process.cwd(), pathValue);
 }
 
-export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = process.env): ContractIntegrationConfig {
+export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = getRuntimeEnv()): ContractIntegrationConfig {
   const enabled = readBoolean(env.CHAIN_INTEGRATION_ENABLED, false);
   const readOnlyEnabled = readBoolean(env.CHAIN_READ_ONLY_ENABLED, enabled);
   const indexerEnabled = readBoolean(env.CHAIN_INDEXER_ENABLED, false);

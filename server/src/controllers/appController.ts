@@ -7,6 +7,7 @@ import { getReceiptVerifierDiagnostics } from '../services/receiptVerifier';
 import { getMerkleClaimVerifierDiagnostics } from '../services/merkleRewards';
 import { currentRuntimePath } from '../services/runtimeModes';
 import { readPublicV2Tokenomics } from '../services/contracts/v2Tokenomics';
+import { getRuntimeEnv } from '../runtime';
 
 /**
  * Handles GET /v1/app/bootstrap
@@ -21,29 +22,30 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
     const wave = await getCurrentWave();
     const price = await getLatestConfirmedPrice();
     const controls = await listAppControls().catch(() => []);
+    const env = getRuntimeEnv();
     const contractConfig = loadContractIntegrationConfig();
-    const productionMainnetConfigRequired = ['production', 'prod'].includes((process.env.NODE_ENV || '').trim().toLowerCase())
+    const productionMainnetConfigRequired = ['production', 'prod'].includes((env.NODE_ENV || '').trim().toLowerCase())
       || contractConfig.mainlineWritesEnabled
-      || (process.env.CHAIN_ID || '').trim().toLowerCase() === 'ton-mainnet';
+      || (env.CHAIN_ID || '').trim().toLowerCase() === 'ton-mainnet';
     const readBootstrapAddress = (primaryName: string, testnetName: string) => {
-      const primary = process.env[primaryName]?.trim();
+      const primary = env[primaryName]?.trim();
       if (primary) return primary;
-      if (productionMainnetConfigRequired && process.env[testnetName]?.trim()) return '';
-      return process.env[testnetName]?.trim() || '';
+      if (productionMainnetConfigRequired && env[testnetName]?.trim()) return '';
+      return env[testnetName]?.trim() || '';
     };
     // TODO: Resolve actual user from auth token. Here we provide a minimal stub.
     const me = null;
     const v2Tokenomics = readPublicV2Tokenomics();
-    const tokenAddress = process.env.TOKEN_ADDRESS || v2Tokenomics.token_address;
+    const tokenAddress = env.TOKEN_ADDRESS || v2Tokenomics.token_address;
     const contracts = {
-      chain_id: process.env.CHAIN_ID || 'ton-mainnet',
+      chain_id: env.CHAIN_ID || 'ton-mainnet',
       token: tokenAddress,
       token_address: tokenAddress,
       token_address_mainnet: v2Tokenomics.token_address,
-      token_decimals: process.env.TOKEN_DECIMALS || '9',
-      vault: process.env.LOCK_VAULT_ADDRESS || (productionMainnetConfigRequired ? '' : process.env.VAULT_ADDRESS) || '',
-      oracle: process.env.ORACLE_ADDRESS || '',
-      reward_distributor: process.env.REWARD_DISTRIBUTOR_ADDRESS || '',
+      token_decimals: env.TOKEN_DECIMALS || '9',
+      vault: env.LOCK_VAULT_ADDRESS || (productionMainnetConfigRequired ? '' : env.VAULT_ADDRESS) || '',
+      oracle: env.ORACLE_ADDRESS || '',
+      reward_distributor: env.REWARD_DISTRIBUTOR_ADDRESS || '',
       merkle_claim: readBootstrapAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET'),
       merkle_claim_role: 'legacy_reward_claim_path',
       season_vault: v2Tokenomics.season_vault_address,
@@ -64,7 +66,7 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
         feature_flags: {
           permit_supported: false,
           poster_enabled: false,
-          wallet_binding_enabled: process.env.WALLET_BINDING_ENABLED === 'true',
+          wallet_binding_enabled: env.WALLET_BINDING_ENABLED === 'true',
           receipt_verification_enabled: contractConfig.receipt.enabled,
           chain_mainline_writes_enabled: contractConfig.mainlineWritesEnabled,
           staging_mvp_enabled: currentRuntimePath() === 'staging-mvp',
