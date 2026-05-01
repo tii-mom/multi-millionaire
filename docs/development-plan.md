@@ -2,8 +2,8 @@
 
 ## 1. 当前链上前提
 
-- 已确认 TON mainnet 72H V2 Jetton Master：`EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`。
-- 已确认 SeasonClaim 主网地址：`EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`。
+- 已确认 TON mainnet 72H V3 Jetton Master：`EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`。
+- 已确认 SeasonClaimV2 主网地址：`EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`。
 - 前端和后端集成优先按 TON Jetton + TonConnect 方向规划。
 
 ## 2. 需要新增的业务合约
@@ -64,8 +64,8 @@ MVP 可先由后端记录奖励、管理员人工审核和批量发放；自动�
 ### Phase 0：链上事实确认
 
 - 确认链：TON mainnet 还是 testnet。
-- 确认 `72H` V2 Jetton Master：`EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`。
-- 确认 Season War 使用 SeasonClaim：`EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`。
+- 确认 `72H` V3 Jetton Master：`EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`。
+- 确认 Season War 使用 SeasonClaimV2：`EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`。
 - 提供 `72HLockVault` 合约地址或合约设计。
 - 确认锁仓合约如何接收 Jetton transfer payload。
 - 确认管理员价格上传走链上还是后端。

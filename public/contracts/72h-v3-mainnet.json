@@ -1,0 +1,64 @@
+{
+  "name": "72H",
+  "symbol": "72H",
+  "network": "ton-mainnet",
+  "standard": "jetton",
+  "version": "v3",
+  "status": "current",
+  "decimals": 9,
+  "totalSupplyRaw": "100000000000000000000",
+  "totalSupply": "100,000,000,000 72H",
+  "mintable": false,
+  "jettonAdmin": null,
+  "jettonMaster": "EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3",
+  "metadataUri": "ipfs://QmSzB37bf7BWRLhssq3RxaEdHQgLWb1RqdwGDkaGidFSmC",
+  "logoUri": "ipfs://QmNzFgWkVCxuJJBym1hoDq5tG4PwFBT8mUMMXdPefb23S4",
+  "contracts": {
+    "seasonVault": "EQCkI1atYYWN-2cnJJASJ1nKsu0ZbvCd_EVZQ61KcoIW-13l",
+    "seasonClaimV2": "EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b",
+    "fundVesting": "EQBKuIRplvhYzL9Gbm6GpZqCxMTHApVOZMVs9T1HzXcP7inb",
+    "developmentFund": "EQBbRZQj_VJU2r-DAtQcHoDngRC9EBvUHFg4LoB5HXLBv1Yh",
+    "presaleVault": "EQDHSwsiQtB3sdoAaOdJi4kCu32GIHM4BtXd-_EtpE96EYXy",
+    "ecosystemTreasury": "EQCy7YpjZJuQAwjCQvQK55dv4p89c5pJUR9vi8nAwoW4a_w7",
+    "teamVesting": "EQC3pNoWZHNmbcazxJV7lzcQH05Zewjl5w1KJhA4OfIPM6cy"
+  },
+  "jettonWallets": {
+    "seasonVault": {
+      "address": "EQClq_b3CeBTPUtjsQWgaIg4dfrjIP2GyTPcYkIMf352BSbt",
+      "balanceRaw": "90000000000000000000"
+    },
+    "seasonClaimV2": {
+      "address": "EQC3AK8tmvIezR6gd_cdmg4qmrFJOloUhpoWE8HpsSKhjPxY",
+      "balanceRaw": "0"
+    },
+    "fundVesting": {
+      "address": "EQBHI_ujpZQVNDj8CVaKMQ6QR2tMVugXaSL46rxgQT7XxnpW",
+      "balanceRaw": "0"
+    },
+    "developmentFund": {
+      "address": "EQAmfNJcT0-DZlc1pLWURIJrQKR2xRJQaBjadpSB9wVcYx8T",
+      "balanceRaw": "500000000000000000"
+    },
+    "presaleVault": {
+      "address": "EQBeIBmsLzSkfVwcGl4Donf3Hca2nfta__S3x2n1TMO1g9Vx",
+      "balanceRaw": "4500000000000000000"
+    },
+    "ecosystemTreasury": {
+      "address": "EQC6l1XfmSrj50sOWHf5S7xiO_O4_0Xd4v2je2Pr7BLcWnBF",
+      "balanceRaw": "4500000000000000000"
+    },
+    "teamVesting": {
+      "address": "EQABKzYV7XtCAi9RcKGWRL8OAHWEr0lYvNXW_h-W9kJ7sO9X",
+      "balanceRaw": "300000000000000000"
+    },
+    "earlyUsersOperations": {
+      "address": "EQD-9WsEEJFTo9yMw2cLOkbN_tnFQuizMRMZzeWOv2E2Zq01",
+      "balanceRaw": "200000000000000000"
+    }
+  },
+  "replaces": {
+    "version": "v2",
+    "status": "frozen-archive",
+    "jettonMaster": "EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg"
+  }
+}

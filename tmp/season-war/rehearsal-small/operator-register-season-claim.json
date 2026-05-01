@@ -1,6 +1,8 @@
 {
   "rehearsal": true,
   "production_root_publishable": false,
+  "archive_status": "frozen-historical-v2-rehearsal",
+  "current_replacement": "public/contracts/72h-v3-mainnet.json",
   "contract_address": "EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS",
   "message": "RegisterSeasonClaim",
   "params": {

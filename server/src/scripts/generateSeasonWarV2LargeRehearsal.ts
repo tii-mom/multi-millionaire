@@ -9,8 +9,8 @@ import {
   SeasonClaimVersion,
 } from '../services/seasonRewards';
 import {
-  PUBLIC_72H_V2_MAINNET,
-} from '../services/contracts/v2Tokenomics';
+  PUBLIC_72H_V3_MAINNET,
+} from '../services/contracts/v3Tokenomics';
 
 const DEFAULT_LEAF_COUNT = 128;
 const DEFAULT_SEASON_ID = 1;
@@ -83,7 +83,7 @@ async function main() {
   const openAt = parsePositiveInteger(readArg('open-at'), DEFAULT_OPEN_AT, 'open-at');
   const generatedAt = readArg('generated-at') || DEFAULT_GENERATED_AT;
   const chainId = readArg('chain-id') || DEFAULT_CHAIN_ID;
-  const tokenAddress = readArg('token-address') || PUBLIC_72H_V2_MAINNET.token_address;
+  const tokenAddress = readArg('token-address') || PUBLIC_72H_V3_MAINNET.token_address;
   const seasonClaimV2Address = readArg('season-claim-address');
   if (!seasonClaimV2Address) {
     throw new Error('--season-claim-address is required for v2-large rehearsal; wait for the confirmed SeasonClaimV2 address');
@@ -151,7 +151,7 @@ async function main() {
     claim_contract_version: CLAIM_VERSION,
     proof_format: proofFormat,
     claim_contract_address: seasonClaimV2Address,
-    season_claim_address: PUBLIC_72H_V2_MAINNET.season_claim_address,
+    season_claim_address: seasonClaimV2Address,
     season_claim_v2_address: seasonClaimV2Address,
     ...(bridgeAddress ? { season_claim_v2_legacy_bridge_address: bridgeAddress } : {}),
     ...(sourceEvidence ? { source_evidence: sourceEvidence } : {}),
@@ -177,11 +177,11 @@ async function main() {
     ...(sourceEvidenceStatus ? { source_evidence_status: sourceEvidenceStatus } : {}),
     contracts: {
       token_address: tokenAddress,
-      season_claim_address: PUBLIC_72H_V2_MAINNET.season_claim_address,
+      season_claim_address: seasonClaimV2Address,
       season_claim_v2_address: seasonClaimV2Address,
       ...(bridgeAddress ? { season_claim_v2_legacy_bridge_address: bridgeAddress } : {}),
       selected_claim_contract_address: seasonClaimV2Address,
-      season_vault_address: PUBLIC_72H_V2_MAINNET.season_vault_address,
+      season_vault_address: PUBLIC_72H_V3_MAINNET.season_vault_address,
     },
     pool_totals: tree.poolTotals,
     total_amount_raw: tree.totalAmountRaw,

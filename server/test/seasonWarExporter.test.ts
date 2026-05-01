@@ -2,7 +2,6 @@ import { Cell } from '@ton/core';
 import { query } from '../src/db';
 import {
   buildSeasonWarExport,
-  SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS,
 } from '../src/services/seasonWarExporter';
 import {
   calculateSeasonRewardRootFromProof,
@@ -17,6 +16,7 @@ const queryMock = query as jest.MockedFunction<typeof query>;
 
 const tokenAddress = '0:1111111111111111111111111111111111111111111111111111111111111111';
 const seasonClaimAddress = '0:9999999999999999999999999999999999999999999999999999999999999999';
+const currentSeasonClaimV2Address = 'EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b';
 
 function baseRows() {
   const createdAt = new Date('2026-04-28T00:00:00Z');
@@ -179,6 +179,7 @@ describe('Season War exporter', () => {
       chainId: 'ton-mainnet',
       tokenAddress,
       seasonClaimAddress,
+      claimVersion: 'season-claim-v1',
       openAt: 1_800_000_000,
     });
 
@@ -311,11 +312,11 @@ describe('Season War exporter', () => {
       production_root_publishable: false,
       claim_contract_version: 'season-claim-v2',
       proof_format: 'ref-chain:siblingOnLeft-bool+sibling-uint256',
-      claim_contract_address: SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS,
+      claim_contract_address: currentSeasonClaimV2Address,
     });
-    expect((result.manifest.contracts as any).season_claim_address).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
-    expect((result.manifest.contracts as any).season_claim_v2_address).toBe(SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS);
-    expect((result.manifest.contracts as any).selected_claim_contract_address).toBe(SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS);
+    expect((result.manifest.contracts as any).season_claim_address).toBe(currentSeasonClaimV2Address);
+    expect((result.manifest.contracts as any).season_claim_v2_address).toBe(currentSeasonClaimV2Address);
+    expect((result.manifest.contracts as any).selected_claim_contract_address).toBe(currentSeasonClaimV2Address);
     expect(result.manifest).not.toHaveProperty('max_supported_single_cell_leaves');
     expect(result.leaves).toHaveLength(128);
     expect(result.leaves.every((leaf) => typeof leaf.proofCellBase64 === 'string')).toBe(true);
@@ -345,7 +346,7 @@ describe('Season War exporter', () => {
 
     queryMock.mockReset();
     mockExporterQueries(largeRows(128));
-    const placeholderResult = await buildSeasonWarExport({
+    const defaultResult = await buildSeasonWarExport({
       seasonId: 1,
       successfulRoundCount: 1,
       successfulWaveIds: [1],
@@ -360,8 +361,9 @@ describe('Season War exporter', () => {
     expect(explicitResult.manifest.claim_contract_address).toBe(explicitSeasonClaimV2Address);
     expect((explicitResult.manifest.contracts as any).season_claim_v2_address).toBe(explicitSeasonClaimV2Address);
     expect((explicitResult.manifest.contracts as any).selected_claim_contract_address).toBe(explicitSeasonClaimV2Address);
-    expect((explicitResult.manifest.contracts as any).season_claim_address).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
-    expect(explicitResult.leaves[0].leafHash).not.toBe(placeholderResult.leaves[0].leafHash);
-    expect(explicitResult.manifest.root).not.toBe(placeholderResult.manifest.root);
+    expect((explicitResult.manifest.contracts as any).season_claim_address).toBe(explicitSeasonClaimV2Address);
+    expect(defaultResult.manifest.claim_contract_address).toBe(currentSeasonClaimV2Address);
+    expect(explicitResult.leaves[0].leafHash).not.toBe(defaultResult.leaves[0].leafHash);
+    expect(explicitResult.manifest.root).not.toBe(defaultResult.manifest.root);
   });
 });

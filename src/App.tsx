@@ -17,14 +17,13 @@ import { readBackendAuthToken } from "@/src/lib/tonSession";
 import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
 
 const BRAND_LOGO_SRC = "/logo-mark-transparent.png";
-const TAB_ORDER = ["home", "team", "live", "rewards", "share"];
+const TAB_ORDER = ["home", "team", "live", "rewards"];
 const TAB_PATHS: Record<string, string> = {
   home: "/",
   team: "/team",
   leaderboard: "/leaderboard",
   live: "/war-room",
   rewards: "/rewards",
-  share: "/share",
 };
 
 function tabFromPathname(pathname: string) {
@@ -39,8 +38,6 @@ function tabFromPathname(pathname: string) {
       return "live";
     case "/rewards":
       return "rewards";
-    case "/share":
-      return "share";
     default:
       return "home";
   }
@@ -51,7 +48,6 @@ const Team = lazy(() => import("./views/Team"));
 const Leaderboard = lazy(() => import("./views/Leaderboard"));
 const WarRoom = lazy(() => import("./views/WarRoom"));
 const Rewards = lazy(() => import("./views/Rewards"));
-const Share = lazy(() => import("./views/Share"));
 
 export default function App() {
   const manifestUrl =
@@ -287,12 +283,6 @@ function MainApp() {
         return (
           <Suspense fallback={<TabLoading />}>
             <Rewards />
-          </Suspense>
-        );
-      case "share":
-        return (
-          <Suspense fallback={<TabLoading />}>
-            <Share myDeposit={myDeposit} />
           </Suspense>
         );
       case "home":

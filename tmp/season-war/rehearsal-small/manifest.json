@@ -2,6 +2,8 @@
   "generated_at": "2026-04-28T08:20:47.211Z",
   "rehearsal": true,
   "production_root_publishable": false,
+  "archive_status": "frozen-historical-v2-rehearsal",
+  "current_replacement": "public/contracts/72h-v3-mainnet.json",
   "season_id": 1,
   "successful_round_count": 1,
   "successful_wave_ids": [

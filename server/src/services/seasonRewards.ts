@@ -266,11 +266,11 @@ export function assertSeasonClaimProofCapacity(leafCount: number) {
 }
 
 export function normalizeSeasonClaimVersion(value: string | undefined | null): SeasonClaimVersion {
-  if (!value || value === 'season-claim-v1') {
-    return 'season-claim-v1';
+  if (!value || value === 'season-claim-v2') {
+    return 'season-claim-v2';
   }
-  if (value === 'season-claim-v2') {
-    return value;
+  if (value === 'season-claim-v1') {
+    return 'season-claim-v1';
   }
   throw new Error(`Unsupported SeasonClaim claim version: ${value}`);
 }

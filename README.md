@@ -89,7 +89,7 @@ Backend:
 - `JWT_SECRET`: JWT signing secret for email/password auth.
 - `PORT`: API port, default `4000`.
 - `CHAIN_ID`: display/config value for future chain integration.
-- `TOKEN_ADDRESS`: 72H V2 Jetton Master for Season War exports, currently `EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`.
+- `TOKEN_ADDRESS`: current 72H V3 Jetton Master for Season War exports, currently `EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`.
 - `LOCK_VAULT_ADDRESS`: future lock contract address.
 - `ORACLE_ADDRESS`: future price/oracle contract address.
 - `REWARD_DISTRIBUTOR_ADDRESS`: future reward distributor contract address.
@@ -99,7 +99,7 @@ Backend:
 ## Currently Implemented
 
 - Email/password registration and login with JWT.
-- App bootstrap with current wave, latest price, and contract placeholders.
+- App bootstrap with current wave, latest price, and current V3 mainnet contract metadata.
 - Wave lookup and current wave selection.
 - Rush Pass claim through authenticated JWT.
 - Deposit precheck.
@@ -117,7 +117,14 @@ Backend:
 
 - `multi-millionaire` is the Season War allocation data source: verified wallets, lock positions, referrals, squads, leaderboard data, and risk-review state should be exported from this repository's production data.
 - `/Users/yudeyou/Desktop/72` is not an allocation source and not a proof source; treat it only as a display/navigation surface unless a future decision explicitly changes that.
-- SeasonClaimV2 is not yet deployed, audited, and evidence-complete. Until those gates are complete, Season War manifests must remain `production_root_publishable=false`.
+- SeasonClaimV2 is deployed in the current V3 mainnet set at `EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`. Season War manifests still remain `production_root_publishable=false` unless an explicit operator approval gate changes that.
+
+## Contract Source Of Truth
+
+- This repository's `contracts/` folder is a legacy mirror only. It remains in place so existing local contract build and test scripts keep resolving their current paths.
+- The local draft contracts and tests were copied to `/Users/yudeyou/Desktop/72h-capital-contracts/contracts/apps/multi-millionaire/legacy/` on 2026-05-01.
+- Future V3 app-specific contract work should happen under `/Users/yudeyou/Desktop/72h-capital-contracts/contracts/apps/multi-millionaire/v3/` after review, testnet evidence, mainnet planning, and audit notes.
+- Migration details are recorded in [docs/contracts/app-contract-migration-2026-05-01.md](docs/contracts/app-contract-migration-2026-05-01.md).
 
 ## Not Yet Implemented
 

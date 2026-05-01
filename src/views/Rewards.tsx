@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Coins, Gift, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Coins, Gift, Loader2, RefreshCw, Share2, ShieldAlert } from "lucide-react";
 import { motion } from "motion/react";
 import { useTonConnectUI } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
@@ -140,6 +140,27 @@ export default function Rewards() {
         : !merkleClaimAddress
           ? t("rewards.claimContractMissing")
           : null;
+  const shareText = t("rewards.share.text", { pool: formatNumber(90_000_000_000, locale, { maximumFractionDigits: 0 }) });
+
+  const shareRewardPool = async () => {
+    const url = window.location.origin;
+    const text = `${shareText} ${url}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: t("share.nativeTitle"), text: shareText, url });
+        toast.success(t("share.shared"));
+        return;
+      } catch {
+        // Fall through to clipboard copy when native share is cancelled or unavailable.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("share.copied"));
+    } catch {
+      toast.error(t("share.copyFailed"));
+    }
+  };
 
   const handleClaim = async (ledgerId: string) => {
     const walletSession = readTonWalletSession();
@@ -448,6 +469,26 @@ export default function Rewards() {
               </div>
             ))
           )}
+        </div>
+      </section>
+
+      <section className="financial-panel rounded-[14px] border-[#d7b46a]/20 bg-[#d7b46a]/[0.055] p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-[#d7b46a]/25 bg-[#d7b46a]/10">
+            <Share2 className="h-5 w-5 text-[#d7b46a]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-white">{t("rewards.share.title")}</div>
+            <p className="mt-1 text-[11px] leading-5 text-white/55">{shareText}</p>
+            <button
+              type="button"
+              onClick={shareRewardPool}
+              className="depth-button focus-ring mt-3 inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#d7b46a]/30 bg-[#d7b46a]/12 px-4 text-[10px] font-bold uppercase tracking-widest text-[#e1c07b]"
+            >
+              <Share2 className="h-4 w-4" />
+              {t("share.share")}
+            </button>
+          </div>
         </div>
       </section>
     </div>

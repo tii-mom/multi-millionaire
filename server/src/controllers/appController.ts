@@ -6,7 +6,7 @@ import { loadContractIntegrationConfig } from '../services/contracts/config';
 import { getReceiptVerifierDiagnostics } from '../services/receiptVerifier';
 import { getMerkleClaimVerifierDiagnostics } from '../services/merkleRewards';
 import { currentRuntimePath } from '../services/runtimeModes';
-import { readPublicV2Tokenomics } from '../services/contracts/v2Tokenomics';
+import { readPublicV3Tokenomics } from '../services/contracts/v3Tokenomics';
 import { getRuntimeEnv } from '../runtime';
 
 /**
@@ -35,22 +35,28 @@ export async function bootstrap(req: Request, res: Response, next: NextFunction)
     };
     // TODO: Resolve actual user from auth token. Here we provide a minimal stub.
     const me = null;
-    const v2Tokenomics = readPublicV2Tokenomics();
-    const tokenAddress = env.TOKEN_ADDRESS || v2Tokenomics.token_address;
+    const v3Tokenomics = readPublicV3Tokenomics();
+    const chainId = env.CHAIN_ID || v3Tokenomics.chain_id;
+    const tokenAddress = chainId.trim().toLowerCase() === 'ton-mainnet'
+      ? v3Tokenomics.token_address
+      : env.TOKEN_ADDRESS?.trim() || v3Tokenomics.token_address;
     const contracts = {
-      chain_id: env.CHAIN_ID || 'ton-mainnet',
+      chain_id: chainId,
       token: tokenAddress,
       token_address: tokenAddress,
-      token_address_mainnet: v2Tokenomics.token_address,
+      token_address_mainnet: v3Tokenomics.token_address,
       token_decimals: env.TOKEN_DECIMALS || '9',
+      token_metadata_uri: v3Tokenomics.metadata_uri,
+      token_logo_uri: v3Tokenomics.logo_uri,
       vault: env.LOCK_VAULT_ADDRESS || (productionMainnetConfigRequired ? '' : env.VAULT_ADDRESS) || '',
       oracle: env.ORACLE_ADDRESS || '',
       reward_distributor: env.REWARD_DISTRIBUTOR_ADDRESS || '',
       merkle_claim: readBootstrapAddress('MERKLE_CLAIM_ADDRESS', 'MERKLE_CLAIM_ADDRESS_TESTNET'),
       merkle_claim_role: 'legacy_reward_claim_path',
-      season_vault: v2Tokenomics.season_vault_address,
-      season_claim: v2Tokenomics.season_claim_address,
-      v2_tokenomics: v2Tokenomics,
+      season_vault: v3Tokenomics.season_vault_address,
+      season_claim: v3Tokenomics.season_claim_v2_address,
+      season_claim_v2: v3Tokenomics.season_claim_v2_address,
+      token_contract_metadata: '/contracts/72h-v3-mainnet.json',
     };
     const controlMap = Object.fromEntries(controls.map((control) => [control.key, { enabled: control.enabled, reason: control.reason }]));
     const receiptVerifier = getReceiptVerifierDiagnostics();

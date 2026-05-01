@@ -49,6 +49,6 @@ Before running `npm run smoke:production-canary`, confirm:
 
 Only then set `PRODUCTION_CANARY_APPROVED=true` for the canary window and run the mutating smoke.
 
-## Current SeasonClaimV2 blocker
+## Current SeasonClaimV2 gate
 
-SeasonClaimV2 exporter validation is non-publishable only. Production Season War root publication remains blocked until bridge-focused evidence completes legacy pending settlement.
+SeasonClaimV2 is deployed in the current V3 mainnet set. Production Season War root publication remains blocked by operator approval and evidence review, not by the old V2 claim address.

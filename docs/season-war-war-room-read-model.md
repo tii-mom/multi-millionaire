@@ -152,7 +152,7 @@ Fields:
 - Stale data must degrade visibly; never fake live status.
 - Demo data must never be labeled live.
 - Claim preview must clearly distinguish pending, proof-ready, claimable, claimed, and disabled.
-- SeasonClaimV2 must remain disabled until gates pass.
+- SeasonClaimV2 is the current V3 mainnet claim contract; production root publication still stays disabled until explicit operator approval gates pass.
 
 ## Implementation Sequence
 

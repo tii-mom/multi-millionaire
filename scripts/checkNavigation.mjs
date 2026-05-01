@@ -207,15 +207,14 @@ try {
   const checks = [
     ["锁仓记录", "TON 钱包访问"],
     ["战队", "奖励池"],
-    ["战况", "钱包："],
+    ["战况", "专业价格走势图"],
     ["奖励记录", "奖励账本"],
-    ["分享", "邀请配额"],
   ];
 
   const navOrder = await evaluate(client, `
     Array.from(document.querySelectorAll('.bottom-nav-shell button')).map((button) => button.getAttribute('aria-label') || button.textContent?.trim()).filter(Boolean).join('/')
   `);
-  if (navOrder !== "锁仓记录/战队/战况/奖励记录/分享") {
+  if (navOrder !== "锁仓记录/战队/战况/奖励记录") {
     throw new Error(`Unexpected bottom nav order: ${navOrder}`);
   }
 
@@ -225,7 +224,7 @@ try {
 
   await client.send("Page.navigate", { url: new URL("war-room", appUrl).toString() });
   await waitFor(client, "document.readyState === 'complete'", "war-room deep link load");
-  await waitFor(client, "document.body.innerText.includes('钱包：')", "war-room deep link content");
+  await waitFor(client, "document.body.innerText.includes('专业价格走势图')", "war-room deep link content");
   await waitFor(client, `
     (() => {
       const active = document.querySelector('button[aria-current="page"]');

@@ -191,7 +191,9 @@ export interface AdminOpsDiagnostics {
     issues?: Array<{ severity: string; key: string; message: string }>;
     abiArtifacts?: Array<{ role: string; path: string; resolvedPath: string; exists: boolean }>;
   };
-  v2_tokenomics?: Record<string, unknown>;
+  season_claim_v2?: string;
+  current_tokenomics?: Record<string, unknown>;
+  v3_tokenomics?: Record<string, unknown>;
 }
 
 export interface Position {

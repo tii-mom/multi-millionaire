@@ -15,11 +15,9 @@ import {
   SeasonRewardLeafInput,
   SeasonRewardPool,
 } from './seasonRewards';
-import { readPublicV2Tokenomics } from './contracts/v2Tokenomics';
+import { readPublicV3Tokenomics } from './contracts/v3Tokenomics';
 
 const LEADERBOARD_WEIGHTS = [30, 20, 15, 10, 7, 5, 4, 3, 3, 3];
-export const SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS = '0:2222222222222222222222222222222222222222222222222222222222222222';
-
 export interface SeasonWarExportInput {
   seasonId: number;
   successfulRoundCount: number;
@@ -274,14 +272,15 @@ function sha256Hex(value: string): string {
 function resolveSeasonClaimAddress(
   claimVersion: SeasonClaimVersion,
   inputAddress: string | undefined,
-  deployedSeasonClaimAddress: string
+  currentSeasonClaimV2Address: string
 ): string {
   if (inputAddress) {
     return inputAddress;
   }
-  return claimVersion === 'season-claim-v2'
-    ? SEASON_CLAIM_V2_PLACEHOLDER_ADDRESS
-    : deployedSeasonClaimAddress;
+  if (claimVersion === 'season-claim-v1') {
+    throw new Error('season-claim-v1 exports require an explicit historical SeasonClaim address');
+  }
+  return currentSeasonClaimV2Address;
 }
 
 function summarizeQuarantine(rows: QuarantineRow[]) {
@@ -514,7 +513,7 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
     throw new Error('successful-wave-ids count must equal successfulRoundCount');
   }
 
-  const publicTokenomics = readPublicV2Tokenomics();
+  const publicTokenomics = readPublicV3Tokenomics();
   const chainId = input.chainId || publicTokenomics.chain_id;
   const tokenAddress = input.tokenAddress || publicTokenomics.token_address;
   const seasonClaimAddress = resolveSeasonClaimAddress(claimVersion, input.seasonClaimAddress, publicTokenomics.season_claim_address);
@@ -802,7 +801,7 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
     claim_contract_version: claimVersion,
     proof_format: proofFormat,
     claim_contract_address: seasonClaimAddress,
-    season_claim_address: claimVersion === 'season-claim-v1' ? seasonClaimAddress : publicTokenomics.season_claim_address,
+    season_claim_address: seasonClaimAddress,
     ...(claimVersion === 'season-claim-v2' ? { season_claim_v2_address: seasonClaimAddress } : {}),
     source_rows: sourceRows,
     quarantine_rows: quarantineRows,
@@ -824,7 +823,7 @@ export async function buildSeasonWarExport(input: SeasonWarExportInput): Promise
     chain_id: chainId,
     contracts: {
       token_address: tokenAddress,
-      season_claim_address: claimVersion === 'season-claim-v1' ? seasonClaimAddress : publicTokenomics.season_claim_address,
+      season_claim_address: seasonClaimAddress,
       ...(claimVersion === 'season-claim-v2' ? { season_claim_v2_address: seasonClaimAddress } : {}),
       selected_claim_contract_address: seasonClaimAddress,
       season_vault_address: publicTokenomics.season_vault_address,

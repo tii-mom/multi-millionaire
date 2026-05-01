@@ -81,8 +81,10 @@ describe('API integration tests', () => {
     });
     expect(res.body.data.ops.runtime_path).toBe('staging-mvp');
     expect(res.body.data.feature_flags.staging_mvp_enabled).toBe(true);
-    expect(res.body.data.contracts.token_address_mainnet).toBe('EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg');
-    expect(res.body.data.contracts.season_claim).toBe('EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS');
+    expect(res.body.data.contracts.token_address_mainnet).toBe('EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3');
+    expect(res.body.data.contracts.season_claim).toBe('EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b');
+    expect(res.body.data.contracts.season_claim_v2).toBe('EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b');
+    expect(res.body.data.contracts.token_contract_metadata).toBe('/contracts/72h-v3-mainnet.json');
     expect(res.body.data.contracts.merkle_claim_role).toBe('legacy_reward_claim_path');
   });
 

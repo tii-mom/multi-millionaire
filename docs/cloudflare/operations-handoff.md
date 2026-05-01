@@ -129,11 +129,11 @@ Production chain configuration rule:
 
 - `CHAIN_ID`, `CHAIN_RPC_URL`, and `TOKEN_ADDRESS` must point at the same TON
   network. Do not use a testnet RPC with the mainnet 72H token address.
-- The mainnet 72H V2 token master
-  `EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg` is active and supports the
+- The current mainnet 72H V3 token master
+  `EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3` is active and supports the
   standard Jetton `get_wallet_address` path on mainnet.
-- Season War rewards use SeasonClaim
-  `EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`; legacy MerkleClaim
+- Season War rewards use SeasonClaimV2
+  `EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`; legacy MerkleClaim
   remains a separate reward-claim path.
 - Backend code reads `TOKEN_ADDRESS` for Jetton wallet derivation. Setting only
   `TOKEN_ADDRESS_MAINNET` is not sufficient for production runtime.

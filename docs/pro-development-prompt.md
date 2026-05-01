@@ -12,8 +12,8 @@
 - 开发计划：`docs/development-plan.md`。
 
 链上前提：
-- 已部署的 72H V2 Jetton Master：`EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`。
-- 已部署的 SeasonClaim：`EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`。
+- 当前 TON mainnet 72H V3 Jetton Master：`EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`。
+- 当前 SeasonClaimV2：`EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`。
 - 这些地址按 TON mainnet 生态处理。
 - 不要使用 EVM / ERC-20 / approve / wagmi / viem / ethers 的逻辑。
 - 钱包连接使用 TON 方向，优先使用 `@tonconnect/ui-react`。

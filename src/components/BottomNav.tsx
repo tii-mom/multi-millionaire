@@ -1,4 +1,4 @@
-import { Gift, Radio, Share2, Users, Wallet } from "lucide-react";
+import { Gift, Radio, Users, Wallet } from "lucide-react";
 import { motion } from "motion/react";
 import { useI18n } from "@/src/lib/i18n";
 
@@ -9,13 +9,12 @@ export default function BottomNav({ activeTab, setActiveTab }: { activeTab: stri
     { id: "team", label: t("nav.squad"), icon: Users },
     { id: "live", label: t("nav.live"), icon: Radio },
     { id: "rewards", label: t("nav.reward"), icon: Gift },
-    { id: "share", label: t("nav.share"), icon: Share2 },
   ];
 
   return (
     <div className="bottom-nav-shell relative z-50 mx-auto w-[calc(100%-2rem)] max-w-[432px] overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#07090b]/[0.9] px-2 py-2 shadow-[0_24px_54px_rgba(0,0,0,0.72)] backdrop-blur-[30px] sm:w-[calc(100%-3rem)]">
       <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/35 to-transparent" />
-      <div className="relative z-10 grid w-full grid-cols-5 items-center gap-1">
+      <div className="relative z-10 grid w-full grid-cols-4 items-center gap-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const isPrimary = tab.id === "home";

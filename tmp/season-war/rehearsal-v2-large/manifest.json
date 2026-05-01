@@ -3,6 +3,8 @@
   "rehearsal": true,
   "synthetic_fixture": true,
   "production_root_publishable": false,
+  "archive_status": "frozen-historical-testnet-rehearsal-with-v2-context",
+  "current_replacement": "public/contracts/72h-v3-mainnet.json",
   "claim_contract_version": "season-claim-v2",
   "proof_format": "ref-chain:siblingOnLeft-bool+sibling-uint256",
   "claim_contract_address": "kQDEELj9KCzdqT07sVp4FRnbZRo-QhjS5ig0N6lcpJDGcn0H",

@@ -221,11 +221,11 @@ incident rollback owner.
 
 ## Legacy App Contract Deployment
 
-Do not use this section for the 72H V2 Season War exporter. `multi-millionaire/contracts`
+Do not use this section for the 72H V3 Season War exporter. `multi-millionaire/contracts`
 must not be deployed to mainnet until the app contracts are migrated, hardened,
 tested, and audited in the 72H contracts repository. The current Season War path
-uses the deployed V2 Jetton Master `EQBGIzEDvvKObStrcVb6i5Z1-8uYZYtUrYzF2rFZU7xUAXVg`
-and SeasonClaim `EQCYvg-_oFE8q8cweVScna-WDRzDYol-FBwHKuTcAjcFGonS`.
+uses the deployed V3 Jetton Master `EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`
+and SeasonClaimV2 `EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`.
 
 Legacy mainnet contract deployment uses Blueprint with TonConnect. The connected
 Tonkeeper wallet must match `CHAIN_ADMIN_ADDRESS`; the scripts refuse to deploy
@@ -260,7 +260,7 @@ Precomputed mainnet addresses from `contract:build` followed by
 - LockVault: `EQAGRYLCBGAehR8RKVvQswLpVS-sQBK2i0wVVW-u6bd3IEOO`
 - MerkleClaim: historical pre-V2 derived address, not used by Season War.
 - owner/admin wallet: `EQCxJ05yeawVWlsN5SfJ-obajgh2lFffR-O7ebH_s_wqQamv`
-- 72H token master: legacy placeholder, not the V2 Season War Jetton Master.
+- 72H token master: legacy placeholder, not the V3 Season War Jetton Master.
 - LockVault Jetton wallet:
   `EQAGiEeODWa9q6GyTJm4jkDhC3_TvWgkB8FaohSD34GpefQD`
 - MerkleClaim reward Jetton wallet:

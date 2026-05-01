@@ -704,7 +704,7 @@ function AdminReadinessSection({ ops }: { ops: AdminOpsDiagnostics | null }) {
           <div className="mb-2 text-[10px] font-medium uppercase tracking-widest text-slate-600">{t("admin.readiness.contracts")}</div>
           <div className="grid gap-1 font-mono text-[11px] text-slate-400">
             <span className="truncate">SeasonVault: {ops?.season_vault || t("common.none")}</span>
-            <span className="truncate">SeasonClaim: {ops?.season_claim || t("common.none")}</span>
+            <span className="truncate">SeasonClaimV2: {ops?.season_claim_v2 || ops?.season_claim || t("common.none")}</span>
           </div>
         </div>
         <div className="rounded-[12px] border border-slate-800 bg-slate-950/60 p-3">

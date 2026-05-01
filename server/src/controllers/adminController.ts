@@ -18,7 +18,7 @@ import {
   getContractIntegrationDiagnostics,
   loadContractIntegrationConfig,
 } from '../services/contracts/config';
-import { readPublicV2Tokenomics } from '../services/contracts/v2Tokenomics';
+import { readPublicV3Tokenomics } from '../services/contracts/v3Tokenomics';
 import { currentRuntimePath, merkleDraftWritesEnabled } from '../services/runtimeModes';
 
 function readAdminListOptions(req: Request): AdminListOptions {
@@ -146,6 +146,7 @@ export async function getChainEvents(req: Request, res: Response, next: NextFunc
 export async function getOpsDiagnostics(req: Request, res: Response, next: NextFunction) {
   try {
     const contractConfig = loadContractIntegrationConfig();
+    const v3Tokenomics = readPublicV3Tokenomics();
     return res.json({
       request_id: req.id || '',
       data: {
@@ -154,9 +155,11 @@ export async function getOpsDiagnostics(req: Request, res: Response, next: NextF
         merkle_claim_verifier: getMerkleClaimVerifierDiagnostics(),
         contract_integration: getContractIntegrationDiagnostics(contractConfig),
         contract_artifacts: getContractArtifactStatuses(contractConfig),
-        season_vault: readPublicV2Tokenomics().season_vault_address,
-        season_claim: readPublicV2Tokenomics().season_claim_address,
-        v2_tokenomics: readPublicV2Tokenomics(),
+        season_vault: v3Tokenomics.season_vault_address,
+        season_claim: v3Tokenomics.season_claim_v2_address,
+        season_claim_v2: v3Tokenomics.season_claim_v2_address,
+        current_tokenomics: v3Tokenomics,
+        v3_tokenomics: v3Tokenomics,
         runtime_path: currentRuntimePath(),
         merkle_draft_writes_enabled: merkleDraftWritesEnabled(),
       },

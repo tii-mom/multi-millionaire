@@ -38,7 +38,7 @@ Scope as of April 28, 2026:
 - v2 manifests keep the deployed mainnet SeasonClaim v1 address under `contracts.season_claim_address`.
 - v2 manifests use `contracts.season_claim_v2_address` and `contracts.selected_claim_contract_address` for the selected V2 address.
 - v2 testnet evidence artifacts record the bridge address and evidence status when provided.
-- The general exporter can use a v2 placeholder for non-publishable local rehearsal only.
+- The general exporter defaults to the current V3 SeasonClaimV2 address for mainnet. Non-publishable testnet rehearsals must pass explicit testnet addresses.
 - The v2-large rehearsal script requires an explicit `--season-claim-address` so the next artifact binds to the confirmed V2 address.
 
 ## Tests
