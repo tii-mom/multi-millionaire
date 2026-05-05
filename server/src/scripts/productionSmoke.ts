@@ -1,8 +1,10 @@
 type StepStatus = 'pass' | 'fail';
+type SmokeProfile = 'infra' | 'gray';
 
 interface SmokeConfig {
   apiBaseUrl: string;
   allowChainWrites: boolean;
+  profile: SmokeProfile;
 }
 
 interface StepResult {
@@ -48,9 +50,14 @@ function normalizeBaseUrl(raw: string): string {
 }
 
 function loadConfig(): SmokeConfig {
+  const profile = process.env.PRODUCTION_SMOKE_PROFILE || 'infra';
+  if (profile !== 'infra' && profile !== 'gray') {
+    throw new Error(`PRODUCTION_SMOKE_PROFILE must be infra or gray; got ${profile}`);
+  }
   return {
     apiBaseUrl: normalizeBaseUrl(requiredEnv('API_BASE_URL', 'http://127.0.0.1:4000')),
     allowChainWrites: process.env.ALLOW_PRODUCTION_SMOKE_CHAIN_WRITES === 'true',
+    profile,
   };
 }
 
@@ -207,35 +214,42 @@ async function main() {
       };
     });
 
-    await runRequiredStep('current wave', async () => {
-      const response = await requestJson(config, '/v1/waves/current');
-      const data = objectValue(objectValue(response.body, 'current wave response').data, 'current wave response.data');
-      assert(typeof data.wave_id === 'number' || typeof data.wave_id === 'string', 'Expected current wave data.wave_id');
-      if (data.status === 'live') {
-        const endTime = Date.parse(String(data.end_time || ''));
-        assert(Number.isFinite(endTime), 'Live current wave must include a valid end_time');
-        assert(endTime > Date.now(), `Live current wave is expired; end_time=${String(data.end_time)}`);
-      }
-      return { status_code: response.status, wave_id: data.wave_id, status: data.status, end_time: data.end_time };
-    });
+    if (config.profile === 'gray') {
+      await runRequiredStep('current wave', async () => {
+        const response = await requestJson(config, '/v1/waves/current');
+        const data = objectValue(objectValue(response.body, 'current wave response').data, 'current wave response.data');
+        assert(typeof data.wave_id === 'number' || typeof data.wave_id === 'string', 'Expected current wave data.wave_id');
+        if (data.status === 'live') {
+          const endTime = Date.parse(String(data.end_time || ''));
+          assert(Number.isFinite(endTime), 'Live current wave must include a valid end_time');
+          assert(endTime > Date.now(), `Live current wave is expired; end_time=${String(data.end_time)}`);
+        }
+        return { status_code: response.status, wave_id: data.wave_id, status: data.status, end_time: data.end_time };
+      });
 
-    await runRequiredStep('season war current', async () => {
-      const response = await requestJson(config, '/v1/season-war/current');
-      const data = objectValue(objectValue(response.body, 'season war current response').data, 'season war current response.data');
-      assert(typeof data.seasonId === 'string' && data.seasonId.length > 0, 'Expected season war current data.seasonId');
-      assert(typeof data.waveId === 'string' && data.waveId.length > 0, 'Expected season war current data.waveId');
-      return { status_code: response.status, season_id: data.seasonId, wave_id: data.waveId, status: data.status };
-    });
+      await runRequiredStep('season war current', async () => {
+        const response = await requestJson(config, '/v1/season-war/current');
+        const data = objectValue(objectValue(response.body, 'season war current response').data, 'season war current response.data');
+        assert(typeof data.seasonId === 'string' && data.seasonId.length > 0, 'Expected season war current data.seasonId');
+        assert(typeof data.waveId === 'string' && data.waveId.length > 0, 'Expected season war current data.waveId');
+        return { status_code: response.status, season_id: data.seasonId, wave_id: data.waveId, status: data.status };
+      });
+    }
   } finally {
     const finishedAt = new Date();
+    const checkedPaths = ['/health', '/ready', '/v1/app/bootstrap'];
+    if (config.profile === 'gray') {
+      checkedPaths.push('/v1/waves/current', '/v1/season-war/current');
+    }
     const report = {
       status: failed ? 'fail' : 'pass',
       api_base_url: config.apiBaseUrl,
-      mode: 'production-non-mutating',
+      profile: config.profile,
+      mode: `production-${config.profile}-non-mutating`,
       started_at: startedAt.toISOString(),
       finished_at: finishedAt.toISOString(),
       duration_ms: finishedAt.getTime() - startedAt.getTime(),
-      checked_paths: ['/health', '/ready', '/v1/app/bootstrap', '/v1/waves/current', '/v1/season-war/current'],
+      checked_paths: checkedPaths,
       mutation_guard: 'GET-only smoke; does not register, deposit, claim, or call admin endpoints',
       steps,
     };

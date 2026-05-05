@@ -4,16 +4,18 @@
  */
 
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from "react";
+import { toast } from "sonner";
+import { LogOut, RefreshCw, Wallet } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { THEME, TonConnectUIProvider } from "@tonconnect/ui-react";
+import { THEME, TonConnectUIProvider, useIsConnectionRestored, useTonAddress, useTonConnectModal, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import Home from "./views/Home";
 import BottomNav from "./components/BottomNav";
 import LanguageToggle from "./components/LanguageToggle";
 import { Toaster } from "@/src/components/ui/sonner";
-import { LanguageProvider, formatNumber, useI18n } from "@/src/lib/i18n";
+import { LanguageProvider, useI18n } from "@/src/lib/i18n";
 import { api } from "@/src/lib/api";
-import type { BootstrapData } from "@/src/lib/types";
-import { readBackendAuthToken } from "@/src/lib/tonSession";
+import type { BootstrapData, WalletAuthIntent } from "@/src/lib/types";
+import { clearBackendAuthToken, clearTonWalletSession, readBackendAuthToken, shortWalletAddress, writeBackendAuthToken, writeTonWalletSession } from "@/src/lib/tonSession";
 import { rawTokenAmountToDisplayNumber } from "@/src/lib/tonTransactions";
 
 const BRAND_LOGO_SRC = "/logo-mark-transparent.png";
@@ -49,11 +51,33 @@ const Leaderboard = lazy(() => import("./views/Leaderboard"));
 const WarRoom = lazy(() => import("./views/WarRoom"));
 const Rewards = lazy(() => import("./views/Rewards"));
 
+function isLocalPreviewHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function normalizeTonConnectChainId(chain: unknown): string | null {
+  const value = String(chain || "").trim().toLowerCase();
+  if (!value) return null;
+  if (value === "-239" || value === "mainnet" || value === "ton-mainnet") return "ton-mainnet";
+  if (value === "-3" || value === "testnet" || value === "ton-testnet") return "ton-testnet";
+  return value;
+}
+
+function notifyWalletAuthenticated() {
+  window.dispatchEvent(new Event("72h-wallet-authenticated"));
+}
+
+function notifyWalletDisconnected() {
+  window.dispatchEvent(new Event("72h-wallet-disconnected"));
+}
+
 export default function App() {
   const manifestUrl =
     typeof window === "undefined"
       ? "/tonconnect-manifest.json"
-      : `${window.location.origin}/tonconnect-manifest.json`;
+      : isLocalPreviewHost(window.location.hostname)
+        ? "https://mm.72h.lol/tonconnect-manifest.json"
+        : `${window.location.origin}/tonconnect-manifest.json`;
 
   return (
     <TonConnectUIProvider
@@ -140,11 +164,20 @@ function AppToaster() {
 }
 
 function MainApp() {
-  const { locale, t } = useI18n();
+  const { formatError, t } = useI18n();
+  const [tonConnectUI] = useTonConnectUI();
+  const tonModal = useTonConnectModal();
+  const tonAddress = useTonAddress();
+  const rawTonAddress = useTonAddress(false);
+  const tonWallet = useTonWallet();
+  const connectionRestored = useIsConnectionRestored();
   const shellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState(() => tabFromPathname(window.location.pathname));
   const [direction, setDirection] = useState(0);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const [walletAuthIntent, setWalletAuthIntent] = useState<WalletAuthIntent | null>(null);
+  const walletAuthInFlightRef = useRef(false);
   const tokenPrice: number | null = null;
   const [myDeposit, setMyDeposit] = useState(0);
   const [squadGoal, setSquadGoal] = useState(() => {
@@ -152,16 +185,7 @@ function MainApp() {
     return saved ? Number(saved) : 5000000;
   });
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
-  const [bootstrapStatus, setBootstrapStatus] = useState<"loading" | "ready" | "error">("loading");
   const targetValue = 1000000;
-  const envLabel = bootstrap?.feature_flags?.chain_mainline_writes_enabled
-    ? t("app.env.canary")
-    : bootstrap
-      ? t("app.env.display")
-      : bootstrapStatus === "error"
-        ? t("app.env.unavailable")
-        : t("app.env.loading");
-
   useEffect(() => localStorage.setItem("72h_goal", squadGoal.toString()), [squadGoal]);
   useEffect(() => {
     let cancelled = false;
@@ -169,13 +193,11 @@ function MainApp() {
       .then((data) => {
         if (!cancelled) {
           setBootstrap(data);
-          setBootstrapStatus("ready");
         }
       })
       .catch(() => {
         if (!cancelled) {
           setBootstrap(null);
-          setBootstrapStatus("error");
         }
       });
     return () => {
@@ -204,6 +226,77 @@ function MainApp() {
       cancelled = true;
     };
   }, [bootstrap?.contracts?.token_decimals, bootstrap?.current_wave?.wave_id]);
+  useEffect(() => {
+    if (!connectionRestored) return;
+    if (!tonAddress) {
+      clearTonWalletSession();
+      return;
+    }
+    const walletName = tonWallet && "name" in tonWallet ? tonWallet.name : tonWallet?.device.appName || t("home.ton.walletFallback");
+    const walletAppName = tonWallet && "appName" in tonWallet ? tonWallet.appName : tonWallet?.device.appName || "ton-wallet";
+    writeTonWalletSession({
+      address: tonAddress,
+      rawAddress: rawTonAddress || tonAddress,
+      walletName,
+      walletAppName,
+      provider: tonWallet?.provider || "tonconnect",
+      connectedAt: new Date().toISOString(),
+    });
+  }, [connectionRestored, rawTonAddress, t, tonAddress, tonWallet]);
+  useEffect(() => {
+    if (
+      isLocalPreviewHost(window.location.hostname)
+      || !connectionRestored
+      || !tonWallet
+      || readBackendAuthToken()
+      || walletAuthInFlightRef.current
+    ) {
+      return;
+    }
+
+    const account = (tonWallet as any).account;
+    const tonProof = (tonWallet as any).connectItems?.tonProof;
+    const expectedChainId = bootstrap?.contracts?.chain_id || walletAuthIntent?.chain_id || "";
+    const connectedChainId = normalizeTonConnectChainId(account?.chain);
+    const chainMismatch =
+      !!expectedChainId && !!connectedChainId && normalizeTonConnectChainId(expectedChainId) !== connectedChainId;
+    if (!account?.address || !account?.publicKey || !account.walletStateInit || chainMismatch || !tonProof || !("proof" in tonProof)) {
+      return;
+    }
+    const intentToken = walletAuthIntent?.intent_token;
+    if (!intentToken) return;
+
+    walletAuthInFlightRef.current = true;
+    api.walletLogin({
+      walletAddress: account.address,
+      signature: JSON.stringify({
+        account: {
+          address: account.address,
+          chain: account.chain,
+          publicKey: account.publicKey,
+          walletStateInit: account.walletStateInit,
+        },
+        publicKey: account.publicKey,
+        walletStateInit: account.walletStateInit,
+        proof: tonProof.proof,
+      }),
+      intentToken,
+      walletType: tonWallet.device?.appName || "tonconnect",
+    })
+      .then((result) => {
+        writeBackendAuthToken(result.token);
+        setWalletAuthIntent(null);
+        tonConnectUI.setConnectRequestParameters(null);
+        notifyWalletAuthenticated();
+        toast.success(t("home.ton.backendReady"));
+      })
+      .catch((error) => {
+        toast.error(formatError(error, "home.ton.backendPending"));
+      })
+      .finally(() => {
+        walletAuthInFlightRef.current = false;
+      });
+  }, [bootstrap?.contracts?.chain_id, connectionRestored, formatError, t, tonConnectUI, tonWallet, walletAuthIntent]);
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [activeTab]);
@@ -239,6 +332,49 @@ function MainApp() {
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--pointer-x", `${event.clientX - rect.left}px`);
     event.currentTarget.style.setProperty("--pointer-y", `${event.clientY - rect.top}px`);
+  };
+
+  const openTonWallet = async () => {
+    setWalletMenuOpen(false);
+    if (isLocalPreviewHost(window.location.hostname)) {
+      tonConnectUI.setConnectRequestParameters(null);
+      setWalletAuthIntent(null);
+      tonModal.open();
+      return;
+    }
+    try {
+      tonConnectUI.setConnectRequestParameters({ state: "loading" });
+      const intent = await api.createWalletAuthIntent();
+      setWalletAuthIntent(intent);
+      tonConnectUI.setConnectRequestParameters({
+        state: "ready",
+        value: { tonProof: intent.payload },
+      });
+    } catch {
+      tonConnectUI.setConnectRequestParameters(null);
+      setWalletAuthIntent(null);
+    }
+    tonModal.open();
+  };
+
+  const disconnectTonWallet = async () => {
+    setWalletMenuOpen(false);
+    try {
+      await tonConnectUI.disconnect();
+    } catch {
+      // Local app state is still cleared if the wallet bridge is already unavailable.
+    }
+    clearBackendAuthToken();
+    clearTonWalletSession();
+    setWalletAuthIntent(null);
+    notifyWalletDisconnected();
+  };
+
+  const switchTonWallet = async () => {
+    await disconnectTonWallet();
+    window.setTimeout(() => {
+      openTonWallet();
+    }, 120);
   };
 
   const variants = {
@@ -307,59 +443,67 @@ function MainApp() {
 
         <div className="app-background" />
 
-        <div className="absolute right-5 top-4 z-20 flex items-center gap-2">
-          <LanguageToggle />
-          <div className="status-chip flex items-center gap-2 rounded-full px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
-            <div className="h-1.5 w-1.5 rounded-full bg-[#d7b46a]" />
-            <span className="text-[10px] font-medium tracking-[0.16em]">{envLabel}</span>
-          </div>
-        </div>
-
-        <header className="relative z-10 flex shrink-0 items-end justify-between px-6 pb-2 pt-14">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="relative flex h-11 w-12 shrink-0 items-center justify-center">
-              <div className="absolute inset-2 rounded-[16px] bg-[#d7b46a]/10 blur-xl" />
+        <header className="relative z-10 shrink-0 px-6 pb-4 pt-6">
+          <div className="flex min-h-[58px] items-center justify-between gap-4 rounded-[22px] border border-white/[0.035] bg-black/[0.08] px-1 py-1">
+            <div className="relative flex h-12 w-13 shrink-0 items-center justify-center">
+              <div className="absolute inset-1 rounded-[16px] bg-[#d7b46a]/10 blur-xl" />
               <img
                 src={BRAND_LOGO_SRC}
                 alt={t("app.brand.name")}
                 className="relative h-full w-full object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
               />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-[#d7b46a] shadow-[0_0_10px_rgba(215,180,106,0.45)]" />
-                <h1 className="ui-label truncate">
-                  {t("app.brand.kicker")}
-                </h1>
-              </div>
-              <div className={`mt-1 truncate font-semibold tracking-tight text-white/95 ${locale.startsWith("zh") ? "text-[20px]" : "text-[16px]"}`}>
-                {t("app.brand.name")}
-              </div>
-            </div>
-          </div>
 
-          <div className="top-terminal-panel flex shrink-0 flex-col items-end gap-1">
-            <div className="flex items-center gap-1.5">
-              <span className="ui-label text-[9px]">{t("app.price.label")}</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/85" />
+            <div className="flex min-w-0 items-center justify-end gap-2">
+              <LanguageToggle />
+              <div className="relative">
+                {!tonAddress ? (
+                  <button
+                    type="button"
+                    onClick={openTonWallet}
+                    disabled={!connectionRestored}
+                    className="status-chip focus-ring flex h-11 items-center gap-2 rounded-full border border-[#d7b46a]/35 bg-[#d7b46a]/[0.055] px-4 text-[11px] font-bold tracking-[0.16em] text-[#d7b46a] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl disabled:cursor-wait disabled:opacity-55"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    {connectionRestored ? t("home.ton.connectShort") : t("common.loading")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setWalletMenuOpen((open) => !open)}
+                    className="status-chip focus-ring flex h-11 items-center gap-2 rounded-full border border-[#d7b46a]/35 bg-[#d7b46a]/[0.055] px-4 font-mono text-[10px] font-bold tracking-[0.08em] text-[#d7b46a] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl"
+                    aria-expanded={walletMenuOpen}
+                  >
+                    <Wallet className="h-4 w-4" />
+                    {shortWalletAddress(tonAddress)}
+                  </button>
+                )}
+                {walletMenuOpen && tonAddress && (
+                  <div className="absolute right-0 top-13 w-36 overflow-hidden rounded-[14px] border border-white/[0.08] bg-[#080a0b]/95 p-1.5 shadow-[0_18px_38px_rgba(0,0,0,0.58)] backdrop-blur-2xl">
+                    <button
+                      type="button"
+                      onClick={switchTonWallet}
+                      className="flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-[11px] font-semibold text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 text-[#d7b46a]" />
+                      {t("home.ton.switch")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={disconnectTonWallet}
+                      className="flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-[11px] font-semibold text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <LogOut className="h-3.5 w-3.5 text-[#d7b46a]" />
+                      {t("home.ton.disconnect")}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 font-mono text-[15px] font-semibold text-[#d7b46a] tabular-nums">
-              <motion.span
-                initial={{ opacity: 0.5, color: "#fff" }}
-                animate={{ opacity: 1, color: "#d7b46a" }}
-                transition={{ duration: 0.55 }}
-              >
-                --
-              </motion.span>
-              <span className="rounded-md border border-white/[0.06] bg-white/[0.045] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white/55">
-                {t("app.price.unavailable")}
-              </span>
-            </div>
-            <div className="mt-1 h-4 w-[96px] rounded-md border border-white/[0.06] bg-black/20 market-line" aria-hidden="true" />
           </div>
         </header>
 
-        <main ref={mainRef} className="app-scroll relative z-10 flex-1 overflow-y-auto overflow-x-hidden pt-1 no-scrollbar scroll-smooth">
+        <main ref={mainRef} className="app-scroll relative z-10 flex-1 overflow-y-auto overflow-x-hidden pt-0 no-scrollbar scroll-smooth">
           <AnimatePresence mode="popLayout" custom={direction} initial={false}>
             <motion.div
               key={activeTab}

@@ -39,5 +39,6 @@ export const emptyControlDrafts: ControlDrafts = {
   pause_deposits: "",
   pause_reward_claims: "",
   pause_referral_rewards: "",
+  pause_deposit_streak_rewards: "",
   maintenance_banner: "",
 };

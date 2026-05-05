@@ -14,6 +14,7 @@ import type {
   BootstrapData,
   ChainEvent,
   DepositReceiptResult,
+  DepositStreakView,
   JettonWalletDerivation,
   LeaderboardMe,
   MerkleRewardBatch,
@@ -181,6 +182,18 @@ export const api = {
     return requestJson<UserWavePositionTotal>(`/v1/waves/${waveId}/positions/me`, { token });
   },
 
+  depositStreakMe(waveId: number, token: string) {
+    return requestJson<DepositStreakView>(`/v1/deposit-streak/me?waveId=${encodeURIComponent(String(waveId))}`, { token });
+  },
+
+  saveDepositStreakGoal(input: { waveId: number; targetUsd9: string }, token: string) {
+    return requestJson<DepositStreakView>("/v1/deposit-streak/goal", {
+      method: "POST",
+      token,
+      body: input,
+    });
+  },
+
   createWalletBindIntent(walletAddress: string, token: string) {
     return requestJson<WalletBindIntent>("/v1/wallet/bind-intent", {
       method: "POST",
@@ -201,7 +214,7 @@ export const api = {
     return requestJson<WalletBinding[]>("/v1/wallet/me", { token });
   },
 
-  submitDepositReceipt(waveId: number, input: { txHash: string; amount?: string; walletAddress?: string }, token: string) {
+  submitDepositReceipt(waveId: number, input: { txHash: string; amount?: string; walletAddress?: string; seasonId?: number; targetUsd9?: string }, token: string) {
     return requestJson<DepositReceiptResult>(`/v1/waves/${waveId}/deposit-receipt`, {
       method: "POST",
       token,

@@ -8,6 +8,7 @@ type CheckStatus = 'present' | 'missing' | 'invalid';
 interface EnvCheck {
   name: string;
   hint: string;
+  aliases?: string[];
   validate?: (value: string, profile: Profile) => string | null;
 }
 
@@ -37,6 +38,15 @@ function normalizeProfile(raw: string | undefined): Profile {
 
 function hasValue(name: string): boolean {
   return !!process.env[name]?.trim();
+}
+
+function readCheckValue(check: EnvCheck): string | null {
+  const names = [check.name, ...(check.aliases || [])];
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return null;
 }
 
 function validateNodeEnv(value: string, profile: Profile): string | null {
@@ -228,7 +238,7 @@ const contractEnv: EnvCheck[] = [
   { name: 'CHAIN_ID', hint: 'Target chain identifier. Current RC1 smoke records off-chain stubs only.', validate: validateContractValue },
   { name: 'CHAIN_RPC_URL', hint: 'RPC endpoint for chain-backed lock/settlement integration.', validate: (value) => validateUrl(value) },
   { name: 'TOKEN_ADDRESS', hint: 'Token contract address for future on-chain lock integration.', validate: validateContractValue },
-  { name: 'LOCK_VAULT_ADDRESS', hint: 'Lock vault contract address. Currently documented as a stub boundary.', validate: validateContractValue },
+  { name: 'DEPOSIT_VAULT_ADDRESS', aliases: ['LOCK_VAULT_ADDRESS'], hint: 'Deposit vault contract address. LOCK_VAULT_ADDRESS remains accepted for the legacy contract path.', validate: validateContractValue },
   { name: 'ORACLE_ADDRESS', hint: 'Oracle contract address. Currently documented as a stub boundary.', validate: validateContractValue },
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Reward distributor address. Current claim API is an off-chain status update stub.', validate: validateContractValue },
 ];
@@ -237,9 +247,9 @@ const productionMerkleContractEnv: EnvCheck[] = [
   { name: 'CHAIN_ID', hint: 'Target production chain identifier.', validate: validateContractValue },
   { name: 'CHAIN_RPC_URL', hint: 'Production RPC endpoint for receipt and claim-event verification.', validate: (value) => validateUrl(value) },
   { name: 'TOKEN_ADDRESS', hint: 'Production reward/deposit token address.', validate: validateContractValue },
-  { name: 'TOKEN_DECIMALS', hint: '72H token decimals. Must be 9 for the audited LockVault math.', validate: (value) => value.trim() === '9' ? null : 'TOKEN_DECIMALS must be 9' },
-  { name: 'LOCK_VAULT_ADDRESS', hint: 'Production lock vault contract address.', validate: validateContractValue },
-  { name: 'LOCK_VAULT_JETTON_WALLET_ADDRESS', hint: 'Jetton wallet owned by LockVault, derived from TOKEN_ADDRESS + LOCK_VAULT_ADDRESS.', validate: validateContractValue },
+  { name: 'TOKEN_DECIMALS', hint: '72H token decimals. Must be 9 for the audited vault math.', validate: (value) => value.trim() === '9' ? null : 'TOKEN_DECIMALS must be 9' },
+  { name: 'DEPOSIT_VAULT_ADDRESS', hint: 'Production DepositVault address. Use the explicit V3 address for target deposits.', validate: validateContractValue },
+  { name: 'DEPOSIT_VAULT_JETTON_WALLET_ADDRESS', hint: 'Jetton wallet owned by DepositVault, derived from TOKEN_ADDRESS + DEPOSIT_VAULT_ADDRESS.', validate: validateContractValue },
   { name: 'MERKLE_CLAIM_ADDRESS', hint: 'Production MerkleClaim contract address when REWARD_CLAIM_MODEL=merkle.', validate: validateContractValue },
   { name: 'REWARD_JETTON_WALLET_ADDRESS', hint: 'Jetton wallet owned by MerkleClaim, derived from TOKEN_ADDRESS + MERKLE_CLAIM_ADDRESS.', validate: validateContractValue },
 ];
@@ -264,7 +274,7 @@ const productionChainRecommended: EnvCheck[] = [
   { name: 'PRODUCTION_CANARY_APPROVED', hint: 'Set true only for an approved named-operator, allowlisted-wallet, fixed-amount canary window.', validate: validateTrue },
   { name: 'MAINNET_CANARY_EVIDENCE_URL', hint: 'Evidence URL or artifact path for the approved mainnet canary run.', validate: validateProductionValue },
   { name: 'REWARD_CLAIM_MODEL', hint: 'Production reward claim model. Use merkle for limited gray launch.', validate: validateProductionValue },
-  { name: 'ORACLE_ADDRESS', hint: 'Optional external oracle contract address. Current LockVault can only use staged owner price for testnet/canary.', validate: validateContractValue },
+  { name: 'ORACLE_ADDRESS', hint: 'Optional external oracle contract address. Current vault path can only use staged owner price for testnet/canary.', validate: validateContractValue },
   { name: 'REWARD_DISTRIBUTOR_ADDRESS', hint: 'Only required when REWARD_CLAIM_MODEL=distributor.', validate: validateContractValue },
   { name: 'RECEIPT_REQUIRED_CONFIRMATIONS', hint: 'Finality confirmations required before applying receipts.', validate: (value) => validateInteger(value) },
 ];
@@ -289,6 +299,8 @@ const profileChecks: Record<Profile, { required: EnvCheck[]; recommended: EnvChe
     required: stagingRequired,
     recommended: [
       { name: 'API_BASE_URL', hint: 'Production API base URL for manual smoke checks only.', validate: (value) => validateUrl(value) },
+      { name: 'PRODUCTION_PUBLIC_LAUNCH_ENABLED', hint: 'Keep false until real-funds, Merkle claim, anti-sybil, support, and rollback gates are approved.', validate: (value) => validateBoolean(value) },
+      { name: 'ANTI_SYBIL_PUBLIC_LAUNCH_APPROVED', hint: 'Set true only after the public-launch anti-sybil posture has been approved.', validate: validateTrue },
       { name: 'ADMIN_OPERATIONS_ENABLED', hint: 'Set false for the decentralized/no-admin production mode.', validate: (value) => validateBoolean(value) },
       { name: 'ADMIN_EMAILS', hint: 'Comma-separated admin emails. May be empty when ADMIN_OPERATIONS_ENABLED=false.', validate: validateProductionAdminEmails },
       { name: 'RISK_REVIEW_ENABLED', hint: 'Set false when reward/deposit flow must not depend on manual risk review.', validate: (value) => validateBoolean(value) },
@@ -299,14 +311,14 @@ const profileChecks: Record<Profile, { required: EnvCheck[]; recommended: EnvChe
 };
 
 function runCheck(check: EnvCheck, profile: Profile): CheckResult {
-  if (!hasValue(check.name)) {
+  const value = readCheckValue(check);
+  if (!value) {
     return {
       name: check.name,
       status: 'missing',
       hint: check.hint,
     };
   }
-  const value = process.env[check.name]!.trim();
   const validationMessage = check.validate?.(value, profile);
   if (validationMessage) {
     return {
@@ -339,9 +351,9 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
     { name: 'CHAIN_ID', hint: 'Production chain writes require an explicit chain id.', validate: validateContractValue },
     { name: 'CHAIN_RPC_URL', hint: 'Production chain writes require a production RPC endpoint.', validate: (value) => validateUrl(value) },
     { name: 'TOKEN_ADDRESS', hint: 'Production chain writes require the production 72H token address.', validate: validateContractValue },
-    { name: 'TOKEN_DECIMALS', hint: 'The audited LockVault math requires 72H token decimals to be 9.', validate: (value) => value.trim() === '9' ? null : 'TOKEN_DECIMALS must be 9' },
-    { name: 'LOCK_VAULT_ADDRESS', hint: 'Production chain writes require the deployed mainnet LockVault address.', validate: validateContractValue },
-    { name: 'LOCK_VAULT_JETTON_WALLET_ADDRESS', hint: 'Production chain writes require the derived LockVault Jetton wallet address.', validate: validateContractValue },
+    { name: 'TOKEN_DECIMALS', hint: 'The audited vault math requires 72H token decimals to be 9.', validate: (value) => value.trim() === '9' ? null : 'TOKEN_DECIMALS must be 9' },
+    { name: 'DEPOSIT_VAULT_ADDRESS', hint: 'Production chain writes require the explicit deployed mainnet DepositVault address.', validate: validateContractValue },
+    { name: 'DEPOSIT_VAULT_JETTON_WALLET_ADDRESS', hint: 'Production chain writes require the derived DepositVault Jetton wallet address.', validate: validateContractValue },
     { name: 'MERKLE_CLAIM_ADDRESS', hint: 'Production chain writes require the deployed mainnet MerkleClaim address.', validate: validateContractValue },
     { name: 'REWARD_JETTON_WALLET_ADDRESS', hint: 'Production chain writes require the derived MerkleClaim reward Jetton wallet address.', validate: validateContractValue },
     { name: 'WALLET_BINDING_ENABLED', hint: 'Production chain writes require wallet binding to be enabled.', validate: validateTrue },
@@ -445,6 +457,14 @@ function productionConsistencyChecks(profile: Profile): CheckResult[] {
     }
   }
   if (publicLaunch) {
+    if (!isTruthy(process.env.ANTI_SYBIL_PUBLIC_LAUNCH_APPROVED)) {
+      checks.push({
+        name: 'ANTI_SYBIL_PUBLIC_LAUNCH_APPROVED',
+        status: 'invalid',
+        hint: 'Set true only after allowlist, rate limits, abnormal referral/deposit review, and reward-freeze operations are approved for public launch.',
+        message: 'Public launch requires an approved anti-sybil posture',
+      });
+    }
     if (!hasValue('ORACLE_ADDRESS')) {
       checks.push({
         name: 'ORACLE_ADDRESS',
@@ -511,6 +531,7 @@ function buildCheckGroups(profile: Profile): CheckGroup[] {
     'PRODUCTION_CANARY_APPROVED',
     'MAINNET_CANARY_EVIDENCE_URL',
     'PRICE_ORACLE_EXTERNAL_AUDIT_APPROVED',
+    'ANTI_SYBIL_PUBLIC_LAUNCH_APPROVED',
   ]);
 
   const baseRequired = checks.required.map((check) => runCheck(check, profile));
@@ -521,6 +542,7 @@ function buildCheckGroups(profile: Profile): CheckGroup[] {
       && !check.name.includes('MERKLE')
       && !check.name.includes('TOKEN')
       && !check.name.includes('LOCK_VAULT')
+      && !check.name.includes('DEPOSIT_VAULT')
       && !canaryAuditNames.has(check.name))
     .map((check) => runCheck(check, profile));
   const productionRecommended = checks.recommended

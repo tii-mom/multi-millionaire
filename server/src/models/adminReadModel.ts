@@ -51,6 +51,7 @@ export interface AdminReward {
   source_user_id: string;
   source_email: string | null;
   source_position_id: string;
+  source_ref: string | null;
   wave_id: number;
   reward_type: string;
   gross_amount: string;
@@ -241,6 +242,7 @@ export async function listAdminRewards(optionsInput: AdminListOptions = {}): Pro
     'rl.source_user_id::text',
     'source_user.email',
     'rl.source_position_id::text',
+    'rl.source_ref',
     'rl.wave_id::text',
     'rl.reward_type',
     'rl.status',
@@ -254,6 +256,7 @@ export async function listAdminRewards(optionsInput: AdminListOptions = {}): Pro
        rl.source_user_id,
        source_user.email AS source_email,
        rl.source_position_id,
+       rl.source_ref,
        rl.wave_id,
        rl.reward_type,
        rl.gross_amount,

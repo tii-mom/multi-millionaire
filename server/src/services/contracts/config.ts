@@ -185,7 +185,7 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = getRuntim
   const chainId = readString(env.CHAIN_ID) ?? 'ton-mainnet';
   const rpcUrl = readString(env.CHAIN_RPC_URL) ?? readString(env.RPC_URL);
   const tokenAddress = readString(env.TOKEN_ADDRESS);
-  const lockVaultAddress = readString(env.LOCK_VAULT_ADDRESS);
+  const lockVaultAddress = readString(env.DEPOSIT_VAULT_ADDRESS) ?? readString(env.LOCK_VAULT_ADDRESS);
   const oracleAddress = readString(env.ORACLE_ADDRESS);
   const rewardDistributorAddress = readString(env.REWARD_DISTRIBUTOR_ADDRESS);
   const merkleClaimAddress = readString(env.MERKLE_CLAIM_ADDRESS);
@@ -215,7 +215,7 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = getRuntim
     lockVault: {
       address: lockVaultAddress,
       abiPath: lockVaultAbiPath,
-      startBlock: readInteger(env.LOCK_VAULT_START_BLOCK, null),
+      startBlock: readInteger(env.DEPOSIT_VAULT_START_BLOCK, readInteger(env.LOCK_VAULT_START_BLOCK, null)),
     },
     merkleClaim: {
       address: merkleClaimAddress,
@@ -245,7 +245,7 @@ export function loadContractIntegrationConfig(env: NodeJS.ProcessEnv = getRuntim
       reorgLookbackBlocks: readInteger(env.CHAIN_REORG_LOOKBACK_BLOCKS, 64) ?? 64,
       pollIntervalMs: readInteger(env.CHAIN_INDEXER_POLL_INTERVAL_MS, 15000) ?? 15000,
       startBlocks: {
-        lockVault: readInteger(env.LOCK_VAULT_START_BLOCK, null),
+        lockVault: readInteger(env.DEPOSIT_VAULT_START_BLOCK, readInteger(env.LOCK_VAULT_START_BLOCK, null)),
         oracle: readInteger(env.ORACLE_START_BLOCK, null),
         rewardDistributor: readInteger(env.REWARD_DISTRIBUTOR_START_BLOCK, null),
       },

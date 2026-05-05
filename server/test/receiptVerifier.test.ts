@@ -9,14 +9,22 @@ describe('chain receipt verifier selection', () => {
   const otherAddress = 'kQBgpmYcdBHoG1D4t0AfSF8CLrOU4Ad4Sg94KmjzYs6JDKWg';
   const vaultJettonWalletAddress = '0:1111111111111111111111111111111111111111111111111111111111111111';
 
-  function buildDepositBody(input: { waveId?: number; amountRaw?: string; sender?: string } = {}): string {
-    return beginCell()
+  function buildDepositBody(input: { seasonId?: number; waveId?: number; targetUsd9?: string; amountRaw?: string; sender?: string } = {}): string {
+    let body = beginCell()
       .storeUint(LOCK_VAULT_DEPOSIT_OPCODE, 32)
       .storeUint(BigInt('1'), 64)
       .storeCoins(BigInt(input.amountRaw || '1000'))
       .storeAddress(Address.parse(input.sender || senderAddress))
-      .storeBit(false)
-      .storeUint(input.waveId ?? 7, 32)
+      .storeBit(false);
+    if (input.targetUsd9) {
+      body = body
+        .storeUint(input.seasonId ?? 1, 8)
+        .storeUint(input.waveId ?? 7, 32)
+        .storeUint(BigInt(input.targetUsd9), 128);
+    } else {
+      body = body.storeUint(input.waveId ?? 7, 32);
+    }
+    return body
       .endCell()
       .toBoc()
       .toString('base64');
@@ -64,6 +72,76 @@ describe('chain receipt verifier selection', () => {
       } as any);
   }
 
+  function mockTonDepositVaultTransaction(input: {
+    body?: string;
+    source?: string;
+    destination?: string;
+    supportedTarget?: boolean;
+    derivedDepositKey?: string;
+    userState?: {
+      activeRaw?: string;
+      targetUsd9?: string;
+      seasonId?: number;
+      waveId?: number;
+      goalReached?: boolean;
+      pendingWithdrawal?: boolean;
+    };
+  } = {}) {
+    const targetUsd9 = input.userState?.targetUsd9 ?? '10000000000000';
+    const derivedDepositKey = input.derivedDepositKey ?? deriveLockVaultPositionId({ senderAddress, queryId: '1' });
+    return jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: [{
+            transaction_id: { lt: '123', hash: 'tx-hash' },
+            utime: 1777027651,
+            description: { aborted: false, compute_ph: { success: true }, action: { success: true } },
+            in_msg: {
+              source: input.source || vaultJettonWalletAddress,
+              destination: input.destination || lockVaultAddress,
+              body: input.body || buildDepositBody({ seasonId: 2, waveId: 7, targetUsd9: '10000000000000' }),
+            },
+          }],
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: {
+            stack: [['num', input.supportedTarget === false ? '0x0' : '-0x1']],
+          },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: {
+            stack: [['num', `0x${BigInt(derivedDepositKey).toString(16)}`]],
+          },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: {
+            stack: [
+              ['num', `0x${BigInt(input.userState?.activeRaw ?? '1000').toString(16)}`],
+              ['num', `0x${BigInt(targetUsd9).toString(16)}`],
+              ['num', `0x${BigInt(input.userState?.seasonId ?? 2).toString(16)}`],
+              ['num', `0x${BigInt(input.userState?.waveId ?? 7).toString(16)}`],
+              ['num', input.userState?.goalReached ? '-1' : '0x0'],
+              ['num', input.userState?.pendingWithdrawal ? '-1' : '0x0'],
+            ],
+          },
+        }),
+      } as any);
+  }
+
   beforeEach(() => {
     process.env = { ...originalEnv };
     delete process.env.RECEIPT_VERIFICATION_ENABLED;
@@ -72,6 +150,9 @@ describe('chain receipt verifier selection', () => {
     delete process.env.LOCK_VAULT_ADDRESS;
     delete process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS;
     delete process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET;
+    delete process.env.DEPOSIT_VAULT_ADDRESS;
+    delete process.env.DEPOSIT_VAULT_JETTON_WALLET_ADDRESS;
+    delete process.env.DEPOSIT_VAULT_JETTON_WALLET_ADDRESS_TESTNET;
     delete process.env.TON_TRANSACTIONS_API_URL;
     delete process.env.NODE_ENV;
     delete process.env.CHAIN_MAINLINE_WRITES_ENABLED;
@@ -229,6 +310,136 @@ describe('chain receipt verifier selection', () => {
       positionId: expectedPositionId,
       finalized: true,
     });
+    fetchMock.mockRestore();
+  });
+
+  it('verifies DepositVault V3 receipts with target and user state getters', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.DEPOSIT_VAULT_ADDRESS = lockVaultAddress;
+    process.env.DEPOSIT_VAULT_JETTON_WALLET_ADDRESS = vaultJettonWalletAddress;
+    const expectedPositionId = deriveLockVaultPositionId({ senderAddress, queryId: '1' });
+    const fetchMock = mockTonDepositVaultTransaction();
+
+    const receipt = await verifyDepositReceipt({
+      txHash: 'tx-hash',
+      seasonId: 2,
+      waveId: 7,
+      targetUsd9: '10000000000000',
+      amountRaw: '1000',
+      walletAddress: senderAddress,
+    });
+
+    expect(receipt).toMatchObject({
+      chainId: 'ton-testnet',
+      txHash: 'tx-hash',
+      walletAddress: Address.parse(senderAddress).toRawString().toLowerCase(),
+      amountRaw: '1000',
+      positionId: expectedPositionId,
+      seasonId: 2,
+      waveId: 7,
+      targetUsd9: '10000000000000',
+      finalized: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    fetchMock.mockRestore();
+  });
+
+  it('rejects DepositVault receipts when contract user state does not match the receipt', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.DEPOSIT_VAULT_ADDRESS = lockVaultAddress;
+    process.env.DEPOSIT_VAULT_JETTON_WALLET_ADDRESS = vaultJettonWalletAddress;
+    const fetchMock = mockTonDepositVaultTransaction({ userState: { waveId: 8 } });
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      seasonId: 2,
+      waveId: 7,
+      targetUsd9: '10000000000000',
+      amountRaw: '1000',
+      walletAddress: senderAddress,
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'POSITION_WAVE_MISMATCH',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    fetchMock.mockRestore();
+  });
+
+  it('rejects DepositVault V3 payloads when only legacy env aliases are used', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.LOCK_VAULT_ADDRESS = lockVaultAddress;
+    process.env.LOCK_VAULT_JETTON_WALLET_ADDRESS = vaultJettonWalletAddress;
+    const fetchMock = mockTonDepositVaultTransaction();
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      seasonId: 2,
+      waveId: 7,
+      targetUsd9: '10000000000000',
+      amountRaw: '1000',
+      walletAddress: senderAddress,
+    })).rejects.toMatchObject({
+      status: 503,
+      code: 'DEPOSIT_VAULT_NOT_CONFIGURED',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockRestore();
+  });
+
+  it('rejects DepositVault receipts when submitted goal metadata does not match the receipt', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.DEPOSIT_VAULT_ADDRESS = lockVaultAddress;
+    process.env.DEPOSIT_VAULT_JETTON_WALLET_ADDRESS = vaultJettonWalletAddress;
+    const fetchMock = mockTonDepositVaultTransaction();
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      seasonId: 2,
+      waveId: 7,
+      targetUsd9: '100000000000000',
+      amountRaw: '1000',
+      walletAddress: senderAddress,
+    })).rejects.toMatchObject({
+      code: 'TARGET_MISMATCH',
+      status: 409,
+    });
+
+    fetchMock.mockRestore();
+  });
+
+  it('rejects malformed submitted DepositVault targets without an internal error', async () => {
+    process.env.RECEIPT_VERIFICATION_ENABLED = 'true';
+    process.env.CHAIN_RECEIPT_VERIFIER = 'ton_rpc';
+    process.env.CHAIN_ID = 'ton-testnet';
+    process.env.CHAIN_RPC_URL = 'https://ton-testnet.api.onfinality.io/public/jsonRPC';
+    process.env.DEPOSIT_VAULT_ADDRESS = lockVaultAddress;
+    process.env.DEPOSIT_VAULT_JETTON_WALLET_ADDRESS = vaultJettonWalletAddress;
+    const fetchMock = mockTonDepositVaultTransaction();
+
+    await expect(verifyDepositReceipt({
+      txHash: 'tx-hash',
+      seasonId: 2,
+      waveId: 7,
+      targetUsd9: 'not-a-number',
+      amountRaw: '1000',
+      walletAddress: senderAddress,
+    })).rejects.toMatchObject({
+      code: 'INVALID_DEPOSIT_TARGET',
+      status: 400,
+    });
+
     fetchMock.mockRestore();
   });
 

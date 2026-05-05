@@ -3,6 +3,7 @@ import type { MerkleRewardProofWithBatch } from "./types";
 
 const JETTON_TRANSFER_OPCODE = 0x0f8a7ea5;
 const CLAIM_REWARD_OPCODE = 0x434c414d;
+export const DEPOSIT_GOAL_TARGETS = [10_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000] as const;
 
 function readPositiveBigInt(value: string, label: string): bigint {
   try {
@@ -102,15 +103,20 @@ export function deriveLockVaultPositionId(input: { walletAddress: string; queryI
 }
 
 export function buildDepositTransferBody(input: {
+  seasonId: number;
   waveId: number;
+  targetUsd9: string;
   amountRaw: string;
   lockVaultAddress: string;
   responseAddress: string;
   queryId?: string | number | bigint;
   forwardTon?: string;
 }) {
+  const targetUsd9 = readPositiveBigInt(input.targetUsd9, "targetUsd9");
   const forwardPayload = beginCell()
+    .storeUint(input.seasonId, 8)
     .storeUint(input.waveId, 32)
+    .storeUint(targetUsd9, 128)
     .endCell();
   const queryId = input.queryId === undefined ? BigInt(Date.now()) : readUint64(input.queryId, "queryId");
   return beginCell()

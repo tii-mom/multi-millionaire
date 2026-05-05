@@ -3,6 +3,7 @@ import { closePool, query } from '../db';
 const REQUIRED_MIGRATIONS = [
   '005_production_chain_ops.sql',
   '006_merkle_rewards.sql',
+  '007_deposit_streaks.sql',
 ];
 
 const REQUIRED_TABLES = [
@@ -11,6 +12,7 @@ const REQUIRED_TABLES = [
   'admin_audit_logs',
   'merkle_reward_batches',
   'merkle_reward_proofs',
+  'deposit_streak_goals',
 ];
 
 function redactDatabaseUrl(raw?: string) {

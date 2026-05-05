@@ -133,6 +133,11 @@ export function AdminListRows({
               <Metric label={t("admin.rows.wave")} value={`#${reward.wave_id}`} />
               <Metric label={t("common.created")} value={formatDate(reward.created_at, locale)} />
             </div>
+            {reward.source_ref && (
+              <div className="mt-3 truncate font-mono text-[10px] uppercase tracking-wide text-slate-500">
+                {t("admin.rows.sourceRef")}: {reward.source_ref}
+              </div>
+            )}
           </div>
         ))}
       </div>

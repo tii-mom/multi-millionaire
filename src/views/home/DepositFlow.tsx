@@ -13,7 +13,10 @@ type DepositFlowProps = {
   myDeposit: number;
   onDeposit: () => void;
   onInputChange: (value: string) => void;
+  onTargetChange: (value: number) => void;
   locale: string;
+  selectedTargetValue: number;
+  targetOptions: readonly number[];
   t: ReturnType<typeof useI18n>["t"];
 };
 
@@ -28,7 +31,10 @@ export default function DepositFlow({
   myDeposit,
   onDeposit,
   onInputChange,
+  onTargetChange,
   locale,
+  selectedTargetValue,
+  targetOptions,
   t,
 }: DepositFlowProps) {
   return (
@@ -56,6 +62,36 @@ export default function DepositFlow({
       </div>
 
       <div className="flex flex-col gap-5 p-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {targetOptions.map((target) => {
+            const selected = target === selectedTargetValue;
+            return (
+              <button
+                key={target}
+                type="button"
+                onClick={() => onTargetChange(target)}
+                disabled={isConfirming || backendUnavailable}
+                className={`focus-ring rounded-[10px] border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  selected
+                    ? "border-[#d7b46a]/50 bg-[#d7b46a]/14 text-[#d7b46a]"
+                    : "border-white/[0.08] bg-white/[0.035] text-white/68 hover:border-white/16 hover:bg-white/[0.055]"
+                }`}
+              >
+                <span className="block font-mono text-sm font-semibold tabular-nums">
+                  ${formatNumber(target, locale, { maximumFractionDigits: 0 })}
+                </span>
+                <span className="mt-0.5 block text-[8px] uppercase tracking-widest text-white/32">
+                  {t("home.deposit.targetTier")}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="rounded-[12px] border border-amber-200/18 bg-amber-200/8 px-3 py-2 text-[10px] leading-relaxed text-amber-50/80">
+          {t("home.deposit.goalWarning")}
+        </div>
+
         <div className="group relative flex flex-col gap-2">
           <div className="absolute right-5 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2">
             <button

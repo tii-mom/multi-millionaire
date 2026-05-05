@@ -62,6 +62,9 @@ test risk thresholds in production.
 - Current production deployment is an infrastructure canary, not a real
   chain-backed launch. Chain writes, wallet binding, receipt verification,
   indexer, and read-only chain integration are all disabled.
+- `npm run check:prelaunch` must pass on the release candidate before any
+  production promotion. Its output is a read-only readiness gate and should be
+  archived with the release record.
 - `ADMIN_OPERATIONS_ENABLED=false` and `RISK_REVIEW_ENABLED=false` are the
   intended no-manual-review production posture. This removes admin/risk review
   from the product path; it does not make undeployed contracts or unverified
@@ -71,8 +74,8 @@ test risk thresholds in production.
   controls are all validated on staging.
 - If `CHAIN_MAINLINE_WRITES_ENABLED=true`, `npm run check:env -- production`
   must fail closed unless all launch gates are present:
-  `TOKEN_DECIMALS=9`, deployed mainnet LockVault/MerkleClaim addresses, derived
-  Jetton wallet addresses, `WALLET_SIGNATURE_MODE=ton_proof`,
+  `TOKEN_DECIMALS=9`, deployed mainnet DepositVault/MerkleClaim addresses,
+  derived Jetton wallet addresses, `WALLET_SIGNATURE_MODE=ton_proof`,
   `CHAIN_RECEIPT_VERIFIER=ton_rpc`, `MERKLE_CLAIM_VERIFIER=ton_rpc`,
   `REWARD_CLAIM_MODEL=merkle`, `CHAIN_CANARY_ALLOWLIST`,
   positive `CHAIN_CANARY_MAX_AMOUNT_RAW`, explicit `CHAIN_CANARY_WAVE_IDS`,
@@ -80,9 +83,12 @@ test risk thresholds in production.
   `CONTRACTS_EXTERNAL_AUDIT_APPROVED=true`,
   `PRODUCTION_CANARY_APPROVED=true`, and `MAINNET_CANARY_EVIDENCE_URL`.
 - `CHAIN_RECEIPT_VERIFIER` must remain `disabled` or unset for production until
-  mainnet LockVault/MerkleClaim addresses, RPC, wallet binding, and receipt
-  parsing are validated against a small approved mainnet canary. The `test`
-  verifier is for local/staging-only controlled rehearsals.
+  the exact mainnet DepositVault/MerkleClaim addresses, RPC, wallet binding,
+  and receipt parsing are validated against a small approved mainnet canary.
+  DepositVault receipt verification requires all three V3 getters to agree with
+  the submitted receipt: `supportedTarget(targetUsd9)`,
+  `derivedDepositKey(user, queryId)`, and `userState(user)`.
+  The `test` verifier is for local/staging-only controlled rehearsals.
 - Production deposits must use `POST /v1/waves/:waveId/deposit-receipt`; the
   legacy `POST /v1/waves/:waveId/deposit` endpoint is an off-chain staging
   stub and fails closed when mainline chain writes are required.
@@ -91,15 +97,23 @@ test risk thresholds in production.
 - Limited gray launch uses Merkle Claim by default. Admins may create draft
   Merkle batches from approved, risk-clear reward ledgers; user claim status
   must follow verified claim events, not client-submitted status.
+- Streak rewards are eligibility ledgers until included in a published Merkle
+  batch with retrievable proof data. The product must show them as pending
+  proof/claim publication, not as chain-claimable rewards, before that point.
 - `pause_deposits`, `pause_reward_claims`, and `pause_referral_rewards` must be
   usable before public launch.
+- `PRODUCTION_PUBLIC_LAUNCH_ENABLED=true` requires
+  `ANTI_SYBIL_PUBLIC_LAUNCH_APPROVED=true`, external oracle approval, support
+  macros, incident ownership, and a rollback rehearsal. Without those gates,
+  operate only as closed beta, infrastructure canary, or off-chain MVP records.
 
 ## Non-Mutating Production Smoke
 
-Run only non-mutating checks by default. From `server/`:
+Run only non-mutating checks by default. From `server/`, the infrastructure
+canary profile is:
 
 ```bash
-API_BASE_URL="https://api.example.com" npm run smoke:production
+API_BASE_URL="https://api.example.com" npm run smoke:production-readonly
 ```
 
 This script only sends `GET` requests to:
@@ -108,8 +122,17 @@ This script only sends `GET` requests to:
 curl -fsS "$API_BASE_URL/health"
 curl -fsS "$API_BASE_URL/ready"
 curl -fsS "$API_BASE_URL/v1/app/bootstrap"
-curl -fsS "$API_BASE_URL/v1/waves/current"
 ```
+
+Restricted gray launch requires the stricter GET-only profile:
+
+```bash
+API_BASE_URL="https://api.example.com" npm run smoke:production-gray-readonly
+```
+
+That profile also checks `/v1/waves/current` and
+`/v1/season-war/current`, so it will fail until production campaign data is
+configured.
 
 It does not register users, create passes, join squads, submit deposits, claim
 rewards, or call admin endpoints. Keep the JSON output with the release marker
@@ -124,7 +147,8 @@ Latest evidence:
 
 - Date: 2026-04-26
 - API base URL: `https://api.mm.72h.lol`
-- Mode: `production-non-mutating`
+- Mode: historical `production-non-mutating`; current infra profile is
+  `production-infra-non-mutating`
 - Result: `pass`
 - Latest strict smoke rerun:
   `2026-04-26T15:32:47.292Z` to `2026-04-26T15:32:48.804Z`, `pass`
@@ -170,9 +194,12 @@ This proves the audit-remediated testnet LockVault can receive a real Jetton
 deposit and expose the derived position by getter, and the audit-remediated
 MerkleClaim can publish a one-leaf root and complete a claimant-owned testnet
 claim. It also proves the latest backend verifiers can parse those receipts
-when a transactions API returns execution descriptions. The local isolated
-database apply harness has also passed for deposit and claim receipts. This
-does not authorize production chain writes or mainnet launch.
+when a transactions API returns execution descriptions. It does not yet prove
+the V3 DepositVault target-deposit path; that path needs separate evidence
+recording the V3 ABI source, configured address, transaction hash, and getter
+agreement for `supportedTarget`, `derivedDepositKey`, and `userState`. The
+local isolated database apply harness has also passed for deposit and claim
+receipts. This does not authorize production chain writes or mainnet launch.
 
 Optional database apply harness:
 
@@ -198,10 +225,15 @@ non-production database. Use only a migrated throwaway database.
    contract ABI, RPC provider, wallet binding, receipt ingest, Merkle proof
    generation, claim-event verification, and emergency pause controls have all
    passed staging.
+   For target deposits, this includes a DepositVault testnet canary and backend
+   receipt apply using the V3 getter verifier, not only the legacy LockVault
+   verifier.
 3. Deploy the API to production with public traffic disabled or routed to an
    internal canary route when supported by the hosting platform.
-4. Run `API_BASE_URL="$PRODUCTION_API_BASE_URL" npm run smoke:production`.
-   Stop the canary if any step fails.
+4. Run `API_BASE_URL="$PRODUCTION_API_BASE_URL" npm run smoke:production-readonly`.
+   Stop the canary if any step fails. For restricted gray launch, also run
+   `API_BASE_URL="$PRODUCTION_API_BASE_URL" npm run smoke:production-gray-readonly`
+   after production campaign data is configured.
 5. Enable a small traffic slice or restricted operator access. Watch health,
    readiness, latency, error rate, database pool usage, and audit logs for at
    least 15 minutes.

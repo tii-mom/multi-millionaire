@@ -29,7 +29,9 @@ describe('TON Tact message parsers', () => {
     expect(parseLockVaultDepositBody(body)).toEqual({
       opcode: LOCK_VAULT_DEPOSIT_OPCODE,
       queryId: '11',
+      seasonId: null,
       waveId: 7,
+      targetUsd9: null,
       amountRaw: '1000',
       positionId: deriveLockVaultPositionId({ senderAddress: walletAddress, queryId: '11' }),
       senderAddress: wallet.toRawString().toLowerCase(),
@@ -53,9 +55,35 @@ describe('TON Tact message parsers', () => {
 
     expect(parseLockVaultDepositBody(body)).toMatchObject({
       queryId: '12',
+      seasonId: null,
       waveId: 8,
+      targetUsd9: null,
       amountRaw: '2000',
       positionId: deriveLockVaultPositionId({ senderAddress: walletAddress, queryId: '12' }),
+      senderAddress: wallet.toRawString().toLowerCase(),
+    });
+  });
+
+  it('parses DepositVault V3 goal metadata with season, wave, and USD9 target', () => {
+    const body = beginCell()
+      .storeUint(JETTON_TRANSFER_NOTIFICATION_OPCODE, 32)
+      .storeUint(BigInt('13'), 64)
+      .storeCoins(BigInt('3000'))
+      .storeAddress(wallet)
+      .storeBit(false)
+      .storeUint(2, 8)
+      .storeUint(9, 32)
+      .storeUint(BigInt('10000000000000'), 128)
+      .endCell()
+      .toBoc()
+      .toString('base64');
+
+    expect(parseLockVaultDepositBody(body)).toMatchObject({
+      queryId: '13',
+      seasonId: 2,
+      waveId: 9,
+      targetUsd9: '10000000000000',
+      amountRaw: '3000',
       senderAddress: wallet.toRawString().toLowerCase(),
     });
   });

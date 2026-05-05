@@ -16,8 +16,9 @@
     "seed:dev": "ts-node src/scripts/seedDev.ts",
     "smoke": "ts-node src/scripts/smoke.ts",
     "smoke:staging-mutating": "ts-node src/scripts/smoke.ts",
-    "smoke:production": "ts-node src/scripts/productionSmoke.ts",
-    "smoke:production-readonly": "ts-node src/scripts/productionSmoke.ts",
+    "smoke:production": "PRODUCTION_SMOKE_PROFILE=infra ts-node src/scripts/productionSmoke.ts",
+    "smoke:production-readonly": "PRODUCTION_SMOKE_PROFILE=infra ts-node src/scripts/productionSmoke.ts",
+    "smoke:production-gray-readonly": "PRODUCTION_SMOKE_PROFILE=gray ts-node src/scripts/productionSmoke.ts",
     "smoke:production-canary": "node -e \"if (process.env.PRODUCTION_CANARY_APPROVED !== 'true') { console.error('PRODUCTION_CANARY_APPROVED=true is required for production canary smoke'); process.exit(1); }\" && ts-node src/scripts/smoke.ts",
     "season-war:export": "ts-node src/scripts/exportSeasonWar.ts",
     "season-war:rehearsal:v2-large": "ts-node src/scripts/generateSeasonWarV2LargeRehearsal.ts"

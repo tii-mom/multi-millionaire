@@ -44,14 +44,15 @@ export default function BottomNav({ activeTab, setActiveTab }: { activeTab: stri
                 strokeWidth={isActive ? 2.35 : 1.9}
                 style={{ transform: isActive ? "translateY(-1px)" : "translateY(0)" }}
               />
-              <span
-                className={`relative z-10 max-w-[4.25rem] text-center text-[10px] font-bold leading-none transition-all duration-300 ${
-                  locale.startsWith("zh") ? "tracking-[0.02em]" : "truncate tracking-[0.08em]"
-                } ${isActive ? "translate-y-0 opacity-100 drop-shadow-[0_0_10px_rgba(215,180,106,0.18)]" : "translate-y-0.5 opacity-0"}`}
-                aria-hidden={!isActive}
-              >
-                {tab.label}
-              </span>
+              {isActive && (
+                <span
+                  className={`relative z-10 max-w-[4.25rem] text-center text-[10px] font-bold leading-none drop-shadow-[0_0_10px_rgba(215,180,106,0.18)] ${
+                    locale.startsWith("zh") ? "tracking-[0.02em]" : "truncate tracking-[0.08em]"
+                  }`}
+                >
+                  {tab.label}
+                </span>
+              )}
             </button>
           );
         })}

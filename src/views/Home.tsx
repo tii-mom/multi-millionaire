@@ -1,22 +1,21 @@
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, LogOut, PlugZap, ShieldCheck, Target, Wallet } from "lucide-react";
+import { Target } from "lucide-react";
 import { motion } from "motion/react";
-import { useIsConnectionRestored, useTonAddress, useTonConnectModal, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
+import { useIsConnectionRestored, useTonAddress, useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { api } from "@/src/lib/api";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
-import { buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId, rawTokenAmountToDisplayNumber, toRawTokenAmount } from "@/src/lib/tonTransactions";
+import { DEPOSIT_GOAL_TARGETS, buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId, rawTokenAmountToDisplayNumber, toRawTokenAmount } from "@/src/lib/tonTransactions";
 import {
   clearBackendAuthToken,
   clearTonWalletSession,
   readBackendAuthToken,
   readTonWalletSession,
-  shortWalletAddress,
-  writeBackendAuthToken,
   writeTonWalletSession,
 } from "@/src/lib/tonSession";
-import type { BootstrapData, WalletAuthIntent, WalletBindIntent, WalletBinding } from "@/src/lib/types";
+import type { BootstrapData, DepositStreakView, WalletBindIntent, WalletBinding } from "@/src/lib/types";
 import DepositFlow from "./home/DepositFlow";
+import DepositStreakPanel from "./home/DepositStreakPanel";
 import ReceiptSubmission from "./home/ReceiptSubmission";
 import WalletBindingFlow from "./home/WalletBindingFlow";
 import type { PendingDepositReceipt } from "./home/types";
@@ -36,15 +35,82 @@ function normalizeTonConnectChainId(chain: unknown): string | null {
   return value;
 }
 
+function wholeUsdToUsd9(value: number) {
+  return (BigInt(Math.round(value)) * 1_000_000_000n).toString();
+}
+
+const PREVIEW_STREAK_STORAGE_KEY = "72h_deposit_streak_preview";
+const PREVIEW_STREAK_PRICE_RAW = "200000000";
+const TOKEN_SCALE_RAW = 1_000_000_000n;
+
+function calculatePreviewRequiredRaw(targetUsd: number) {
+  const dailyUsd9 = BigInt(Math.round(targetUsd)) * 1_000_000_000n / 100n;
+  const price = BigInt(PREVIEW_STREAK_PRICE_RAW);
+  return ((dailyUsd9 * TOKEN_SCALE_RAW + price - 1n) / price).toString();
+}
+
+function buildPreviewDepositStreak(targetUsd: number, waveId: number | null): DepositStreakView {
+  const now = new Date().toISOString();
+  const targetUsd9 = wholeUsdToUsd9(targetUsd);
+  return {
+    goal: {
+      id: "preview-deposit-streak",
+      user_id: "preview-user",
+      wave_id: waveId || 1,
+      target_usd9: targetUsd9,
+      status: "active",
+      started_at: null,
+      completed_week_at: null,
+      completed_month_at: null,
+      created_at: now,
+      updated_at: now,
+    },
+    daily_target_usd9: (BigInt(targetUsd9) / 100n).toString(),
+    latest_price_raw: PREVIEW_STREAK_PRICE_RAW,
+    required_today_raw: calculatePreviewRequiredRaw(targetUsd),
+    current_day_index: null,
+    week_completed: false,
+    month_completed: false,
+    current_consecutive_days: 0,
+    monthly_progress_days: 0,
+    claimed_week_rewards: 0,
+    next_week_reward_index: 1,
+    next_week_reward_days_remaining: 7,
+    weekly_reward_cap: 4,
+    reward_pool_sufficient: true,
+    blocked_reward_reason: null,
+    streak_broken: false,
+    last_missed_day_index: null,
+    last_missed_day_start_at: null,
+    last_missed_required_usd9: null,
+    last_missed_deposited_usd9: null,
+    days: [],
+    pool: {
+      total_raw: "100000000000000000",
+      allocated_raw: "0",
+      remaining_raw: "100000000000000000",
+    },
+  };
+}
+
+function readPreviewDepositStreak(): DepositStreakView | null {
+  try {
+    const raw = window.localStorage.getItem(PREVIEW_STREAK_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as DepositStreakView : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue }: HomeProps) {
   const { formatError, locale, t } = useI18n();
   const [tonConnectUI] = useTonConnectUI();
-  const tonModal = useTonConnectModal();
   const tonWallet = useTonWallet();
   const tonAddress = useTonAddress();
   const rawTonAddress = useTonAddress(false);
   const connectionRestored = useIsConnectionRestored();
   const [inputValue, setInputValue] = useState("");
+  const [selectedTargetValue, setSelectedTargetValue] = useState(() => DEPOSIT_GOAL_TARGETS.includes(targetValue as (typeof DEPOSIT_GOAL_TARGETS)[number]) ? targetValue : 1_000_000);
   const [isConfirming, setIsConfirming] = useState(false);
   const [authToken, setAuthToken] = useState(readBackendAuthToken);
   const [tonSession, setTonSession] = useState(readTonWalletSession);
@@ -55,20 +121,21 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const [walletAddress, setWalletAddress] = useState("");
   const [walletSignature, setWalletSignature] = useState("");
   const [bindIntent, setBindIntent] = useState<WalletBindIntent | null>(null);
-  const [walletAuthIntent, setWalletAuthIntent] = useState<WalletAuthIntent | null>(null);
   const [wallets, setWallets] = useState<WalletBinding[]>([]);
   const [walletLoading, setWalletLoading] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [pendingDepositReceipt, setPendingDepositReceipt] = useState<PendingDepositReceipt | null>(null);
+  const [depositStreak, setDepositStreak] = useState<DepositStreakView | null>(null);
+  const [depositStreakLoading, setDepositStreakLoading] = useState(false);
+  const [depositStreakSaving, setDepositStreakSaving] = useState(false);
   const previousTonAddressRef = useRef<string | null>(tonSession?.address ?? null);
-  const walletAuthInFlightRef = useRef(false);
 
   const availableBalance = 2450000 - myDeposit;
   const hasConfirmedPrice = typeof tokenPrice === "number" && Number.isFinite(tokenPrice) && tokenPrice > 0;
   const currentFiatValue = hasConfirmedPrice ? myDeposit * tokenPrice : null;
-  const progressPercent = currentFiatValue == null ? 0 : Math.min((currentFiatValue / targetValue) * 100, 100);
-  const needed72H = currentFiatValue == null ? null : Math.max(0, (targetValue - currentFiatValue) / tokenPrice);
+  const progressPercent = currentFiatValue == null ? 0 : Math.min((currentFiatValue / selectedTargetValue) * 100, 100);
+  const needed72H = currentFiatValue == null ? null : Math.max(0, (selectedTargetValue - currentFiatValue) / tokenPrice);
   const goalMilestones = [25, 50, 75, 100];
   const backendUnavailable = !!bootstrapError && !bootstrap;
   const chainMainlineEnabled = !!bootstrap?.feature_flags?.chain_mainline_writes_enabled;
@@ -77,7 +144,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const depositsPaused = !!bootstrap?.controls?.pause_deposits?.enabled;
   const maintenanceBanner = bootstrap?.controls?.maintenance_banner;
   const receiptVerifierConfigured = !!bootstrap?.ops?.receipt_verifier?.configured;
-  const expectedChainId = bootstrap?.contracts?.chain_id || walletAuthIntent?.chain_id || "";
+  const expectedChainId = bootstrap?.contracts?.chain_id || "";
   const tonAccount = (tonWallet as any)?.account;
   const connectedChainId = normalizeTonConnectChainId(tonAccount?.chain);
   const chainMismatch =
@@ -112,7 +179,6 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
   const statusBannerTechnicalDetail = backendUnavailable ? localizedBootstrapError : "";
   const showStatusBannerTechnicalDetail = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV && statusBannerTechnicalDetail);
   const showApiError = !!apiError && apiError !== statusBannerMessage;
-  const activeWalletLabel = tonSession?.walletName || t("home.ton.walletFallback");
   const chainDisabledReason = backendUnavailable
     ? t("home.wallet.disabledBackend")
     : !tonSession
@@ -131,6 +197,21 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             ? t("home.wallet.disabledVerifier")
             : null;
   const chainActionDisabled = !!chainDisabledReason;
+
+  const loadDepositStreak = useCallback(async () => {
+    if (!authToken || !waveId) {
+      setDepositStreak(readPreviewDepositStreak());
+      return;
+    }
+    setDepositStreakLoading(true);
+    try {
+      setDepositStreak(await api.depositStreakMe(waveId, authToken));
+    } catch {
+      setDepositStreak(readPreviewDepositStreak());
+    } finally {
+      setDepositStreakLoading(false);
+    }
+  }, [authToken, waveId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,32 +272,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     }
   }, [connectionRestored, rawTonAddress, t, tonAddress, tonWallet]);
 
-  const openTonWallet = async () => {
-    setApiError(null);
-    try {
-      tonConnectUI.setConnectRequestParameters({ state: "loading" });
-      const intent = await api.createWalletAuthIntent();
-      setWalletAuthIntent(intent);
-      tonConnectUI.setConnectRequestParameters({
-        state: "ready",
-        value: { tonProof: intent.payload },
-      });
-      tonModal.open();
-    } catch (error) {
-      tonConnectUI.setConnectRequestParameters(null);
-      const message = formatError(error, "home.wallet.intentFailed");
-      setApiError(message);
-      toast.error(message);
-    }
-  };
-
-  const disconnectTonWallet = async () => {
-    try {
-      await tonConnectUI.disconnect();
-    } catch {
-      // The local UI session is still cleared below if the wallet bridge is already gone.
-    }
-
+  const clearWalletAuthState = useCallback(() => {
     setAuthToken(null);
     clearBackendAuthToken();
     clearTonWalletSession();
@@ -224,78 +280,64 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     previousTonAddressRef.current = null;
     setWallets([]);
     setBindIntent(null);
-    setWalletAuthIntent(null);
     setWalletSignature("");
     setPendingDepositReceipt(null);
     setApiError(null);
-    toast.message(t("home.ton.disconnected"));
-  };
+  }, []);
 
   useEffect(() => {
-    if (!connectionRestored || !tonWallet || authToken || walletAuthInFlightRef.current) return;
+    loadDepositStreak();
+  }, [loadDepositStreak]);
 
-    const account = (tonWallet as any).account;
-    const tonProof = (tonWallet as any).connectItems?.tonProof;
-    if (!account?.address || !account?.publicKey) {
-      setApiError(t("home.ton.backendAuthWaiting"));
+  useEffect(() => {
+    const handleAuthenticated = () => {
+      setAuthToken(readBackendAuthToken());
+      setApiError(null);
+    };
+    const handleDisconnected = () => {
+      clearWalletAuthState();
+      toast.message(t("home.ton.disconnected"));
+    };
+    window.addEventListener("72h-wallet-authenticated", handleAuthenticated);
+    window.addEventListener("72h-wallet-disconnected", handleDisconnected);
+    return () => {
+      window.removeEventListener("72h-wallet-authenticated", handleAuthenticated);
+      window.removeEventListener("72h-wallet-disconnected", handleDisconnected);
+    };
+  }, [clearWalletAuthState, t]);
+
+  const saveDepositStreakGoal = async () => {
+    if (!authToken) {
+      const preview = buildPreviewDepositStreak(selectedTargetValue, waveId);
+      window.localStorage.setItem(PREVIEW_STREAK_STORAGE_KEY, JSON.stringify(preview));
+      setDepositStreak(preview);
+      setApiError(null);
+      toast.success(t("home.streak.previewSaved"));
       return;
     }
-    if (chainMismatch) {
-      setApiError(t("home.ton.chainMismatch", { expected: expectedChainId, actual: connectedChainId }));
-      return;
-    }
-    if (!account.walletStateInit) {
-      setApiError(t("home.ton.stateInitMissing"));
-      return;
-    }
-    if (!tonProof || !("proof" in tonProof)) {
-      setApiError(t("home.ton.backendAuthWaiting"));
+    if (!waveId) {
+      setApiError(t("home.deposit.noWave"));
+      toast.error(t("home.deposit.noWave"));
       return;
     }
 
-    const intentToken = walletAuthIntent?.intent_token;
-    if (!intentToken) {
-      setApiError(t("home.ton.backendPending"));
-      return;
+    setDepositStreakSaving(true);
+    setApiError(null);
+    try {
+      const next = await api.saveDepositStreakGoal({
+        waveId,
+        targetUsd9: wholeUsdToUsd9(selectedTargetValue),
+      }, authToken);
+      setDepositStreak(next);
+      toast.success(t("home.streak.goalSaved"));
+    } catch (error) {
+      const message = formatError(error, "home.streak.goalSaveFailed");
+      setApiError(message);
+      toast.error(message);
+    } finally {
+      setDepositStreakSaving(false);
     }
-
-    walletAuthInFlightRef.current = true;
-    api.walletLogin({
-      walletAddress: account.address,
-      signature: JSON.stringify({
-        account: {
-          address: account.address,
-          chain: account.chain,
-          publicKey: account.publicKey,
-          walletStateInit: account.walletStateInit,
-        },
-        publicKey: account.publicKey,
-        walletStateInit: account.walletStateInit,
-        proof: tonProof.proof,
-      }),
-      intentToken,
-      walletType: tonWallet.device?.appName || "tonconnect",
-    })
-      .then((result) => {
-        writeBackendAuthToken(result.token);
-        setAuthToken(result.token);
-        if (result.wallet) {
-          setWallets((current) => [result.wallet!, ...current.filter((item) => item.id !== result.wallet!.id)]);
-        }
-        setWalletAuthIntent(null);
-        tonConnectUI.setConnectRequestParameters(null);
-        setApiError(null);
-        toast.success(t("home.ton.backendReady"));
-      })
-      .catch((error) => {
-        const message = formatError(error, "home.ton.backendPending");
-        setApiError(message);
-        toast.error(message);
-      })
-      .finally(() => {
-        walletAuthInFlightRef.current = false;
-      });
-  }, [authToken, chainMismatch, connectedChainId, connectionRestored, expectedChainId, formatError, t, tonConnectUI, tonWallet, walletAuthIntent]);
+  };
 
   const handleDeposit = async () => {
     if (backendUnavailable) {
@@ -353,8 +395,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         toast.error(message);
         return;
       }
-      const lockVaultAddress = bootstrap?.contracts?.vault;
-      if (!lockVaultAddress) {
+      const depositVaultAddress = bootstrap?.contracts?.deposit_vault;
+      if (!depositVaultAddress || bootstrap?.contracts?.deposit_contract_kind !== "deposit_vault") {
+        setApiError(t("home.deposit.depositVaultRequired"));
+        toast.error(t("home.deposit.depositVaultRequired"));
+        return;
+      }
+      if (!depositVaultAddress) {
         setApiError(t("home.deposit.contractMissing"));
         toast.error(t("home.deposit.contractMissing"));
         return;
@@ -368,10 +415,14 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         const derived = await api.deriveJettonWallet(ownerAddress, authToken);
         const queryId = createTonQueryId();
         const positionId = deriveLockVaultPositionId({ walletAddress: ownerAddress, queryId });
+        const seasonId = Number(bootstrap?.contracts?.deposit_season_id || 1);
+        const targetUsd9 = (BigInt(selectedTargetValue) * 1_000_000_000n).toString();
         const body = buildDepositTransferBody({
+          seasonId,
           waveId,
+          targetUsd9,
           amountRaw,
-          lockVaultAddress,
+          lockVaultAddress: depositVaultAddress,
           responseAddress: ownerAddress,
           queryId,
         });
@@ -386,10 +437,12 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         setPendingDepositReceipt({
           amountRaw,
           queryId,
+          seasonId,
           waveId,
+          targetUsd9,
           positionId,
           ownerAddress,
-          vaultAddress: lockVaultAddress,
+          vaultAddress: depositVaultAddress,
           jettonWalletAddress: derived.jetton_wallet,
         });
         setTxHash("");
@@ -420,10 +473,13 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         throw new Error(translatedReasons?.join(", ") || t("home.deposit.precheckFailed"));
       }
 
-      await api.deposit(waveId, val.toString(), authToken);
+      const tokenDecimals = Number(bootstrap?.contracts?.token_decimals || 9);
+      const amountRaw = toRawTokenAmount(inputValue, tokenDecimals);
+      const position = await api.deposit(waveId, amountRaw, authToken);
 
-      setMyDeposit((p: number) => p + val);
+      setMyDeposit((p: number) => p + rawTokenAmountToDisplayNumber(position.amount_raw || "0", tokenDecimals));
       setInputValue("");
+      await loadDepositStreak();
       toast.success(t("home.deposit.recorded", { amount: formatNumber(val, locale) }));
     } catch (error) {
       const message = formatError(error, "home.deposit.failed");
@@ -562,6 +618,8 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
           txHash: txHash.trim(),
           amount: pendingDepositReceipt.amountRaw,
           walletAddress: pendingDepositReceipt.ownerAddress,
+          seasonId: pendingDepositReceipt.seasonId,
+          targetUsd9: pendingDepositReceipt.targetUsd9,
         },
         authToken
       );
@@ -570,6 +628,7 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
       setTxHash("");
       setInputValue("");
       setPendingDepositReceipt(null);
+      await loadDepositStreak();
       toast.success(t("home.receipt.submitted"));
     } catch (error) {
       const message = formatError(error, "home.receipt.failed");
@@ -588,96 +647,16 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
 
   return (
     <div className="tab-content-safe flex flex-col gap-4 px-6">
-      <section className="financial-panel relative overflow-hidden rounded-[16px] p-4">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d7b46a]/35 to-transparent" />
-        <div className="relative z-10 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-white/[0.62]">
-              <Wallet className="h-4 w-4 text-[#d7b46a]" />
-              <span className="text-[10px] uppercase tracking-[0.2em]">{t("home.account.title")}</span>
-            </div>
-            <div className={`text-[9px] uppercase tracking-widest ${tonSession ? "text-[#d7b46a]" : "text-white/35"}`}>
-              {!connectionRestored ? t("common.loading") : tonSession ? t("common.connected") : t("common.required")}
-            </div>
-          </div>
-
-          {!tonSession ? (
-            <button
-              type="button"
-              onClick={openTonWallet}
-              disabled={!connectionRestored}
-              className="depth-button focus-ring flex w-full items-center justify-between gap-3 rounded-[14px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.075] px-3.5 py-3 text-left disabled:cursor-wait disabled:opacity-60"
-            >
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#d7b46a] text-black shadow-[0_10px_24px_rgba(215,180,106,0.12)]">
-                  {!connectionRestored ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-white/90">{t("home.ton.title")}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-white/[0.44]">{t("home.ton.helperShort")}</span>
-                </span>
-              </span>
-              <span className="shrink-0 rounded-full border border-[#d7b46a]/25 bg-[#d7b46a]/12 px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-widest text-[#d7b46a]">
-                {connectionRestored ? t("home.ton.connectShort") : t("home.ton.restoring")}
-              </span>
-            </button>
-          ) : (
-            <div className="grid gap-3">
-              <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#d7b46a]/20 bg-[#d7b46a]/[0.06] px-4 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d7b46a] text-black">
-                    <ShieldCheck className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-white/90">{activeWalletLabel}</div>
-                    <div className="mt-0.5 truncate font-mono text-[11px] text-[#d7b46a]/80">
-                      {shortWalletAddress(tonSession.address)}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={disconnectTonWallet}
-                  className="flex shrink-0 items-center gap-2 text-[10px] uppercase tracking-widest text-white/[0.52] transition-colors hover:text-white"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  {t("home.ton.disconnect")}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="metric-card rounded-[12px] px-3 py-3">
-                  <div className="text-[9px] uppercase tracking-widest text-white/35">{t("home.account.currentWave")}</div>
-                  <div className="mt-1 font-mono text-sm text-white/[0.82]">{waveId ? `#${waveId}` : t("home.account.loadingWave")}</div>
-                </div>
-                <div className="metric-card rounded-[12px] px-3 py-3">
-                  <div className="text-[9px] uppercase tracking-widest text-white/35">{t("home.ton.backend")}</div>
-                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${authToken ? "text-[#d7b46a]" : "text-amber-100/85"}`}>
-                    {authToken ? t("home.ton.backendReady") : t("home.ton.backendPendingShort")}
-                  </div>
-                </div>
-              </div>
-
-              {!authToken && (
-                <div className="rounded-xl border border-amber-200/20 bg-amber-200/10 px-3 py-2 text-[10px] font-mono leading-relaxed text-amber-50/85">
-                  {t("home.ton.backendPending")}
-                </div>
-              )}
-            </div>
-          )}
-
-          {showApiError && (
-            <div className="status-inline-error rounded-[10px] px-3 py-2 text-[10px] font-mono leading-relaxed">
-              {apiError}
-            </div>
-          )}
+      {showApiError && (
+        <div className="status-inline-error rounded-[12px] px-3 py-2 text-[10px] font-mono leading-relaxed">
+          {apiError}
         </div>
-      </section>
+      )}
 
       <section className="financial-panel relative overflow-hidden rounded-[16px] p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="relative z-10">
-          <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2 text-white/[0.56]">
               <Target className="h-4 w-4 text-[#d7b46a]" />
               <span className="ui-label">{t("home.goal.title")}</span>
@@ -687,19 +666,19 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
             </div>
           </div>
 
-          <div className="grid grid-cols-[1.18fr_0.82fr] gap-3">
-            <div className="metric-card rounded-[12px] px-4 py-3">
-              <div className="ui-label">{t("home.need.label")}</div>
+          <div className="grid grid-cols-[1.1fr_0.9fr] gap-3">
+            <div className="min-w-0 rounded-[12px] border border-white/[0.07] bg-black/[0.18] px-3.5 py-3">
+              <div className="ui-label text-[9px]">{t("home.need.label")}</div>
               <motion.div
                 key={needed72H ?? "unavailable"}
                 initial={{ opacity: 0.8, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-2 flex items-baseline gap-2 font-mono text-[1.8rem] font-semibold leading-none tracking-tight text-white"
+                className="mt-2 flex min-w-0 items-baseline gap-1.5 font-mono text-[1.55rem] font-semibold leading-none tracking-tight text-white"
               >
-                <span className="tabular-nums">{needed72H == null ? "--" : formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}</span>
+                <span className="min-w-0 truncate tabular-nums">{needed72H == null ? "--" : formatNumber(needed72H, locale, { maximumFractionDigits: 0 })}</span>
                 <span className="text-xs font-bold tracking-widest text-[#d7b46a]">{needed72H == null ? "" : "72H"}</span>
               </motion.div>
-              <div className="mt-2 text-[10px] uppercase tracking-[0.08em] text-white/[0.36]">
+              <div className="mt-2 truncate text-[9px] uppercase tracking-[0.08em] text-white/[0.36]">
                 {t("home.need.basedOn")}
                 <motion.span
                   key={tokenPrice ?? "unavailable"}
@@ -712,29 +691,29 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <div className="metric-card rounded-[12px] px-3 py-3">
+            <div className="grid min-w-0 gap-2">
+              <div className="rounded-[12px] border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
                 <div className="ui-label text-[9px]">{t("common.display")}</div>
                 <div className="mt-1 truncate font-mono text-sm font-semibold text-white/85 tabular-nums">
                   {currentFiatValue == null ? "--" : `$${formatNumber(currentFiatValue, locale, { maximumFractionDigits: 0 })}`}
                 </div>
               </div>
-              <div className="metric-card rounded-[12px] px-3 py-3">
+              <div className="rounded-[12px] border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
                 <div className="ui-label text-[9px]">{t("common.goal")}</div>
                 <div className="mt-1 truncate font-mono text-sm font-semibold text-white/85 tabular-nums">
-                  ${formatNumber(targetValue, locale)}
+                  ${formatNumber(selectedTargetValue, locale)}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4">
-            <div className="relative flex h-2 w-full items-center overflow-hidden rounded-full border border-white/[0.055] bg-black/55 shadow-inner">
+          <div className="mt-3">
+            <div className="relative flex h-1.5 w-full items-center overflow-hidden rounded-full border border-white/[0.055] bg-black/55 shadow-inner">
               <div className="absolute inset-x-0 top-1/2 z-0 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
               {goalMilestones.map((milestone) => (
                 <div
                   key={milestone}
-                  className={`absolute top-1/2 z-10 h-3 w-px -translate-y-1/2 ${
+                  className={`absolute top-1/2 z-10 h-2.5 w-px -translate-y-1/2 ${
                     progressPercent >= milestone ? "bg-[#d7b46a]/80" : "bg-white/[0.18]"
                   }`}
                   style={{ left: `${milestone}%` }}
@@ -745,10 +724,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
                 className="absolute left-0 top-0 z-20 flex h-full items-center justify-end bg-gradient-to-r from-[#6f5a2d] via-[#d7b46a]/80 to-[#f0ce83] transition-all duration-1000 ease-out"
                 style={{ width: `${Math.max(progressPercent, 2)}%` }}
               >
-                <div className="mr-0.5 h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_2px_#d7b46a]" />
+                <div className="mr-0.5 h-1 w-1 rounded-full bg-white shadow-[0_0_10px_2px_#d7b46a]" />
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-1 text-center font-mono text-[8px] uppercase tracking-widest text-white/[0.26]">
+            <div className="mt-2 grid grid-cols-4 gap-1 text-center font-mono text-[8px] uppercase tracking-widest text-white/[0.26]">
               {goalMilestones.map((milestone) => (
                 <span key={milestone} className={progressPercent >= milestone ? "text-[#d7b46a]/70" : ""}>
                   {milestone}%
@@ -759,6 +738,15 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         </div>
       </section>
 
+      <DepositStreakPanel
+        locale={locale}
+        selectedTargetValue={selectedTargetValue}
+        streak={depositStreak}
+        loading={depositStreakLoading}
+        saving={depositStreakSaving}
+        onSaveGoal={saveDepositStreakGoal}
+        t={t}
+      />
 
       {statusBannerMessage && (
         <div className={`status-notice rounded-[14px] px-4 py-2.5 ${
@@ -791,7 +779,10 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         myDeposit={myDeposit}
         onDeposit={handleDeposit}
         onInputChange={setInputValue}
+        onTargetChange={setSelectedTargetValue}
         locale={locale}
+        selectedTargetValue={selectedTargetValue}
+        targetOptions={DEPOSIT_GOAL_TARGETS}
         t={t}
       />
 

@@ -86,6 +86,9 @@ describe('API integration tests', () => {
     expect(res.body.data.contracts.season_claim_v2).toBe('EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b');
     expect(res.body.data.contracts.token_contract_metadata).toBe('/contracts/72h-v3-mainnet.json');
     expect(res.body.data.contracts.merkle_claim_role).toBe('legacy_reward_claim_path');
+    expect(res.body.data.contracts.deposit_vault).toBeDefined();
+    expect(res.body.data.contracts.deposit_vault_jetton_wallet).toBeDefined();
+    expect(res.body.data.contracts.deposit_season_id).toBe('1');
   });
 
   it('does not expose testnet MerkleClaim fallback in production bootstrap', async () => {

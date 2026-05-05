@@ -9,6 +9,7 @@ const REQUIRED_MIGRATIONS = [
   '004_risk.sql',
   '005_production_chain_ops.sql',
   '006_merkle_rewards.sql',
+  '007_deposit_streaks.sql',
 ];
 
 const REQUIRED_TABLES_AFTER_UP = [
@@ -26,6 +27,7 @@ const REQUIRED_TABLES_AFTER_UP = [
   'admin_audit_logs',
   'merkle_reward_batches',
   'merkle_reward_proofs',
+  'deposit_streak_goals',
 ];
 
 function redactDatabaseUrl(raw: string) {

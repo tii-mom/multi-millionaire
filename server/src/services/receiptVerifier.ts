@@ -7,14 +7,16 @@ import {
   TonMessageParseError,
   TonTransactionLike,
 } from './tonMessages';
-import { Cell } from '@ton/core';
+import { Address, beginCell, Cell } from '@ton/core';
 
 export type ChainReceiptVerifierStatus = 'disabled' | 'test' | 'ton_rpc' | 'not_configured';
 
 export interface DepositReceiptInput {
   txHash: string;
   logIndex?: number;
+  seasonId?: number;
   waveId?: number;
+  targetUsd9?: string;
   walletAddress?: string;
   contractAddress?: string;
   amountRaw?: string;
@@ -32,6 +34,9 @@ export interface VerifiedDepositReceipt {
   contractAddress: string;
   amountRaw: string;
   positionId: string;
+  seasonId: number | null;
+  waveId: number;
+  targetUsd9: string | null;
   blockNumber: number | null;
   blockTime: string | null;
   finalized: boolean;
@@ -55,6 +60,15 @@ interface LockVaultPositionSnapshot {
   amountRaw: string;
   waveId: number;
   status: number | null;
+}
+
+interface DepositVaultUserStateSnapshot {
+  activeRaw: string;
+  targetUsd9: string;
+  seasonId: number;
+  waveId: number;
+  goalReached: boolean | null;
+  pendingWithdrawal: boolean | null;
 }
 
 export class ReceiptVerificationError extends Error {
@@ -86,15 +100,38 @@ function productionMainnetConfigRequired(): boolean {
   return isProductionRuntime() || mainlineWrites || chainId === 'ton-mainnet';
 }
 
-function readProductionAddress(primaryName: string, testnetName: string): string {
-  const primary = process.env[primaryName]?.trim();
-  if (primary) {
-    return primary;
+function readProductionAddressAny(primaryNames: string[], testnetNames: string[]): string {
+  for (const name of primaryNames) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
   }
-  if (productionMainnetConfigRequired() && process.env[testnetName]?.trim()) {
-    return '';
+  if (productionMainnetConfigRequired()) {
+    for (const name of testnetNames) {
+      if (process.env[name]?.trim()) return '';
+    }
   }
-  return process.env[testnetName]?.trim() || '';
+  for (const name of testnetNames) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function isDepositVaultReceipt(deposit: { seasonId: number | null; targetUsd9: string | null }): boolean {
+  return Boolean(process.env.DEPOSIT_VAULT_ADDRESS?.trim()) || deposit.seasonId !== null || deposit.targetUsd9 !== null;
+}
+
+function explicitDepositVaultConfigured(): boolean {
+  return Boolean(process.env.DEPOSIT_VAULT_ADDRESS?.trim());
+}
+
+function normalizeSubmittedTargetUsd9(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  try {
+    return BigInt(value).toString();
+  } catch {
+    throw new ReceiptVerificationError(400, 'INVALID_DEPOSIT_TARGET', 'Deposit target must be a whole-number USD9 amount');
+  }
 }
 
 class DisabledChainReceiptVerifier implements ChainReceiptVerifier {
@@ -186,6 +223,9 @@ class TestChainReceiptVerifier implements ChainReceiptVerifier {
       contractAddress,
       amountRaw,
       positionId,
+      seasonId: input.seasonId ?? null,
+      waveId: input.waveId ?? 0,
+      targetUsd9: input.targetUsd9 ?? null,
       blockNumber: input.blockNumber ?? null,
       blockTime: input.blockTime ?? null,
       finalized,
@@ -213,14 +253,17 @@ class TonRpcReceiptVerifier implements ChainReceiptVerifier {
       throw new ReceiptVerificationError(503, 'CHAIN_RPC_NOT_CONFIGURED', 'CHAIN_RPC_URL is required for TON receipt verification');
     }
     if (!config.lockVault.address) {
-      throw new ReceiptVerificationError(503, 'LOCK_VAULT_NOT_CONFIGURED', 'LOCK_VAULT_ADDRESS is required for TON receipt verification');
+      throw new ReceiptVerificationError(503, 'LOCK_VAULT_NOT_CONFIGURED', 'DEPOSIT_VAULT_ADDRESS or LOCK_VAULT_ADDRESS is required for TON receipt verification');
     }
-    const vaultJettonWalletAddress = readProductionAddress('LOCK_VAULT_JETTON_WALLET_ADDRESS', 'LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET');
+    const vaultJettonWalletAddress = readProductionAddressAny(
+      ['DEPOSIT_VAULT_JETTON_WALLET_ADDRESS', 'LOCK_VAULT_JETTON_WALLET_ADDRESS'],
+      ['DEPOSIT_VAULT_JETTON_WALLET_ADDRESS_TESTNET', 'LOCK_VAULT_JETTON_WALLET_ADDRESS_TESTNET']
+    );
     if (!vaultJettonWalletAddress) {
       throw new ReceiptVerificationError(
         503,
         'LOCK_VAULT_JETTON_WALLET_NOT_CONFIGURED',
-        'LOCK_VAULT_JETTON_WALLET_ADDRESS is required for TON receipt verification'
+        'DEPOSIT_VAULT_JETTON_WALLET_ADDRESS or LOCK_VAULT_JETTON_WALLET_ADDRESS is required for TON receipt verification'
       );
     }
 
@@ -249,25 +292,71 @@ class TonRpcReceiptVerifier implements ChainReceiptVerifier {
     if (input.waveId !== undefined && match.deposit.waveId !== input.waveId) {
       throw new ReceiptVerificationError(409, 'WAVE_MISMATCH', 'Receipt wave does not match requested wave');
     }
+    if (input.seasonId !== undefined && match.deposit.seasonId !== input.seasonId) {
+      throw new ReceiptVerificationError(409, 'SEASON_MISMATCH', 'Receipt season does not match requested season');
+    }
+    const submittedTargetUsd9 = normalizeSubmittedTargetUsd9(input.targetUsd9);
+    if (submittedTargetUsd9 !== undefined && match.deposit.targetUsd9 !== submittedTargetUsd9) {
+      throw new ReceiptVerificationError(409, 'TARGET_MISMATCH', 'Receipt target does not match submitted target');
+    }
     if (input.walletAddress && normalizeTonAddress(input.walletAddress) !== match.deposit.senderAddress) {
       throw new ReceiptVerificationError(409, 'WALLET_MISMATCH', 'Receipt wallet does not match submitted wallet');
     }
     if (input.amountRaw && input.amountRaw !== match.deposit.amountRaw) {
       throw new ReceiptVerificationError(409, 'AMOUNT_MISMATCH', 'Receipt amount does not match submitted amount');
     }
-    if (input.positionId && input.positionId !== match.deposit.positionId) {
-      throw new ReceiptVerificationError(409, 'POSITION_MISMATCH', 'Receipt position does not match submitted position');
-    }
-
-    const position = await fetchLockVaultPosition(config.rpcUrl, config.lockVault.address, match.deposit.positionId);
-    if (position.ownerAddress !== match.deposit.senderAddress) {
-      throw new ReceiptVerificationError(409, 'POSITION_OWNER_MISMATCH', 'On-chain position owner does not match the receipt wallet');
-    }
-    if (position.amountRaw !== match.deposit.amountRaw) {
-      throw new ReceiptVerificationError(409, 'POSITION_AMOUNT_MISMATCH', 'On-chain position amount does not match the receipt amount');
-    }
-    if (position.waveId !== match.deposit.waveId) {
-      throw new ReceiptVerificationError(409, 'POSITION_WAVE_MISMATCH', 'On-chain position wave does not match the receipt wave');
+    let verifiedPositionId = match.deposit.positionId;
+    if (isDepositVaultReceipt(match.deposit)) {
+      if (!explicitDepositVaultConfigured()) {
+        throw new ReceiptVerificationError(
+          503,
+          'DEPOSIT_VAULT_NOT_CONFIGURED',
+          'DepositVault receipts require DEPOSIT_VAULT_ADDRESS; legacy LOCK_VAULT_ADDRESS cannot accept goal payloads'
+        );
+      }
+      if (match.deposit.seasonId === null || match.deposit.targetUsd9 === null) {
+        throw new ReceiptVerificationError(409, 'INVALID_DEPOSIT_GOAL_PAYLOAD', 'DepositVault receipts must include season, wave, and supported target payload');
+      }
+      const targetSupported = await fetchDepositVaultSupportedTarget(config.rpcUrl, config.lockVault.address, match.deposit.targetUsd9);
+      if (!targetSupported) {
+        throw new ReceiptVerificationError(409, 'UNSUPPORTED_DEPOSIT_TARGET', 'DepositVault target is not supported by the configured contract');
+      }
+      verifiedPositionId = await fetchDepositVaultDerivedDepositKey(
+        config.rpcUrl,
+        config.lockVault.address,
+        match.deposit.senderAddress,
+        match.deposit.queryId
+      );
+      if (input.positionId && input.positionId !== verifiedPositionId) {
+        throw new ReceiptVerificationError(409, 'POSITION_MISMATCH', 'Receipt position does not match the DepositVault derived deposit key');
+      }
+      const userState = await fetchDepositVaultUserState(config.rpcUrl, config.lockVault.address, match.deposit.senderAddress);
+      if (BigInt(userState.activeRaw) < BigInt(match.deposit.amountRaw)) {
+        throw new ReceiptVerificationError(409, 'POSITION_AMOUNT_MISMATCH', 'DepositVault active amount is lower than the receipt amount');
+      }
+      if (userState.seasonId !== match.deposit.seasonId) {
+        throw new ReceiptVerificationError(409, 'POSITION_SEASON_MISMATCH', 'DepositVault user season does not match the receipt season');
+      }
+      if (userState.waveId !== match.deposit.waveId) {
+        throw new ReceiptVerificationError(409, 'POSITION_WAVE_MISMATCH', 'DepositVault user wave does not match the receipt wave');
+      }
+      if (userState.targetUsd9 !== match.deposit.targetUsd9) {
+        throw new ReceiptVerificationError(409, 'POSITION_TARGET_MISMATCH', 'DepositVault user target does not match the receipt target');
+      }
+    } else {
+      if (input.positionId && input.positionId !== match.deposit.positionId) {
+        throw new ReceiptVerificationError(409, 'POSITION_MISMATCH', 'Receipt position does not match submitted position');
+      }
+      const position = await fetchLockVaultPosition(config.rpcUrl, config.lockVault.address, match.deposit.positionId);
+      if (position.ownerAddress !== match.deposit.senderAddress) {
+        throw new ReceiptVerificationError(409, 'POSITION_OWNER_MISMATCH', 'On-chain position owner does not match the receipt wallet');
+      }
+      if (position.amountRaw !== match.deposit.amountRaw) {
+        throw new ReceiptVerificationError(409, 'POSITION_AMOUNT_MISMATCH', 'On-chain position amount does not match the receipt amount');
+      }
+      if (position.waveId !== match.deposit.waveId) {
+        throw new ReceiptVerificationError(409, 'POSITION_WAVE_MISMATCH', 'On-chain position wave does not match the receipt wave');
+      }
     }
 
     return {
@@ -277,7 +366,10 @@ class TonRpcReceiptVerifier implements ChainReceiptVerifier {
       walletAddress: match.deposit.senderAddress,
       contractAddress: match.message.destination,
       amountRaw: match.deposit.amountRaw,
-      positionId: match.deposit.positionId,
+      positionId: verifiedPositionId,
+      seasonId: match.deposit.seasonId,
+      waveId: match.deposit.waveId,
+      targetUsd9: match.deposit.targetUsd9,
       blockNumber: getTonTransactionLt(match.transaction) ? Number(getTonTransactionLt(match.transaction)) : null,
       blockTime: getTonTransactionTime(match.transaction) ? new Date(getTonTransactionTime(match.transaction)! * 1000).toISOString() : null,
       finalized: true,
@@ -318,6 +410,33 @@ function readToncenterApiKey(): string | undefined {
   return process.env.TONCENTER_API_KEY?.trim() || process.env.TONCENTER_TESTNET_API_KEY?.trim() || undefined;
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRetryableChainRpcError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes('429') || message.includes('timeout') || message.includes('timed out') || message.includes('socket hang up') || message.includes('network');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withChainRpcRetry<T>(label: string, operation: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableChainRpcError(error) || attempt === attempts) break;
+      await sleep(attempt * 1000);
+    }
+  }
+  throw lastError;
+}
+
 function deriveToncenterV3TransactionsUrl(rpcUrl: string): string | null {
   const explicit = process.env.TON_TRANSACTIONS_API_URL?.trim();
   if (explicit) {
@@ -343,11 +462,13 @@ async function fetchToncenterV3Transactions(apiUrl: string, address: string): Pr
   if (apiKey) {
     headers['X-API-Key'] = apiKey;
   }
-  const response = await fetch(url, { headers });
-  if (!response.ok) {
-    throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', `TON transactions API returned HTTP ${response.status}`);
-  }
-  const payload: { transactions?: TonTransactionLike[]; error?: string; message?: string } = await response.json();
+  const payload = await withChainRpcRetry('ton transactions', async () => {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', `TON transactions API returned HTTP ${response.status}`);
+    }
+    return response.json() as Promise<{ transactions?: TonTransactionLike[]; error?: string; message?: string }>;
+  });
   if (!Array.isArray(payload.transactions)) {
     throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', payload.error || payload.message || 'TON transactions API returned an invalid response');
   }
@@ -387,10 +508,13 @@ function normalizeStackInt(value: unknown): string {
     return BigInt(value).toString();
   }
   if (typeof value === 'string') {
+    if (value.startsWith('-0x')) {
+      return (-BigInt(`0x${value.slice(3)}`)).toString();
+    }
     return BigInt(value).toString();
   }
   if (Array.isArray(value) && value.length >= 2) {
-    return BigInt(String(value[1])).toString();
+    return normalizeStackInt(String(value[1]));
   }
   if (value && typeof value === 'object') {
     const record = value as { value?: unknown; num?: unknown };
@@ -398,6 +522,13 @@ function normalizeStackInt(value: unknown): string {
     if (record.num !== undefined) return normalizeStackInt(record.num);
   }
   throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', 'TON RPC returned an unsupported get-method integer stack item');
+}
+
+function normalizeStackBool(value: unknown): boolean {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return BigInt(normalizeStackInt(value)) !== BigInt(0);
 }
 
 function normalizeStackAddress(value: unknown): string {
@@ -476,6 +607,105 @@ function parseLockVaultPositionPayload(payload: unknown): LockVaultPositionSnaps
     };
   }
   throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', 'TON RPC did not return a readable LockVault position');
+}
+
+function parseDepositVaultSupportedTargetPayload(payload: unknown): boolean {
+  const result = (payload && typeof payload === 'object' ? payload as any : {})?.result ?? payload;
+  if (typeof result === 'boolean') return result;
+  if (result && typeof result === 'object' && !Array.isArray(result) && result.supported !== undefined) {
+    return Boolean(result.supported);
+  }
+  if (Array.isArray(result?.stack) && result.stack.length >= 1) {
+    return normalizeStackBool(result.stack[0]);
+  }
+  return normalizeStackBool(result);
+}
+
+function parseDepositVaultDerivedKeyPayload(payload: unknown): string {
+  const result = (payload && typeof payload === 'object' ? payload as any : {})?.result ?? payload;
+  if (result && typeof result === 'object' && !Array.isArray(result) && result.depositKey !== undefined) {
+    return BigInt(result.depositKey).toString();
+  }
+  if (result && typeof result === 'object' && !Array.isArray(result) && result.derivedDepositKey !== undefined) {
+    return BigInt(result.derivedDepositKey).toString();
+  }
+  if (Array.isArray(result?.stack) && result.stack.length >= 1) {
+    return normalizeStackInt(result.stack[0]);
+  }
+  return normalizeStackInt(result);
+}
+
+function parseDepositVaultUserStatePayload(payload: unknown): DepositVaultUserStateSnapshot {
+  const result = (payload && typeof payload === 'object' ? payload as any : {})?.result ?? payload;
+  const candidate = result?.userState ?? result;
+  if (candidate && typeof candidate === 'object' && !Array.isArray(candidate) && candidate.activeRaw !== undefined) {
+    return {
+      activeRaw: BigInt(candidate.activeRaw).toString(),
+      targetUsd9: BigInt(candidate.targetUsd9).toString(),
+      seasonId: Number(candidate.seasonId),
+      waveId: Number(candidate.waveId),
+      goalReached: candidate.goalReached === undefined || candidate.goalReached === null ? null : Boolean(candidate.goalReached),
+      pendingWithdrawal: candidate.pendingWithdrawal === undefined || candidate.pendingWithdrawal === null ? null : Boolean(candidate.pendingWithdrawal),
+    };
+  }
+  const stack = result?.stack;
+  if (Array.isArray(stack) && stack.length >= 6) {
+    return {
+      activeRaw: normalizeStackInt(stack[0]),
+      targetUsd9: normalizeStackInt(stack[1]),
+      seasonId: Number(normalizeStackInt(stack[2])),
+      waveId: Number(normalizeStackInt(stack[3])),
+      goalReached: normalizeStackBool(stack[4]),
+      pendingWithdrawal: normalizeStackBool(stack[5]),
+    };
+  }
+  throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', 'TON RPC did not return a readable DepositVault user state');
+}
+
+function buildRunGetMethodAddressStackItem(address: string): unknown[] {
+  const cell = beginCell().storeAddress(Address.parse(address)).endCell().toBoc().toString('base64');
+  return ['tvm.Slice', cell];
+}
+
+async function runTonGetMethod(rpcUrl: string, address: string, method: string, stack: unknown[]): Promise<unknown> {
+  return withChainRpcRetry(`ton get-method ${method}`, async () => {
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: `get-${method}-${Date.now()}`,
+        method: 'runGetMethod',
+        params: { address, method, stack },
+      }),
+    });
+    if (!response.ok) {
+      throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', `TON RPC returned HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    if (payload?.ok === false) {
+      throw new ReceiptVerificationError(503, 'CHAIN_RPC_ERROR', payload.error?.message || `TON RPC ${method} get-method failed`);
+    }
+    return payload;
+  });
+}
+
+async function fetchDepositVaultSupportedTarget(rpcUrl: string, address: string, targetUsd9: string): Promise<boolean> {
+  const payload = await runTonGetMethod(rpcUrl, address, 'supportedTarget', [['num', `0x${BigInt(targetUsd9).toString(16)}`]]);
+  return parseDepositVaultSupportedTargetPayload(payload);
+}
+
+async function fetchDepositVaultDerivedDepositKey(rpcUrl: string, address: string, userAddress: string, queryId: string): Promise<string> {
+  const payload = await runTonGetMethod(rpcUrl, address, 'derivedDepositKey', [
+    buildRunGetMethodAddressStackItem(userAddress),
+    ['num', `0x${BigInt(queryId).toString(16)}`],
+  ]);
+  return parseDepositVaultDerivedKeyPayload(payload);
+}
+
+async function fetchDepositVaultUserState(rpcUrl: string, address: string, userAddress: string): Promise<DepositVaultUserStateSnapshot> {
+  const payload = await runTonGetMethod(rpcUrl, address, 'userState', [buildRunGetMethodAddressStackItem(userAddress)]);
+  return parseDepositVaultUserStatePayload(payload);
 }
 
 async function fetchLockVaultPosition(rpcUrl: string, address: string, positionId: string): Promise<LockVaultPositionSnapshot> {

@@ -7,6 +7,7 @@ import { createRiskFlag } from '../models/riskModel';
 import { activateSquadMember } from '../models/squadModel';
 import { Wave } from '../models/waveModel';
 import { isControlEnabled, riskReviewEnabled } from './productionGuards';
+import { evaluateDepositStreakRewards } from '../models/depositStreakModel';
 
 export type DepositApplySource = 'offchain_stub' | 'chain_receipt';
 
@@ -91,6 +92,26 @@ function highRiskNote(source: DepositApplySource, threshold: bigint) {
   return `First qualifying ${qualifier} exceeded configured threshold ${threshold.toString()}`;
 }
 
+function requireConfirmedEntryPrice(price: Awaited<ReturnType<typeof getLatestConfirmedPrice>>): string {
+  if (!price) {
+    const error = new Error('A confirmed 72H price is required before recording deposits');
+    (error as any).status = 409;
+    (error as any).code = 'PRICE_REQUIRED';
+    throw error;
+  }
+  try {
+    if (BigInt(price.price) <= BigInt(0)) {
+      throw new Error('non-positive');
+    }
+  } catch {
+    const error = new Error('Latest confirmed 72H price must be a positive raw USD9 amount');
+    (error as any).status = 409;
+    (error as any).code = 'INVALID_CONFIRMED_PRICE';
+    throw error;
+  }
+  return price.price;
+}
+
 export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepositResult> {
   const shouldRunRiskReview = riskReviewEnabled();
   const amount = BigInt(input.amountRaw);
@@ -100,13 +121,13 @@ export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepos
     [input.userId]
   );
   const isFirstQualifyingForUser = qualifies && existing.rows[0].count === '0';
-  const price = await getLatestConfirmedPrice();
+  const entryPrice = requireConfirmedEntryPrice(await getLatestConfirmedPrice());
   const position = await createPosition(
     input.userId,
     input.wave.wave_id,
     input.amountRaw,
     input.onchainPositionId,
-    price ? price.price : '0',
+    entryPrice,
     input.unlockMultiplierBps,
     qualifies,
     isFirstQualifyingForUser,
@@ -141,7 +162,7 @@ export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepos
   if (isFirstQualifyingForUser) {
     await lockReferral(input.userId, input.executor);
   }
-  if (qualifies) {
+  if (qualifies && !(await isControlEnabled('pause_deposit_streak_rewards'))) {
     await activateSquadMember(input.wave.wave_id, input.userId, input.executor);
   }
 
@@ -172,6 +193,15 @@ export async function applyDeposit(input: ApplyDepositInput): Promise<ApplyDepos
       severity: 'medium',
       note: highRiskNote(input.source, highRiskThreshold),
     }, input.executor);
+  }
+
+  if (qualifies) {
+    await evaluateDepositStreakRewards({
+      userId: input.userId,
+      waveId: input.wave.wave_id,
+      depositCreatedAt: position.created_at || new Date(),
+      executor: input.executor,
+    });
   }
 
   return { position, qualifies, isFirstQualifyingForUser };

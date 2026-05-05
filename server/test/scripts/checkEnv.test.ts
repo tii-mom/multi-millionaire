@@ -57,8 +57,8 @@ function productionChainWriteEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.Proc
     CHAIN_RPC_URL: 'https://toncenter.com/api/v2/jsonRPC',
     TOKEN_ADDRESS: 'EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3',
     TOKEN_DECIMALS: '9',
-    LOCK_VAULT_ADDRESS: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
-    LOCK_VAULT_JETTON_WALLET_ADDRESS: 'EQBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBM9d',
+    DEPOSIT_VAULT_ADDRESS: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+    DEPOSIT_VAULT_JETTON_WALLET_ADDRESS: 'EQBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBM9d',
     MERKLE_CLAIM_ADDRESS: 'EQCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCM9e',
     REWARD_JETTON_WALLET_ADDRESS: 'EQDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDM9f',
     REWARD_CLAIM_MODEL: 'merkle',
@@ -169,6 +169,22 @@ describe('checkEnv production chain gates', () => {
     expect(result.stderr).toBe('');
     expect(result.code).toBe(0);
     expect(result.parsed.status).toBe('pass');
+  });
+
+  it('rejects legacy LockVault aliases for production chain write gates', () => {
+    const result = runCheckEnv(productionChainWriteEnv({
+      DEPOSIT_VAULT_ADDRESS: '',
+      DEPOSIT_VAULT_JETTON_WALLET_ADDRESS: '',
+      LOCK_VAULT_ADDRESS: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+      LOCK_VAULT_JETTON_WALLET_ADDRESS: 'EQBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBM9d',
+    }));
+
+    expect(result.code).toBe(1);
+    expect(result.parsed.status).toBe('fail');
+    expect(result.parsed.required).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'DEPOSIT_VAULT_ADDRESS', status: 'missing' }),
+      expect.objectContaining({ name: 'DEPOSIT_VAULT_JETTON_WALLET_ADDRESS', status: 'missing' }),
+    ]));
   });
 
   it('fails public launch when only owner staged price is available', () => {

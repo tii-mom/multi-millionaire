@@ -82,9 +82,9 @@ app.get('/ready', async (req, res) => {
     const migrations = await query<{ ok: number }>(
       `SELECT 1
        FROM schema_migrations
-       WHERE filename IN ('005_production_chain_ops.sql','006_merkle_rewards.sql')
+       WHERE filename IN ('005_production_chain_ops.sql','006_merkle_rewards.sql','007_deposit_streaks.sql')
        GROUP BY 1
-       HAVING COUNT(*) = 2`
+       HAVING COUNT(*) = 3`
     );
     if (migrations.rows.length === 0) {
       throw new Error('Required production migrations are not applied');
@@ -95,13 +95,15 @@ app.get('/ready', async (req, res) => {
       admin_audit_logs: string | null;
       merkle_reward_batches: string | null;
       merkle_reward_proofs: string | null;
+      deposit_streak_goals: string | null;
     }>(
       `SELECT
          to_regclass('public.app_controls') AS app_controls,
          to_regclass('public.chain_events') AS chain_events,
          to_regclass('public.admin_audit_logs') AS admin_audit_logs,
          to_regclass('public.merkle_reward_batches') AS merkle_reward_batches,
-         to_regclass('public.merkle_reward_proofs') AS merkle_reward_proofs`
+         to_regclass('public.merkle_reward_proofs') AS merkle_reward_proofs,
+         to_regclass('public.deposit_streak_goals') AS deposit_streak_goals`
     );
     const tableStatus = tables.rows[0];
     if (!tableStatus || Object.values(tableStatus).some((value) => value === null)) {

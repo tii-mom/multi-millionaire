@@ -154,7 +154,7 @@ async function clickTabAndAssert(client, label, marker) {
   const clicked = await evaluate(client, `
     (() => {
       const buttons = Array.from(document.querySelectorAll("button"));
-      const button = buttons.find((item) => item.textContent?.trim() === ${JSON.stringify(label)});
+      const button = buttons.find((item) => item.getAttribute("aria-label") === ${JSON.stringify(label)} || item.textContent?.trim() === ${JSON.stringify(label)});
       if (!button) return false;
       button.click();
       return true;
@@ -205,7 +205,7 @@ try {
   await waitFor(client, "Boolean(document.querySelector('.app-shell'))", "app shell");
 
   const checks = [
-    ["锁仓记录", "TON 钱包访问"],
+    ["财富自由", "存款目标"],
     ["战队", "奖励池"],
     ["战况", "专业价格走势图"],
     ["奖励记录", "奖励账本"],
@@ -214,7 +214,7 @@ try {
   const navOrder = await evaluate(client, `
     Array.from(document.querySelectorAll('.bottom-nav-shell button')).map((button) => button.getAttribute('aria-label') || button.textContent?.trim()).filter(Boolean).join('/')
   `);
-  if (navOrder !== "锁仓记录/战队/战况/奖励记录") {
+  if (navOrder !== "财富自由/战队/战况/奖励记录") {
     throw new Error(`Unexpected bottom nav order: ${navOrder}`);
   }
 

@@ -8,6 +8,7 @@ export const controlKeys: AppControlKey[] = [
   "pause_deposits",
   "pause_reward_claims",
   "pause_referral_rewards",
+  "pause_deposit_streak_rewards",
   "maintenance_banner",
 ];
 
@@ -23,6 +24,10 @@ export const controlDetails: Record<AppControlKey, { labelKey: string; detailKey
   pause_referral_rewards: {
     labelKey: "admin.controls.pauseReferralRewards",
     detailKey: "admin.controls.pauseReferralRewardsDetail",
+  },
+  pause_deposit_streak_rewards: {
+    labelKey: "admin.controls.pauseDepositStreakRewards",
+    detailKey: "admin.controls.pauseDepositStreakRewardsDetail",
   },
   maintenance_banner: {
     labelKey: "admin.controls.maintenanceBanner",

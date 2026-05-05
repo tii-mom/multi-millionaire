@@ -4,7 +4,7 @@ This checklist is for preparing the real-funds gray launch. It is non-mutating u
 
 ## Scope
 
-- Use the deployed mainnet LockVault, MerkleClaim, Jetton master, LockVault Jetton wallet, and MerkleClaim reward Jetton wallet.
+- Use the deployed mainnet `MultiMillionaireDepositVault`/DepositVault, MerkleClaim, 72H Jetton master, DepositVault Jetton wallet, and MerkleClaim reward Jetton wallet.
 - Do not use SeasonClaimV2 testnet addresses as mainnet configuration.
 - Do not publish a SeasonClaimV2 production root while bridge evidence remains `bridge-forward-complete-pending-legacy-settle`.
 - Do not run the mutating canary unless `PRODUCTION_CANARY_APPROVED=true` is set for a named canary window.
@@ -44,10 +44,16 @@ Before running `npm run smoke:production-canary`, confirm:
 2. The canary amount is below `CHAIN_CANARY_MAX_AMOUNT_RAW`.
 3. The target wave id is in `CHAIN_CANARY_WAVE_IDS`.
 4. Pause controls are ready for deposits and reward claims.
-5. The expected LockVault deposit receipt and MerkleClaim claim receipt fields are documented.
+5. The expected DepositVault target-deposit receipt and MerkleClaim claim receipt fields are documented.
 6. A rollback note is prepared for pausing deposits or reward claims.
 
 Only then set `PRODUCTION_CANARY_APPROVED=true` for the canary window and run the mutating smoke.
+
+The DepositVault target-deposit receipt must carry season id, wave id, target
+USD9, sender wallet, raw amount, query id, and the derived DepositVault
+position key. Backend receipt verification must confirm `supportedTarget`,
+`derivedDepositKey`, and `userState` against the configured DepositVault before
+any position is applied.
 
 ## Current SeasonClaimV2 gate
 

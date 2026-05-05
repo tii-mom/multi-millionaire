@@ -169,6 +169,7 @@ export type AppControlKey =
   | 'pause_deposits'
   | 'pause_reward_claims'
   | 'pause_referral_rewards'
+  | 'pause_deposit_streak_rewards'
   | 'maintenance_banner';
 
 export interface AppControl {
@@ -392,14 +393,67 @@ export interface RewardLedger {
   id: string;
   beneficiary_user_id: string;
   source_user_id: string;
-  source_position_id: string;
+  source_position_id: string | null;
   wave_id: number;
   reward_type: string;
   gross_amount: string;
   final_amount: string;
   status: 'pending' | 'approved' | 'claimed' | 'rejected';
+  source_ref: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DepositStreakGoal {
+  id: string;
+  user_id: string;
+  wave_id: number;
+  target_usd9: string;
+  status: 'active' | 'completed' | 'cancelled' | 'expired';
+  started_at: string | null;
+  completed_week_at: string | null;
+  completed_month_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DepositStreakDay {
+  day_index: number;
+  start_at: string;
+  end_at: string;
+  required_usd9: string;
+  deposited_usd9: string;
+  completed: boolean;
+  is_current: boolean;
+}
+
+export interface DepositStreakView {
+  goal: DepositStreakGoal | null;
+  daily_target_usd9: string;
+  latest_price_raw: string | null;
+  required_today_raw: string | null;
+  current_day_index: number | null;
+  week_completed: boolean;
+  month_completed: boolean;
+  current_consecutive_days: number;
+  monthly_progress_days: number;
+  claimed_week_rewards: number;
+  next_week_reward_index: number | null;
+  next_week_reward_days_remaining: number | null;
+  weekly_reward_cap: number;
+  reward_pool_sufficient: boolean;
+  blocked_reward_reason: 'pool_exhausted' | 'paused' | null;
+  streak_broken: boolean;
+  last_missed_day_index: number | null;
+  last_missed_day_start_at: string | null;
+  last_missed_required_usd9: string | null;
+  last_missed_deposited_usd9: string | null;
+  days: DepositStreakDay[];
+  pool: {
+    total_raw: string;
+    allocated_raw: string;
+    remaining_raw: string;
+  };
 }
 
 export type MerkleRewardBatchStatus = 'draft' | 'published' | 'active' | 'superseded' | 'settled';
@@ -503,6 +557,7 @@ export interface AdminReward {
   source_user_id: string;
   source_email: string | null;
   source_position_id: string;
+  source_ref: string | null;
   wave_id: number;
   reward_type: string;
   gross_amount: string;

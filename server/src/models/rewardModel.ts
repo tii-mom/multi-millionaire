@@ -13,12 +13,13 @@ export interface RewardLedger {
   id: string;
   beneficiary_user_id: string;
   source_user_id: string;
-  source_position_id: string;
+  source_position_id: string | null;
   wave_id: number;
   reward_type: string;
   gross_amount: string;
   final_amount: string;
   status: RewardStatus;
+  source_ref: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -60,7 +61,8 @@ export interface RewardEstimate {
 interface CreateRewardLedgerInput {
   beneficiaryUserId: string;
   sourceUserId: string;
-  sourcePositionId: string;
+  sourcePositionId?: string | null;
+  sourceRef?: string | null;
   waveId: number;
   rewardType?: string;
   grossAmount: string;
@@ -70,7 +72,7 @@ interface CreateRewardLedgerInput {
 
 const rewardLedgerColumns = `
   id, beneficiary_user_id, source_user_id, source_position_id, wave_id,
-  reward_type, gross_amount, final_amount, status, created_at, updated_at
+  reward_type, gross_amount, final_amount, status, source_ref, created_at, updated_at
 `;
 
 export async function createRewardLedger(input: CreateRewardLedgerInput, executor?: QueryExecutor): Promise<RewardLedger | null> {
@@ -78,20 +80,21 @@ export async function createRewardLedger(input: CreateRewardLedgerInput, executo
   const result = await db.query<RewardLedger>(
     `INSERT INTO reward_ledgers (
        beneficiary_user_id, source_user_id, source_position_id, wave_id,
-       reward_type, gross_amount, final_amount, status, created_at, updated_at
+       reward_type, gross_amount, final_amount, status, source_ref, created_at, updated_at
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-     ON CONFLICT (source_position_id, reward_type) DO NOTHING
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+     ON CONFLICT DO NOTHING
      RETURNING ${rewardLedgerColumns}`,
     [
       input.beneficiaryUserId,
       input.sourceUserId,
-      input.sourcePositionId,
+      input.sourcePositionId || null,
       input.waveId,
       input.rewardType || 'direct_referral',
       input.grossAmount,
       input.finalAmount,
       input.status,
+      input.sourceRef || null,
     ]
   );
   return result.rows[0] || null;

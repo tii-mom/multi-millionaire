@@ -1,5 +1,5 @@
 import { Address, Cell } from "@ton/core";
-import { buildClaimRewardBody, buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId, rawTokenAmountToDisplayNumber, toRawTokenAmount } from "../tonTransactions";
+import { DEPOSIT_GOAL_TARGETS, buildClaimRewardBody, buildDepositTransferBody, createTonQueryId, deriveLockVaultPositionId, rawTokenAmountToDisplayNumber, toRawTokenAmount } from "../tonTransactions";
 import type { MerkleRewardProofWithBatch } from "../types";
 
 const JETTON_TRANSFER_OPCODE = 0x0f8a7ea5;
@@ -20,12 +20,18 @@ describe("ton transaction body builders", () => {
     dateNow.mockRestore();
   });
 
+  it("exposes exactly the six supported DepositVault USD target tiers", () => {
+    expect(DEPOSIT_GOAL_TARGETS).toEqual([10_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000]);
+  });
+
   it("encodes TonConnect jetton deposit transfer body deterministically", () => {
     const lockVaultAddress = rawAddress("1");
     const responseAddress = rawAddress("2");
 
     const body = buildDepositTransferBody({
+      seasonId: 2,
       waveId: 7,
+      targetUsd9: "10000000000000",
       amountRaw: "123456789",
       lockVaultAddress,
       responseAddress,
@@ -43,7 +49,9 @@ describe("ton transaction body builders", () => {
     expect(slice.loadBit()).toBe(true);
 
     const forwardPayload = slice.loadRef().beginParse();
+    expect(forwardPayload.loadUint(8)).toBe(2);
     expect(forwardPayload.loadUint(32)).toBe(7);
+    expect(forwardPayload.loadUintBig(128)).toBe(10000000000000n);
     forwardPayload.endParse();
     slice.endParse();
 

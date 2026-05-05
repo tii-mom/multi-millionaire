@@ -4,11 +4,21 @@ export const JETTON_TRANSFER_NOTIFICATION_OPCODE = 0x7362d09c;
 export const LOCK_VAULT_DEPOSIT_OPCODE = JETTON_TRANSFER_NOTIFICATION_OPCODE;
 export const MERKLE_CLAIM_OPCODE = 0x434c414d;
 export const JETTON_EXCESSES_OPCODE = 0xd53276db;
+export const DEPOSIT_GOAL_TARGETS_USD9 = [
+  '10000000000000',
+  '100000000000000',
+  '500000000000000',
+  '1000000000000000',
+  '5000000000000000',
+  '10000000000000000',
+] as const;
 
 export interface ParsedLockVaultDeposit {
   opcode: number;
   queryId: string;
+  seasonId: number | null;
   waveId: number;
+  targetUsd9: string | null;
   amountRaw: string;
   positionId: string;
   senderAddress: string;
@@ -127,6 +137,11 @@ function loadDepositForwardPayload(slice: Slice): Slice {
   throw new TonMessageParseError('INVALID_TON_BODY', 'Jetton deposit notification is missing forward payload metadata');
 }
 
+export function isSupportedDepositGoalTargetUsd9(value: string | bigint): boolean {
+  const normalized = BigInt(value).toString();
+  return (DEPOSIT_GOAL_TARGETS_USD9 as readonly string[]).includes(normalized);
+}
+
 function assertTransactionSucceeded(transaction: TonTransactionLike): void {
   const description = transaction.description;
   if (!description) {
@@ -163,12 +178,26 @@ export function parseLockVaultDepositBody(bodyBase64: string): ParsedLockVaultDe
   const amountRaw = slice.loadCoins().toString();
   const senderAddress = addressToComparableString(slice.loadAddress());
   const forwardPayload = loadDepositForwardPayload(slice);
-  const waveId = Number(forwardPayload.loadUint(32));
+  let seasonId: number | null = null;
+  let targetUsd9: string | null = null;
+  let waveId: number;
+  if (forwardPayload.remainingBits >= 168) {
+    seasonId = Number(forwardPayload.loadUint(8));
+    waveId = Number(forwardPayload.loadUint(32));
+    targetUsd9 = forwardPayload.loadUintBig(128).toString();
+    if (!isSupportedDepositGoalTargetUsd9(targetUsd9)) {
+      throw new TonMessageParseError('UNSUPPORTED_DEPOSIT_TARGET', 'Deposit goal target is not one of the supported USD9 tiers');
+    }
+  } else {
+    waveId = Number(forwardPayload.loadUint(32));
+  }
 
   return {
     opcode,
     queryId,
+    seasonId,
     waveId,
+    targetUsd9,
     amountRaw,
     positionId: deriveLockVaultPositionId({ senderAddress, queryId }),
     senderAddress,

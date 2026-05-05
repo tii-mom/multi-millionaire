@@ -77,6 +77,21 @@ npm run build
 npm test
 ```
 
+## Prelaunch Readiness
+
+Run the repository-level prelaunch gate before preparing any release candidate:
+
+```bash
+npm run audit:release-scope
+npm run check:prelaunch
+```
+
+These gates are read-only. They check release scope, release-freeze state,
+required launch artifacts, production environment readiness, public-launch
+anti-sybil approval, and chain-write canary approval. See
+[docs/ops/prelaunch-readiness.md](docs/ops/prelaunch-readiness.md) for the
+operating rules.
+
 ## Environment Variables
 
 Frontend:
@@ -142,4 +157,4 @@ Backend:
 - Sprint 2: contract-backed deposit flow, reward batch publication, wallet binding, and stronger risk gates.
 - Sprint 3: settlement, withdrawals, admin operations, analytics, and production hardening.
 
-See [docs/roadmap.md](docs/roadmap.md) for the detailed sprint plan, [docs/architecture.md](docs/architecture.md) for system structure, and [docs/api-overview.md](docs/api-overview.md) for API coverage.
+See [docs/roadmap.md](docs/roadmap.md) for the detailed sprint plan, [docs/architecture.md](docs/architecture.md) for system structure, [docs/api-overview.md](docs/api-overview.md) for API coverage, and [docs/deposit-streak-rules.md](docs/deposit-streak-rules.md) for the 30-day deposit streak operating rules.
