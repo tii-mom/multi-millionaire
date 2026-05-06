@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Dispatch, MouseEvent, ReactNode, SetStateAction } from "react";
+import { useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import { toast } from "sonner";
 import { Copy, Download, Loader2, ShareIcon, Zap } from "lucide-react";
 import { formatNumber, useI18n } from "@/src/lib/i18n";
@@ -18,47 +18,6 @@ export default function Share({ myDeposit }: ShareProps) {
   const isChinese = locale.startsWith("zh");
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const shareOrigin = useMemo(() => getShareOrigin(), []);
-  const referralCode = useMemo(() => decodeShareCode(authToken), [authToken]);
-  const referralLink = useMemo(
-    () => `${shareOrigin}/?ref=${encodeURIComponent(referralCode)}`,
-    [referralCode, shareOrigin]
-  );
-  const squadLink = useMemo(() => {
-    const squadKey = featuredSquad ? String(featuredSquad.id) : "pending";
-    const waveKey = waveId ? String(waveId) : "pending";
-    return `${shareOrigin}/?squad=${encodeURIComponent(squadKey)}&wave=${encodeURIComponent(waveKey)}`;
-  }, [featuredSquad, shareOrigin, waveId]);
-
-  const loadShareLinks = useCallback(async () => {
-    setLinksLoading(true);
-    setLinksError(null);
-
-    try {
-      const wave = await api.currentWave();
-      if (!wave?.wave_id) {
-        setWaveId(null);
-        setFeaturedSquad(null);
-        return;
-      }
-
-      const nextWaveId = Number(wave.wave_id);
-      setWaveId(nextWaveId);
-      const rows = await api.listSquads(nextWaveId);
-      setFeaturedSquad(rows[0] || null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load share links.";
-      setLinksError(message);
-      setWaveId(null);
-      setFeaturedSquad(null);
-    } finally {
-      setLinksLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadShareLinks();
-  }, [loadShareLinks]);
 
   const generateImage = async () => {
     if (!posterRef.current) return null;

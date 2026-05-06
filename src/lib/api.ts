@@ -1,7 +1,5 @@
 import type {
   ApiEnvelope,
-  ApiErrorCode,
-  ApiErrorEnvelope,
   AdminDashboard,
   AdminAuditLog,
   AdminOpsDiagnostics,
@@ -86,7 +84,7 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
-  const payload = await response.json().catch(() => null) as ApiEnvelope<T> | ApiErrorEnvelope | null;
+  const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message = payload?.error?.message || `Request failed with ${response.status}`;
     throw new ApiRequestError(message, response.status, payload?.error?.code);

@@ -37,8 +37,6 @@ export default function Rewards() {
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [hasAuthToken, setHasAuthToken] = useState(() => Boolean(localStorage.getItem("auth_token")));
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [proofLoadingId, setProofLoadingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
