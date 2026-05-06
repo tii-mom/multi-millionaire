@@ -137,4 +137,5 @@ Cloudflare smoke run:
 - No real chain lock occurred in this smoke.
 - `POST /v1/waves/:waveId/deposit` remains an off-chain recorded deposit stub.
 - `POST /v1/rewards/:ledgerId/claim` remains an off-chain status update stub.
-- Risk blocking and release are verified through `risk_flags` state, not on-chain settlement.
+- Risk blocking and release are verified through `risk_flags` state, not
+  on-chain settlement.

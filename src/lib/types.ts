@@ -11,6 +11,8 @@ export interface ApiErrorEnvelope {
   };
 }
 
+export type ApiErrorCode = string;
+
 export interface User {
   id: string;
   email: string;

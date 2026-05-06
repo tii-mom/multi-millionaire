@@ -213,8 +213,9 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
     }
   }, [authToken, waveId]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadBootstrap = useCallback(async () => {
+    setBootstrapLoading(true);
+    setBootstrapError(null);
 
     async function loadBootstrap() {
       try {
@@ -232,11 +233,6 @@ export default function Home({ tokenPrice, myDeposit, setMyDeposit, targetValue 
         }
       }
     }
-
-    loadBootstrap();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
