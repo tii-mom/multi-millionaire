@@ -62,10 +62,46 @@ describe('API integration tests', () => {
   });
 
   it('GET /v1/app/bootstrap should return bootstrap payload', async () => {
+    delete process.env.RECEIPT_VERIFICATION_ENABLED;
+    delete process.env.CHAIN_RECEIPT_VERIFIER;
+
     const res = await request(app).get('/v1/app/bootstrap');
     expect(res.status).toBe(200);
     expect(res.body.data).toBeDefined();
     expect(res.body.data.current_wave).toBeDefined();
     expect(res.body.data.latest_price).toBeDefined();
+    expect(res.body.data.ops.receipt_verifier).toMatchObject({
+      configured: false,
+      status: 'disabled',
+      mode: 'disabled',
+    });
+    expect(res.body.data.ops.merkle_claim_verifier).toMatchObject({
+      configured: false,
+      status: 'not_configured',
+    });
+    expect(res.body.data.ops.runtime_path).toBe('staging-mvp');
+    expect(res.body.data.feature_flags.staging_mvp_enabled).toBe(true);
+    expect(res.body.data.contracts.token_address_mainnet).toBe('EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3');
+    expect(res.body.data.contracts.season_claim).toBe('EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b');
+    expect(res.body.data.contracts.season_claim_v2).toBe('EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b');
+    expect(res.body.data.contracts.token_contract_metadata).toBe('/contracts/72h-v3-mainnet.json');
+    expect(res.body.data.contracts.merkle_claim_role).toBe('legacy_reward_claim_path');
+    expect(res.body.data.contracts.deposit_vault).toBeDefined();
+    expect(res.body.data.contracts.deposit_vault_jetton_wallet).toBeDefined();
+    expect(res.body.data.contracts.deposit_season_id).toBe('1');
+  });
+
+  it('does not expose testnet MerkleClaim fallback in production bootstrap', async () => {
+    const originalEnv = { ...process.env };
+    process.env.NODE_ENV = 'production';
+    process.env.CHAIN_ID = 'ton-mainnet';
+    delete process.env.MERKLE_CLAIM_ADDRESS;
+    process.env.MERKLE_CLAIM_ADDRESS_TESTNET = 'EQDTESTMERKLECLAIMADDRESS000000000000000000000000000';
+
+    const res = await request(app).get('/v1/app/bootstrap');
+    expect(res.status).toBe(200);
+    expect(res.body.data.contracts.merkle_claim).toBe('');
+
+    process.env = originalEnv;
   });
 });

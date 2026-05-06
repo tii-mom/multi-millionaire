@@ -1,57 +1,56 @@
 # Staging Smoke Test
 
-## Current Cloudflare RC1 Evidence
+## Cloudflare RC1 Evidence
 
 - Repository: `tii-mom/multi-millionaire`
 - Date: `2026-04-24`
 - Backend staging URL: `https://multi-millionaire-api-staging.348421501.workers.dev`
 - Frontend staging URL: `https://staging.multi-millionaire-staging.pages.dev`
-- Database route: `Hyperdrive -> Neon Postgres`
-- Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
-- Hyperdrive name: `rc1-staging-postgres`
-- Hyperdrive origin host:
-  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
-- Hyperdrive caching: `disabled`
-- Smoke run id: `cf-20260424-neon-rc1`
+- Database route used by this evidence:
+  `Hyperdrive -> VPC Service -> Tunnel -> local Postgres`
+- Smoke run id: `cf-20260424-rc1-final`
 - Smoke status: `pass`
 - Runtime: `NODE_ENV=staging`
 - High-risk threshold used in smoke: `1000000`
 
-The current smoke supersedes the earlier historical
-`cf-20260424-rc1-final` smoke because it ran after the live data plane moved
-from the local tunnel-backed origin to Neon Postgres.
+This document separates:
 
-## Current Live Smoke Status
+1. Real Cloudflare smoke evidence against the deployed Cloudflare backend URL
+2. Earlier local rehearsal evidence against the prepared origin database
 
-As of `2026-04-24`, the current live backend is smokeable and healthy:
+Only the first one counts as Cloudflare RC1 evidence.
 
-- `GET /health`: `200`
-- `GET /ready`: `200`
-- readiness database status: `ok`
-- frontend `GET /`: `200`
-- Hyperdrive origin: Neon direct/unpooled Postgres, `sslmode=require`
-- local Postgres plus Cloudflare Tunnel dependency: none
-- current complete Cloudflare smoke: pass
+## Evidence Classification
 
-Cloudflare API tokens and the Neon `DATABASE_URL` were not written to
-repository files, documentation, or commits.
+This smoke proves that the deployed Cloudflare Worker completed the RC1
+functional path against the temporary tunnel-backed Postgres route at the time
+of the run. It does not prove a sustainable RC1 environment because the data
+plane still depended on a workstation-local Postgres process and an interactive
+Cloudflare Tunnel session.
+
+As of the latest live check in this thread, `/health` returns `200` but
+`/ready` returns `503` with `database=error`. After Hyperdrive is repointed to
+managed Postgres, migrations and seed must be rerun on that origin and this
+full Cloudflare smoke must be rerun before the RC1 decision can change to
+`sustainable RC1 environment: yes`.
 
 ## Real Cloudflare Smoke Result
 
 Command used:
 
 ```bash
+cd server
 API_BASE_URL=https://multi-millionaire-api-staging.348421501.workers.dev \
-SMOKE_RUN_ID=cf-20260424-neon-rc1 \
+SMOKE_RUN_ID=cf-20260424-rc1-final \
 npm run smoke
 ```
 
 Top-level result:
 
 - `status: pass`
-- `started_at: 2026-04-24T02:27:44.918Z`
-- `finished_at: 2026-04-24T02:27:59.983Z`
-- `duration_ms: 15065`
+- `started_at: 2026-04-23T16:47:57.134Z`
+- `finished_at: 2026-04-23T16:48:16.492Z`
+- `duration_ms: 19358`
 
 ## Real Cloudflare Smoke Steps
 
@@ -59,35 +58,53 @@ Top-level result:
 | --- | --- | --- |
 | Health check | `GET /health` returned `200`, `status=ok` | Pass |
 | Readiness check | `GET /ready` returned `200`, `status=ready`, `database=ok` | Pass |
-| Register | Captain/member/risk users registered | Pass |
+| Register | Captain/member/risk users registered with `201` | Pass |
 | Login | Captain and admin login returned `200` | Pass |
 | Claim pass | Captain claimed wave `1` pass | Pass |
-| Create squad | `201`, `squad_id=1`, initial squad status `open` | Pass |
-| Join squad | Member joined squad as `joined_pending` | Pass |
+| Create squad | `201`, `squad_id=2`, initial squad status `open` | Pass |
+| Join squad | Member joined squad `2` as `joined_pending` | Pass |
 | Confirm referral | Member referral saved as `pending` | Pass |
 | Deposit precheck | `200`, `ok=true`, wave status `live` | Pass |
-| Deposit | `201`, qualifying position `2c9ac27b-c64a-4c74-97d6-df9a0b6e823d` created | Pass |
-| Squad activation | Verified through the qualifying deposit path and downstream reward availability | Pass |
-| Referral reward generate | Verified by approved reward ledger `26d65278-c9d0-413f-9655-0a45869b6e48` | Pass |
+| Deposit | `201`, qualifying position `2417b2a7-8e9a-4422-b95c-a62e47582bee` created | Pass |
+| Squad activation | Verified indirectly through the qualifying deposit path completing and the downstream reward path becoming available | Pass |
+| Referral reward generate | Verified by approved reward `e10a63d3-11c7-47a5-a8b6-c2b2c31ce477` appearing after the qualifying deposit | Pass |
 | Reward summary/list | Summary returned `approved_amount=10`; approved reward list contained the new ledger | Pass |
 | Reward claim | First reward claim returned `200`, status became `claimed` | Pass |
-| Risk trigger | High-value deposit `2000000` created risk position `eb1281d5-ca40-4a38-abc3-a05278fa6eac` | Pass |
+| Risk trigger | High-value deposit `2000000` created risk position `f0df2d35-e92a-43e0-887c-0b354dff8716` | Pass |
 | Risk block | Claim returned `409` with `RISK_REVIEW_REQUIRED` while flag was open | Pass |
-| Risk resolve | Admin resolved risk flag `77e56da8-7cad-42ff-8720-fd1d5b78c70b` | Pass |
+| Risk resolve | Admin resolved risk flag `ded87b81-298b-4d8c-9f4c-e8da207a8730` | Pass |
 | Claim retry after risk resolve | Previously blocked reward claim returned `200`, status became `claimed` | Pass |
+
+## Next Staging Admin Ops Evidence
+
+The next staging smoke must keep mutating admin checks in staging and record:
+
+- smoke run id
+- commit SHA
+- control key toggled
+- restored control state
+- audit log id/action for the control update
+- `GET /v1/admin/chain-events?apply_status=applied` result count and filter
+- `/v1/admin/ops` receipt verifier mode/status
+
+Production smoke remains GET-only and must not include admin control toggles,
+deposits, reward claims, risk mutations, or Merkle draft creation unless a
+separate production canary approval records the operator, canary account,
+amount, and rollback window.
 
 ## Real Cloudflare Smoke IDs
 
 - Wave: `1`
-- Squad: `1`
-- Standard reward ledger: `26d65278-c9d0-413f-9655-0a45869b6e48`
-- Risk position: `eb1281d5-ca40-4a38-abc3-a05278fa6eac`
-- Risk flag: `77e56da8-7cad-42ff-8720-fd1d5b78c70b`
-- Risk-blocked reward ledger: `43bd5b45-4fc4-4d56-b68a-bba2e693c36d`
+- Pass: `a8960ae2-80b9-4c17-bef9-d232acbdb655`
+- Squad: `2`
+- Standard reward ledger: `e10a63d3-11c7-47a5-a8b6-c2b2c31ce477`
+- Risk position: `f0df2d35-e92a-43e0-887c-0b354dff8716`
+- Risk flag: `ded87b81-298b-4d8c-9f4c-e8da207a8730`
+- Risk-blocked reward ledger: `6304f74c-2c28-4ab8-8aeb-944fcee523ee`
 
-## Root Cause Fixed Before This Smoke
+## Root Cause Fixed During This Thread
 
-The earlier tunnel-backed Cloudflare smoke uncovered a read-after-write issue:
+The first Cloudflare smoke attempt failed after registration:
 
 - `register`: pass
 - immediate `login`: fail with `401 INVALID_CREDENTIALS`
@@ -98,18 +115,22 @@ Root cause:
 - register path first queried `findByEmail(email)` and cached the empty result
 - immediate login queried the same email and hit that stale empty lookup
 
-Fix retained for the Neon cutover:
+Fix:
 
-- staging Hyperdrive caching remains `disabled`
+- staging Hyperdrive caching was changed to `disabled`
 
-## RC1 Classification
+After that update, login and the rest of the real Cloudflare smoke passed.
 
-- Internal RC1 candidate: `yes`
-  - reason: the current live backend is healthy and a complete Cloudflare smoke
-    passed against the deployed staging backend
-- Sustainable RC1 environment: `yes`
-  - reason: the current live Hyperdrive origin is Neon Postgres, not local
-    Postgres plus Cloudflare Tunnel
+## Local Rehearsal Evidence
+
+Before the final Hyperdrive binding, the prepared Postgres origin was also
+verified locally. This remains useful evidence but is not counted as the
+Cloudflare smoke run:
+
+- local backend URL: `http://127.0.0.1:4100`
+- migrations `001 -> 004`: pass
+- `seed:dev`: pass
+- local smoke result: pass
 
 ## Boundary Notes
 

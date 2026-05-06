@@ -4,14 +4,15 @@ This is the Express + TypeScript API for the Project 72H / Millionaire Path MVP.
 
 ## Current Contract Status
 
-The current backend is not connected to real smart contracts.
+The current backend separates the production-chain path from staging MVP stubs.
 
-- `POST /v1/waves/:waveId/deposit` is an off-chain recorded deposit stub. It writes a `positions` row and creates a fake `onchain_position_id` so the MVP can exercise downstream product logic.
-- `POST /v1/rewards/:ledgerId/claim` is an off-chain reward claim stub. It only moves a reward ledger from `approved` to `claimed`.
-- Reward batches are schema-only in Sprint 1. No Merkle root is published on-chain.
-- Real vault, lock, settlement, and reward distributor contracts are planned for Sprint 2.
+- `POST /v1/waves/:waveId/deposit-receipt` is the production-chain deposit path. It requires receipt verification, wallet ownership resolution, duplicate chain-event protection, and transactional position application.
+- `POST /v1/rewards/:ledgerId/claim-receipt` is the production-chain reward confirmation path for Merkle claims.
+- `POST /v1/waves/:waveId/staging-mvp/deposit` is an off-chain recorded deposit stub for staging/demo runtimes. The legacy `/deposit` path remains only as a compatibility alias.
+- `POST /v1/rewards/:ledgerId/staging-mvp/claim` is an off-chain reward claim stub for staging/demo runtimes. The legacy `/claim` path remains only as a compatibility alias.
+- Oracle, distributor, and indexer resources are future-disabled unless explicitly enabled by config.
 
-Do not represent Sprint 1 deposits or reward claims as real on-chain locks or real token transfers.
+Do not represent staging MVP deposits or reward claims as real on-chain locks or real token transfers. Production chain runtimes fail closed on the off-chain stubs.
 
 ## Setup
 
@@ -66,17 +67,17 @@ npm run seed:dev
 
 - `app`: bootstrap data for the frontend.
 - `auth`: register/login and JWT issuance.
-- `waves`: wave lookup, pass claim, deposit precheck, and deposit recording.
+- `waves`: wave lookup, pass claim, deposit precheck, staging MVP deposit recording, and production deposit receipt application.
 - `referrals`: inviter binding before first qualifying deposit.
 - `prices`: latest confirmed price.
 - `squads`: squad creation, membership, and leaderboard data.
-- `rewards`: reward summaries, ledgers, and claim stub.
+- `rewards`: reward summaries, ledgers, staging MVP claim stub, Merkle proof data, and production claim receipt application.
 - `risk`: admin risk flag review APIs.
 
 ## Known MVP Limits
 
-- No wallet binding or signature verification.
+- Wallet binding and signature verification are gated by runtime config.
 - No production admin UI.
-- No real chain transaction validation.
+- Real chain transaction validation requires receipt/Merkle verifier configuration.
 - No on-chain reward transfer.
 - Risk rules are intentionally simple and should be treated as review gates, not complete fraud detection.

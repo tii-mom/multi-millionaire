@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tact-lang/tact/main/src/config/configSchema.json",
+  "projects": [
+    {
+      "name": "LockVault",
+      "path": "contracts/lock_vault.tact",
+      "output": "build/LockVault",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
+    },
+    {
+      "name": "MerkleClaim",
+      "path": "contracts/merkle_claim.tact",
+      "output": "build/MerkleClaim",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
+    },
+    {
+      "name": "TestJetton",
+      "path": "contracts/test_jetton.tact",
+      "output": "build/TestJetton",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
+    }
+  ]
+}

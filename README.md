@@ -77,6 +77,21 @@ npm run build
 npm test
 ```
 
+## Prelaunch Readiness
+
+Run the repository-level prelaunch gate before preparing any release candidate:
+
+```bash
+npm run audit:release-scope
+npm run check:prelaunch
+```
+
+These gates are read-only. They check release scope, release-freeze state,
+required launch artifacts, production environment readiness, public-launch
+anti-sybil approval, and chain-write canary approval. See
+[docs/ops/prelaunch-readiness.md](docs/ops/prelaunch-readiness.md) for the
+operating rules.
+
 ## Environment Variables
 
 Frontend:
@@ -89,7 +104,7 @@ Backend:
 - `JWT_SECRET`: JWT signing secret for email/password auth.
 - `PORT`: API port, default `4000`.
 - `CHAIN_ID`: display/config value for future chain integration.
-- `TOKEN_ADDRESS`: 72H token address placeholder.
+- `TOKEN_ADDRESS`: current 72H V3 Jetton Master for Season War exports, currently `EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`.
 - `LOCK_VAULT_ADDRESS`: future lock contract address.
 - `ORACLE_ADDRESS`: future price/oracle contract address.
 - `REWARD_DISTRIBUTOR_ADDRESS`: future reward distributor contract address.
@@ -99,7 +114,7 @@ Backend:
 ## Currently Implemented
 
 - Email/password registration and login with JWT.
-- App bootstrap with current wave, latest price, and contract placeholders.
+- App bootstrap with current wave, latest price, and current V3 mainnet contract metadata.
 - Wave lookup and current wave selection.
 - Rush Pass claim through authenticated JWT.
 - Deposit precheck.
@@ -110,15 +125,30 @@ Backend:
 - Reward summary, reward listing, and off-chain claim status update stub.
 - Risk flag creation/list/update with an email-based admin guard.
 - Automatic risk flags for self-referral attempts, rapid deposit bursts, and high-value first locks.
+- Fail-closed wallet binding and deposit receipt endpoints for production chain readiness.
+- Admin operations endpoints for emergency controls, audit logs, chain events, and receipt verifier diagnostics.
+
+## Season War Allocation Source
+
+- `multi-millionaire` is the Season War allocation data source: verified wallets, lock positions, referrals, squads, leaderboard data, and risk-review state should be exported from this repository's production data.
+- `/Users/yudeyou/Desktop/72` is not an allocation source and not a proof source; treat it only as a display/navigation surface unless a future decision explicitly changes that.
+- SeasonClaimV2 is deployed in the current V3 mainnet set at `EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`. Season War manifests still remain `production_root_publishable=false` unless an explicit operator approval gate changes that.
+
+## Contract Source Of Truth
+
+- This repository's `contracts/` folder is a legacy mirror only. It remains in place so existing local contract build and test scripts keep resolving their current paths.
+- The local draft contracts and tests were copied to `/Users/yudeyou/Desktop/72h-capital-contracts/contracts/apps/multi-millionaire/legacy/` on 2026-05-01.
+- Future V3 app-specific contract work should happen under `/Users/yudeyou/Desktop/72h-capital-contracts/contracts/apps/multi-millionaire/v3/` after review, testnet evidence, mainnet planning, and audit notes.
+- Migration details are recorded in [docs/contracts/app-contract-migration-2026-05-01.md](docs/contracts/app-contract-migration-2026-05-01.md).
 
 ## Not Yet Implemented
 
 - Real on-chain token lock transactions.
 - Real vault/position contract integration.
 - Real on-chain reward distribution or Merkle claim publishing.
-- Wallet binding and transaction signature verification.
+- Production wallet signature verification and live receipt verification.
 - Production-grade anti-sybil scoring.
-- Full admin console UI.
+- Full admin console UI for emergency controls and operations.
 - End-to-end settlement, unlock, and withdrawal flows.
 
 ## Development Roadmap
@@ -127,4 +157,4 @@ Backend:
 - Sprint 2: contract-backed deposit flow, reward batch publication, wallet binding, and stronger risk gates.
 - Sprint 3: settlement, withdrawals, admin operations, analytics, and production hardening.
 
-See [docs/roadmap.md](docs/roadmap.md) for the detailed sprint plan, [docs/architecture.md](docs/architecture.md) for system structure, and [docs/api-overview.md](docs/api-overview.md) for API coverage.
+See [docs/roadmap.md](docs/roadmap.md) for the detailed sprint plan, [docs/architecture.md](docs/architecture.md) for system structure, [docs/api-overview.md](docs/api-overview.md) for API coverage, and [docs/deposit-streak-rules.md](docs/deposit-streak-rules.md) for the 30-day deposit streak operating rules.

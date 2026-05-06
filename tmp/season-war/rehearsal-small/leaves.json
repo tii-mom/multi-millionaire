@@ -1,0 +1,66 @@
+[
+  {
+    "seasonId": "1",
+    "beneficiaryUserId": "rehearsal-user-1",
+    "recipientWallet": "0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "personalAmountRaw": "150000000000000000",
+    "teamAmountRaw": "50000000000000000",
+    "referralAmountRaw": "50000000000000000",
+    "leaderboardAmountRaw": "25000000000000000",
+    "totalAmountRaw": "275000000000000000",
+    "leafHash": "0xafb2246ae103327ab805d301d73d1bebcbaec6e0a7661c41b4331a3896f6c6d2",
+    "proof": [
+      "right:0x2e59c4bee504e2c272bce094312aec60f2c3a2468d750a07c947894141a132d7",
+      "right:0x8bbdcca15bacc736f74909dadd4ecf1d1fdc3628302d6c86471d0ba2a627fd7b"
+    ],
+    "seasonClaimProofCellBase64": "te6cckEBAQEAQwAAgRcs4l9ygnFhOV5wShiVdjB5YdEjRrqFA+SjxKCg0Jlrou9zKFbrMc290kJ2t1Ozx0f3DYoMC1shkcdC6KmJ/17gHzLfqw=="
+  },
+  {
+    "seasonId": "1",
+    "beneficiaryUserId": "rehearsal-user-2",
+    "recipientWallet": "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "personalAmountRaw": "75000000000000000",
+    "teamAmountRaw": "50000000000000000",
+    "referralAmountRaw": "25000000000000000",
+    "leaderboardAmountRaw": "15000000000000000",
+    "totalAmountRaw": "165000000000000000",
+    "leafHash": "0x2e59c4bee504e2c272bce094312aec60f2c3a2468d750a07c947894141a132d7",
+    "proof": [
+      "left:0xafb2246ae103327ab805d301d73d1bebcbaec6e0a7661c41b4331a3896f6c6d2",
+      "right:0x8bbdcca15bacc736f74909dadd4ecf1d1fdc3628302d6c86471d0ba2a627fd7b"
+    ],
+    "seasonClaimProofCellBase64": "te6cckEBAQEAQwAAgdfZEjVwgZk9XALpgOuejfXl12NwU7MOINoZjRxLe2NpIu9zKFbrMc290kJ2t1Ozx0f3DYoMC1shkcdC6KmJ/17gf4G6dQ=="
+  },
+  {
+    "seasonId": "1",
+    "beneficiaryUserId": "rehearsal-user-3",
+    "recipientWallet": "0:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "personalAmountRaw": "25000000000000000",
+    "teamAmountRaw": "25000000000000000",
+    "referralAmountRaw": "0",
+    "leaderboardAmountRaw": "5000000000000000",
+    "totalAmountRaw": "55000000000000000",
+    "leafHash": "0xec04bcc3f81b4396ef7c636657dd5508a8d25b3317f99de1fb99b4435393a192",
+    "proof": [
+      "right:0x099e89469c9ee5c3062e0de85b89385cfcdf2d719514acff87fed03c2b442507",
+      "left:0x624be46af6cef1057064ad054f4d33c08f5f84d188d49b1aeee490eb7a433889"
+    ],
+    "seasonClaimProofCellBase64": "te6cckEBAQEAQwAAgQTPRKNOT3LhgxcG9C3EnC5+b5a4yopWf8P/aB4VohKD2JL5Gr2zvEFcGStBU9NM8CPX4TRiNSbGu7kkOt6QziJgiw/U1Q=="
+  },
+  {
+    "seasonId": "1",
+    "beneficiaryUserId": "rehearsal-user-4",
+    "recipientWallet": "0:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "personalAmountRaw": "0",
+    "teamAmountRaw": "0",
+    "referralAmountRaw": "0",
+    "leaderboardAmountRaw": "5000000000000000",
+    "totalAmountRaw": "5000000000000000",
+    "leafHash": "0x099e89469c9ee5c3062e0de85b89385cfcdf2d719514acff87fed03c2b442507",
+    "proof": [
+      "left:0xec04bcc3f81b4396ef7c636657dd5508a8d25b3317f99de1fb99b4435393a192",
+      "left:0x624be46af6cef1057064ad054f4d33c08f5f84d188d49b1aeee490eb7a433889"
+    ],
+    "seasonClaimProofCellBase64": "te6cckEBAQEAQwAAgfYCXmH8DaHLd74xsyvuqoRUaS2Zi/zO8P3M2iGpydDJWJL5Gr2zvEFcGStBU9NM8CPX4TRiNSbGu7kkOt6QziJgR1pKcw=="
+  }
+]

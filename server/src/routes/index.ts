@@ -7,6 +7,9 @@ import pricesRouter from './prices';
 import rewardsRouter from './rewards';
 import riskRouter from './risk';
 import adminRouter from './admin';
+import walletRouter from './wallet';
+import seasonWarRouter from './seasonWar';
+import depositStreakRouter from './depositStreak';
 
 const router = express.Router();
 
@@ -18,5 +21,8 @@ router.use('/prices', pricesRouter);
 router.use('/rewards', rewardsRouter);
 router.use('/risk', riskRouter);
 router.use('/admin', adminRouter);
+router.use('/wallet', walletRouter);
+router.use('/season-war', seasonWarRouter);
+router.use('/deposit-streak', depositStreakRouter);
 
 export default router;

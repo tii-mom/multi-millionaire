@@ -1,6 +1,6 @@
 # Cloudflare Env / Secrets
 
-Date: 2026-04-23
+Date: 2026-04-24
 
 ## Backend Worker
 
@@ -13,9 +13,13 @@ File:
 - `HYPERDRIVE`
   - type: Hyperdrive binding
   - target: existing staging Postgres database
-  - status on 2026-04-23: not configured
+  - status on 2026-04-24: configured
+  - Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
+  - Hyperdrive name: `mm-staging-vpc-127`
+  - current origin mode: Workers VPC Service `019dbb34-5edb-7101-804f-1a62f6a9c105` -> Cloudflare Tunnel -> local Postgres
 
-As of 2026-04-23, `wrangler hyperdrive list` in this Cloudflare account returned no existing Hyperdrive configs.
+The binding is live, but it is not yet backed by a persistent managed Postgres
+origin. See `docs/cloudflare/persistent-db-plan.md`.
 
 ### Required Worker secret
 
@@ -37,9 +41,24 @@ As of 2026-04-23, `wrangler hyperdrive list` in this Cloudflare account returned
 
 - `DATABASE_URL`
 
-Use this only for non-Hyperdrive local development or emergency fallback testing.
+Use this only for operator-side migration/seed commands, non-Hyperdrive local
+development, or emergency fallback testing.
 
-RC1 target remains Hyperdrive + existing Postgres, not direct long-term `DATABASE_URL` from the Worker.
+The deployed Worker's sustainable RC1 target is `Hyperdrive + managed Postgres`,
+not direct long-term `DATABASE_URL` access from the Worker. The current
+tunnel-backed Postgres route is only a temporary internal RC1 candidate route.
+
+### Migration / Seed Operator Note
+
+Even when the deployed Worker uses `env.HYPERDRIVE`, the repository migration
+and seed scripts still run under Node via `ts-node`, not inside the Worker
+runtime. That means `npm run migrate:up` and `npm run seed:dev` require a direct
+`DATABASE_URL` for the target origin database.
+
+This is the current cutover blocker for a persistent staging data plane: no
+managed Postgres connection string is available in the repository or current
+shell environment, so the scripts cannot be pointed at a hosted staging origin
+today.
 
 ## Frontend Pages
 

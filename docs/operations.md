@@ -74,6 +74,32 @@ Optional controls:
 
 The smoke script prints a JSON report with top-level `status`, step-level `pass` or `fail`, generated account emails, created IDs, and failure details. It exits non-zero when any required step fails.
 
+For production, use the non-mutating smoke instead:
+
+```bash
+API_BASE_URL="https://api.example.com" npm run smoke:production
+```
+
+Production smoke is GET-only and checks `/health`, `/ready`,
+`/v1/app/bootstrap`, and `/v1/waves/current`. It does not register users,
+deposit, claim rewards, call admin endpoints, toggle controls, create audit
+events, or generate Merkle draft batches.
+
+Admin operation checks are staging-only unless a production canary window has
+been explicitly approved. Keep these mutating admin checks separate from the
+production GET-only smoke. In staging, verify:
+
+- `GET /v1/admin/controls` lists `pause_deposits`,
+  `pause_reward_claims`, `pause_referral_rewards`, and
+  `maintenance_banner`.
+- `PATCH /v1/admin/controls/:key` can toggle a control with a reason and then
+  restore the previous state.
+- `GET /v1/admin/audit-logs` shows the control update action and actor.
+- `GET /v1/admin/chain-events?apply_status=applied` returns chain event
+  visibility, even if the expected result count is zero for stub-only RC1.
+- `GET /v1/admin/ops` reports receipt verifier `mode`, `status`, and
+  `configured`.
+
 ## Smoke Coverage
 
 The RC1 smoke path covers:
@@ -89,6 +115,8 @@ The RC1 smoke path covers:
 - blocked reward claim
 - admin risk resolution
 - claim retry after risk resolution
+- admin emergency controls and audit log visibility
+- admin chain event and receipt verifier diagnostics
 
 ## Routine Checks
 
@@ -96,6 +124,9 @@ The RC1 smoke path covers:
 - Confirm `HIGH_RISK_DEPOSIT_THRESHOLD` is lower than `SMOKE_RISK_DEPOSIT_AMOUNT`.
 - Confirm CORS allows the staging frontend origin before browser QA.
 - Keep the smoke output with the release marker and commit SHA.
+- Record the smoke run id, commit SHA, admin control key toggled, restored
+  state, audit log id/action, chain-events query result and `apply_status`
+  filter, and `/v1/admin/ops` receipt verifier mode/status.
 
 ## Current Stub Boundaries
 

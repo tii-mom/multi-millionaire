@@ -37,6 +37,8 @@ Current migration order is lexical and numeric:
 2. `002_squads.sql`
 3. `003_rewards.sql`
 4. `004_risk.sql`
+5. `005_production_chain_ops.sql`
+6. `006_merkle_rewards.sql`
 
 Do not run `migrate:reset` outside local or controlled staging rehearsal databases.
 
@@ -78,9 +80,23 @@ npm run smoke
 
 11. Deploy or promote the frontend only after the API smoke result is `pass`.
 
+## Production Chain Gate
+
+Before any production launch with real funds:
+
+- provision production Cloudflare Worker, Pages, Hyperdrive, Neon Postgres, and secrets separately from staging
+- run migrations through `006_merkle_rewards.sql`
+- keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until wallet binding, receipt verification, chain event ingest, Merkle proof generation, claim receipt verification, emergency controls, and audit logs are verified on staging
+- use non-mutating production smoke by default
+- require an approved small-value canary before any mutating production transaction
+
 ## Current Stub Boundaries
 
-- `POST /v1/waves/:waveId/deposit` records an off-chain database position. It does not verify or submit a real token lock.
-- `POST /v1/rewards/:ledgerId/claim` marks an approved reward ledger as claimed. It does not transfer tokens on-chain.
+- `POST /v1/waves/:waveId/staging-mvp/deposit` records an off-chain database position for staging/demo runtimes. The legacy `/deposit` alias remains for compatibility only. Neither path verifies or submits a real token lock.
+- `POST /v1/rewards/:ledgerId/staging-mvp/claim` marks an approved reward ledger as claimed for staging/demo runtimes. The legacy `/claim` alias remains for compatibility only. Neither path transfers tokens on-chain.
+- `GET /v1/rewards/:ledgerId/merkle-proof` exposes proof-backed claim data only after an active Merkle batch exists.
+- `POST /v1/waves/:waveId/deposit-receipt` is the production-chain deposit path and requires wallet binding plus receipt verification.
+- `POST /v1/rewards/:ledgerId/claim-receipt` fails closed until a real chain claim-event verifier is configured.
 - Risk blocking is enforced through `risk_flags` rows with `open` or `reviewing` status.
 - Chain-related env values are tracked for readiness, but RC1 smoke does not prove chain settlement.
+- When production chain writes are required, the staging MVP and legacy off-chain deposit/reward claim endpoints fail closed.

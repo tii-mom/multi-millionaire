@@ -40,12 +40,18 @@ PostgreSQL is the system of record for Sprint 1:
 - `reward_ledgers`: direct referral reward records.
 - `reward_batches`: future batch/Merkle publication records.
 - `risk_flags`: review flags for users, positions, and reward ledgers.
+- `wallet_bind_intents`: nonce-backed wallet ownership challenges.
+- `wallet_bindings`: verified wallet-to-user ownership records.
+- `chain_events`: normalized chain logs and apply/review state.
+- `app_controls`: emergency pause and maintenance controls.
+- `admin_audit_logs`: admin operation history.
 
 Migrations are applied in numeric order from `server/migrations/`.
 
 ## Future Contract Layer
 
-Sprint 2 should replace the deposit and reward stubs with contract-backed flows:
+The production chain layer should replace the deposit and reward stubs with
+contract-backed flows:
 
 - wallet binding and signature verification,
 - real vault/lock transaction submission or verification,
@@ -54,14 +60,18 @@ Sprint 2 should replace the deposit and reward stubs with contract-backed flows:
 - on-chain reward distributor claims,
 - reconciliation between chain events and PostgreSQL records.
 
-Until that work is complete, backend deposit and claim endpoints only update database state.
+Until production chain verification is enabled, backend deposit and claim
+endpoints only update database state. When production chain writes are required,
+the legacy off-chain deposit and reward claim endpoints fail closed.
 
 ## Data Flow
 
 1. The frontend calls `/v1/app/bootstrap` and `/v1/waves/current`.
 2. A user registers or logs in and receives a JWT.
 3. The user can confirm an inviter before their first qualifying deposit.
-4. The user records an MVP deposit through `/v1/waves/:waveId/deposit`.
-5. Deposit side effects activate squad membership and create direct referral reward ledgers when eligible.
-6. Risk rules may add flags for suspicious behavior.
-7. Approved rewards can be claimed only when no blocking open/reviewing risk flag exists.
+4. Staging users can record an MVP deposit through `/v1/waves/:waveId/deposit`.
+5. Production users must bind a wallet and submit a verified chain receipt
+   through `/v1/waves/:waveId/deposit-receipt`.
+6. Deposit side effects activate squad membership and create direct referral reward ledgers when eligible.
+7. Risk rules may add flags for suspicious behavior.
+8. Approved rewards can be claimed only when no blocking open/reviewing risk flag exists and the configured reward distribution path confirms the claim.

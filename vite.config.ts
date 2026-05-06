@@ -26,5 +26,19 @@ export default defineConfig(({mode}) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('@tonconnect')) return 'vendor-tonconnect';
+            if (id.includes('@ton/crypto')) return 'vendor-ton-crypto';
+            if (id.includes('@ton/core')) return 'vendor-ton-core';
+            if (id.includes('@ton/')) return 'vendor-ton';
+            return undefined;
+          },
+        },
+      },
+    },
   };
 });

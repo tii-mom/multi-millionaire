@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { query, QueryExecutor } from '../db';
 
 export type RiskEntityType = 'user' | 'position' | 'reward_ledger';
 export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -40,8 +40,9 @@ const riskFlagColumns = `
   id, entity_type, entity_id, flag_type, severity, status, note, created_at, updated_at
 `;
 
-export async function createRiskFlag(input: CreateRiskFlagInput): Promise<RiskFlag> {
-  const result = await query<RiskFlag>(
+export async function createRiskFlag(input: CreateRiskFlagInput, executor?: QueryExecutor): Promise<RiskFlag> {
+  const db = executor || { query };
+  const result = await db.query<RiskFlag>(
     `INSERT INTO risk_flags (entity_type, entity_id, flag_type, severity, status, note, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
      RETURNING ${riskFlagColumns}`,
@@ -98,6 +99,7 @@ export async function hasBlockingRiskForRewardClaim(ledgerId: string, beneficiar
          ON (
            (rf.entity_type = 'position' AND rf.entity_id = rl.source_position_id::text)
            OR (rf.entity_type = 'user' AND rf.entity_id = rl.beneficiary_user_id::text)
+           OR (rf.entity_type = 'reward_ledger' AND rf.entity_id = rl.id::text)
          )
        WHERE rl.id = $1
          AND rl.beneficiary_user_id = $2

@@ -1,102 +1,233 @@
 # Cloudflare Operations Handoff
 
-Date: 2026-04-24
+Date: 2026-04-26
 
 ## Current State
 
-Cloudflare staging is ready for sustainable RC1 acceptance.
-
-- backend URL:
+- Backend staging Worker:
   `https://multi-millionaire-api-staging.348421501.workers.dev`
-- frontend URL:
+- Frontend staging Pages alias:
   `https://staging.multi-millionaire-staging.pages.dev`
-- frontend `GET /`: `200`
-- backend `GET /health`: `200`
-- backend `GET /ready`: `200`
-- readiness database status: `ok`
-- historical smoke `cf-20260424-rc1-final`: `pass`
-- current complete smoke `cf-20260424-neon-rc1`: `pass`
-- Neon Postgres origin: provisioned, initialized, and live through Hyperdrive
-- Hyperdrive cutover to Neon: complete
+- Hyperdrive binding:
+  - binding: `HYPERDRIVE`
+  - id: `88b8cd7fd84e4064ad29b43a16c579f2`
+  - name: `rc1-staging-postgres`
+  - caching: `disabled`
+- Current Hyperdrive origin references Neon Postgres:
+  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`, database `neondb`,
+  user `neondb_owner`, TLS `sslmode=require`.
+- Historical Cloudflare smoke `cf-20260424-rc1-final`: `pass`.
+- Earlier tunnel-backed live health check in this thread had `/ready=503`;
+  after the Neon cutover, the RC1 smoke readiness evidence is `/ready=200`.
 
-## Data Plane
+Current RC1 judgment:
 
-Current data path:
+- internal RC1 candidate evidence: `yes`, based on the completed Cloudflare
+  smoke run
+- sustainable RC1 environment: `yes for staging`, because the data plane now
+  uses Hyperdrive -> Neon Postgres
+- production environment: `infrastructure canary only`, because production
+  Worker, Pages, Hyperdrive, Neon migrations, and GET-only smoke evidence now
+  exist, but mainnet contracts and mutating canary evidence are still unfinished
 
-`Worker -> Hyperdrive -> Neon Postgres`
+## Current Data Plane
 
-Current Cloudflare resources:
+Current route:
 
-- Worker: `multi-millionaire-api-staging`
-- Hyperdrive binding: `HYPERDRIVE`
+`Cloudflare Worker -> Hyperdrive -> Neon Postgres`
+
+Current managed-origin details:
+
 - Hyperdrive id: `88b8cd7fd84e4064ad29b43a16c579f2`
-- Hyperdrive name: `rc1-staging-postgres`
-- Hyperdrive origin host:
-  `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
-- Hyperdrive origin database: `neondb`
-- Hyperdrive origin user: `neondb_owner`
-- Hyperdrive origin service id: none
-- Hyperdrive SSL mode: `require`
-- Hyperdrive caching: `disabled`
-- Hyperdrive origin connection limit: `20`
-
-The Worker has no `DATABASE_URL` binding. Database access is through the
-Hyperdrive binding only.
-
-Prepared Neon origin:
-
-- project: `dry-art-24207577`
-- branch: `br-curly-mud-an2nh595`
+- host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
 - database: `neondb`
 - role: `neondb_owner`
-- direct host: `ep-odd-feather-anb8qhf3.c-6.us-east-1.aws.neon.tech`
-- connection mode: direct/unpooled, `sslmode=require`
-- `DATABASE_URL`: not stored in git, docs, PR text, or Worker vars
+- caching: `disabled`
+- TLS: `sslmode=require`
 
-The previous route through Workers VPC Service, Cloudflare Tunnel, and local
-Postgres is no longer the live RC1 staging data plane.
+## Historical Temporary Data Plane
 
-## Neon Database State
+Previous route:
 
-- migrations `001_init.sql`, `002_squads.sql`, `003_rewards.sql`, and
-  `004_risk.sql`: applied
-- `npm run seed:dev`: completed against Neon
-- verified users: `admin@example.com`, `member@example.com`, `risk@example.com`
-- active wave: present
-- confirmed price round: present
+`Cloudflare Worker -> Hyperdrive -> Workers VPC Service -> Cloudflare Tunnel -> local Postgres`
 
-## Smoke Evidence
+Known temporary-origin details:
 
-Full Cloudflare smoke was rerun against the deployed backend:
+- database: `mm_cf_staging`
+- role: `mm_cf_staging`
+- VPC Service: `019dbb34-5edb-7101-804f-1a62f6a9c105`
+- tunnel: `7ae7d04e-ca98-40d9-9f5d-fd52aa100b32`
+- local Postgres data directory: `/tmp/mm-pg`
+- local Postgres port: `5432`
+
+That route is not a long-term RC1 environment because it depends on one
+workstation, an interactive `cloudflared` session, and a Postgres data
+directory under `/tmp`. It has no documented managed-service backup, snapshot,
+HA, or provider SLA boundary.
+
+## Sustainable Target
+
+Target route:
+
+`Cloudflare Worker -> Hyperdrive -> managed Postgres`
+
+The staging cutover has been completed. The production cutover remains blocked
+for real chain-backed use until mainnet contracts are deployed and a small
+mainnet canary is recorded. Production Neon, Hyperdrive, Worker, Pages, custom
+domains, and non-mutating smoke have been exercised.
+
+Do not put real secrets in this repository. Export them only in the operator
+shell that runs the cutover commands.
+
+Required operator inputs:
+
+- `DATABASE_URL`: managed production Postgres direct connection string. Already
+  used for the current production migration run; keep it out of git.
+- `CLOUDFLARE_API_TOKEN`: token with permission to update Hyperdrive and deploy
+  the production Worker. Current token can deploy Worker/Pages, list
+  Hyperdrive, and attach the Worker custom domain `api.mm.72h.lol`.
+- Cloudflare Zone permissions still missing for public domains:
+  - Zone DNS Edit for `72h.lol`
+  - Workers Routes Edit for zone-level routes such as `api.72h.lol/*`
+  - Zone SSL/certificate read if operators need API visibility into certificate
+    issuance state
+
+Current production resource evidence:
+
+- production Worker: `multi-millionaire-api-production`
+- production API URL:
+  `https://api.mm.72h.lol`
+- fallback production Worker URL:
+  `https://multi-millionaire-api-production.348421501.workers.dev`
+- latest production Worker version observed: `574b636e-49d6-40c2-8412-651df4a4c4`
+- production Pages project: `multi-millionaire-production`
+- latest Pages alias:
+  `https://production.multi-millionaire-production.pages.dev`
+- latest Pages deployment URL:
+  `https://29f929d8.multi-millionaire-production.pages.dev`
+- production frontend custom domain: `mm.72h.lol` exists in Pages but remains
+  live; `https://mm.72h.lol` returned `200` on 2026-04-26.
+- required frontend DNS record is now present through Cloudflare. DNS answers
+  for `mm.72h.lol` returned Cloudflare A/AAAA records on 2026-04-26.
+- latest DNS API attempt: 2026-04-25 direct Cloudflare API create for that
+  CNAME returned `403` / `code=10000` authentication error. The token can list
+  the `72h.lol` zone but still may not be sufficient for future DNS changes.
+- production Hyperdrive:
+  `multi-millionaire-production-postgres`
+- production Hyperdrive id: `92267e746955420d80eb707f4cf23e17`
+- production GET-only smoke on 2026-04-26 against `https://api.mm.72h.lol`:
+  `/health=200`, `/ready=200`, `/v1/app/bootstrap=200`,
+  `/v1/waves/current=200`
+- latest strict GET-only smoke rerun:
+  `2026-04-26T15:32:47.292Z` to `2026-04-26T15:32:48.804Z`, `pass`;
+  bootstrap showed `chain_mainline_writes_enabled=false` and
+  `receipt_verifier_status=disabled`.
+- DNS resolution check on 2026-04-26: both `api.mm.72h.lol` and `mm.72h.lol`
+  resolve through Cloudflare; `mm.72h.lol` returned the production frontend.
+
+Production chain configuration rule:
+
+- `CHAIN_ID`, `CHAIN_RPC_URL`, and `TOKEN_ADDRESS` must point at the same TON
+  network. Do not use a testnet RPC with the mainnet 72H token address.
+- The current mainnet 72H V3 token master
+  `EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3` is active and supports the
+  standard Jetton `get_wallet_address` path on mainnet.
+- Season War rewards use SeasonClaimV2
+  `EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`; legacy MerkleClaim
+  remains a separate reward-claim path.
+- Backend code reads `TOKEN_ADDRESS` for Jetton wallet derivation. Setting only
+  `TOKEN_ADDRESS_MAINNET` is not sufficient for production runtime.
+- Keep `CHAIN_MAINLINE_WRITES_ENABLED=false` until the relevant app-specific
+  write path is canary-approved. Do not deploy `multi-millionaire/contracts`
+  mainnet contracts as part of Season War exporter setup.
+
+## Cutover Checklist
+
+For production, run from `server/` after exporting the required operator inputs:
 
 ```bash
+NODE_ENV=production DATABASE_URL="$DATABASE_URL" npm run migrate:up
+```
+
+The production Hyperdrive config already exists. If it must be recreated, do
+not reuse the staging config:
+
+```bash
+npx wrangler hyperdrive create multi-millionaire-production-postgres \
+  --connection-string "$DATABASE_URL" \
+  --sslmode require \
+  --caching-disabled
+```
+
+Record the returned production Hyperdrive id and add it to
+`server/wrangler.jsonc` under `env.production.hyperdrive`.
+
+Confirm the production Hyperdrive origin references the production Neon host:
+
+```bash
+npx wrangler hyperdrive get <production-hyperdrive-id>
+```
+
+Deploy and verify staging:
+
+```bash
+npx wrangler deploy --config wrangler.jsonc --env staging
+curl -fsS https://multi-millionaire-api-staging.348421501.workers.dev/health
+curl -fsS https://multi-millionaire-api-staging.348421501.workers.dev/ready
 API_BASE_URL=https://multi-millionaire-api-staging.348421501.workers.dev \
-SMOKE_RUN_ID=cf-20260424-neon-rc1 \
+SMOKE_RUN_ID=cf-20260424-persistent-db \
 npm run smoke
 ```
 
-Result:
+Only after those checks pass should the RC1 gate be updated to
+`sustainable RC1 environment: yes`.
 
-- status: `pass`
-- started at: `2026-04-24T02:27:44.918Z`
-- finished at: `2026-04-24T02:27:59.983Z`
-- duration: `15065ms`
+For production, use GET-only smoke by default:
 
-Covered flows: register, login, claim pass, create squad, join squad,
-deposit-precheck, deposit, squad activation, referral reward generation, reward
-summary/list, reward claim, risk trigger, risk block, risk resolve, and claim
-retry after risk resolve.
+```bash
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/health
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/ready
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/v1/app/bootstrap
+curl -fsS https://multi-millionaire-api-production.348421501.workers.dev/v1/waves/current
+```
 
-## RC1 Boundary
+Preferred custom-domain smoke:
 
-- Current internal RC1 candidate: `yes`
-- Current sustainable RC1 environment: `yes`
-- Reason: live Cloudflare readiness is healthy, the database plane uses managed
-  Neon Postgres through Hyperdrive, and the full Cloudflare smoke passed on the
-  current live staging environment.
+```bash
+API_BASE_URL=https://api.mm.72h.lol npm run smoke:production
+```
 
-Deposit and reward claim remain off-chain stubs. No D1 migration or Sprint 2
-chain work is part of this handoff.
+Do not run the staging mutating smoke against production unless a canary window,
+allowlisted wallet, amount, rollback owner, and stop conditions are documented.
 
-Cloudflare API tokens and the Neon `DATABASE_URL` were not written to repository
-files, documentation, or commits.
+## Smoke Coverage
+
+The required Cloudflare smoke covers:
+
+- backend `/health`
+- backend `/ready`
+- register
+- login
+- claim pass
+- create squad
+- join squad
+- deposit-precheck
+- deposit
+- squad activation through the qualifying deposit path
+- referral reward generation
+- reward summary/list
+- reward claim
+- risk trigger
+- risk block
+- risk resolve and claim retry
+
+## Stub Boundaries
+
+RC1 remains limited to the current off-chain MVP behavior:
+
+- deposits create database positions only
+- reward claims update reward ledger status only
+- risk review uses `risk_flags`
+- no real chain lock is executed
+- no oracle settlement is validated
+- no Merkle reward publication or on-chain reward transfer is validated

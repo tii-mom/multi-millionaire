@@ -24,12 +24,25 @@ describe('Production hardening lite', () => {
   });
 
   it('returns readiness when the database responds', async () => {
-    queryMock.mockResolvedValue({ rows: [{ ok: 1 }] });
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ ok: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ ok: 1 }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          app_controls: 'app_controls',
+          chain_events: 'chain_events',
+          admin_audit_logs: 'admin_audit_logs',
+          merkle_reward_batches: 'merkle_reward_batches',
+          merkle_reward_proofs: 'merkle_reward_proofs',
+        }],
+      });
 
     const res = await request(app).get('/ready');
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ready');
+    expect(res.body.migrations).toBe('ok');
+    expect(res.body.ops_tables).toBe('ok');
   });
 
   it('rejects auth registration without required fields', async () => {

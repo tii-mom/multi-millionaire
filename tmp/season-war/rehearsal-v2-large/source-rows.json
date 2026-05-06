@@ -1,0 +1,913 @@
+{
+  "rehearsal": true,
+  "production_root_publishable": false,
+  "synthetic_fixture": true,
+  "note": "Synthetic 128-wallet SeasonClaimV2 ref-chain rehearsal fixture. Not sourced from production DB and not publishable.",
+  "positions": [
+    {
+      "position_id": "rehearsal-v2-position-1",
+      "user_id": "rehearsal-v2-user-1",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001000"
+    },
+    {
+      "position_id": "rehearsal-v2-position-2",
+      "user_id": "rehearsal-v2-user-2",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001001"
+    },
+    {
+      "position_id": "rehearsal-v2-position-3",
+      "user_id": "rehearsal-v2-user-3",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001002"
+    },
+    {
+      "position_id": "rehearsal-v2-position-4",
+      "user_id": "rehearsal-v2-user-4",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001003"
+    },
+    {
+      "position_id": "rehearsal-v2-position-5",
+      "user_id": "rehearsal-v2-user-5",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001004"
+    },
+    {
+      "position_id": "rehearsal-v2-position-6",
+      "user_id": "rehearsal-v2-user-6",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001005"
+    },
+    {
+      "position_id": "rehearsal-v2-position-7",
+      "user_id": "rehearsal-v2-user-7",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001006"
+    },
+    {
+      "position_id": "rehearsal-v2-position-8",
+      "user_id": "rehearsal-v2-user-8",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001007"
+    },
+    {
+      "position_id": "rehearsal-v2-position-9",
+      "user_id": "rehearsal-v2-user-9",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001008"
+    },
+    {
+      "position_id": "rehearsal-v2-position-10",
+      "user_id": "rehearsal-v2-user-10",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001009"
+    },
+    {
+      "position_id": "rehearsal-v2-position-11",
+      "user_id": "rehearsal-v2-user-11",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000100a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-12",
+      "user_id": "rehearsal-v2-user-12",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000100b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-13",
+      "user_id": "rehearsal-v2-user-13",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000100c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-14",
+      "user_id": "rehearsal-v2-user-14",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000100d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-15",
+      "user_id": "rehearsal-v2-user-15",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000100e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-16",
+      "user_id": "rehearsal-v2-user-16",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000100f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-17",
+      "user_id": "rehearsal-v2-user-17",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001010"
+    },
+    {
+      "position_id": "rehearsal-v2-position-18",
+      "user_id": "rehearsal-v2-user-18",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001011"
+    },
+    {
+      "position_id": "rehearsal-v2-position-19",
+      "user_id": "rehearsal-v2-user-19",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001012"
+    },
+    {
+      "position_id": "rehearsal-v2-position-20",
+      "user_id": "rehearsal-v2-user-20",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001013"
+    },
+    {
+      "position_id": "rehearsal-v2-position-21",
+      "user_id": "rehearsal-v2-user-21",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001014"
+    },
+    {
+      "position_id": "rehearsal-v2-position-22",
+      "user_id": "rehearsal-v2-user-22",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001015"
+    },
+    {
+      "position_id": "rehearsal-v2-position-23",
+      "user_id": "rehearsal-v2-user-23",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001016"
+    },
+    {
+      "position_id": "rehearsal-v2-position-24",
+      "user_id": "rehearsal-v2-user-24",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001017"
+    },
+    {
+      "position_id": "rehearsal-v2-position-25",
+      "user_id": "rehearsal-v2-user-25",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001018"
+    },
+    {
+      "position_id": "rehearsal-v2-position-26",
+      "user_id": "rehearsal-v2-user-26",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001019"
+    },
+    {
+      "position_id": "rehearsal-v2-position-27",
+      "user_id": "rehearsal-v2-user-27",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000101a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-28",
+      "user_id": "rehearsal-v2-user-28",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000101b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-29",
+      "user_id": "rehearsal-v2-user-29",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000101c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-30",
+      "user_id": "rehearsal-v2-user-30",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000101d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-31",
+      "user_id": "rehearsal-v2-user-31",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000101e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-32",
+      "user_id": "rehearsal-v2-user-32",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000101f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-33",
+      "user_id": "rehearsal-v2-user-33",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001020"
+    },
+    {
+      "position_id": "rehearsal-v2-position-34",
+      "user_id": "rehearsal-v2-user-34",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001021"
+    },
+    {
+      "position_id": "rehearsal-v2-position-35",
+      "user_id": "rehearsal-v2-user-35",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001022"
+    },
+    {
+      "position_id": "rehearsal-v2-position-36",
+      "user_id": "rehearsal-v2-user-36",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001023"
+    },
+    {
+      "position_id": "rehearsal-v2-position-37",
+      "user_id": "rehearsal-v2-user-37",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001024"
+    },
+    {
+      "position_id": "rehearsal-v2-position-38",
+      "user_id": "rehearsal-v2-user-38",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001025"
+    },
+    {
+      "position_id": "rehearsal-v2-position-39",
+      "user_id": "rehearsal-v2-user-39",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001026"
+    },
+    {
+      "position_id": "rehearsal-v2-position-40",
+      "user_id": "rehearsal-v2-user-40",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001027"
+    },
+    {
+      "position_id": "rehearsal-v2-position-41",
+      "user_id": "rehearsal-v2-user-41",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001028"
+    },
+    {
+      "position_id": "rehearsal-v2-position-42",
+      "user_id": "rehearsal-v2-user-42",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001029"
+    },
+    {
+      "position_id": "rehearsal-v2-position-43",
+      "user_id": "rehearsal-v2-user-43",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000102a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-44",
+      "user_id": "rehearsal-v2-user-44",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000102b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-45",
+      "user_id": "rehearsal-v2-user-45",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000102c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-46",
+      "user_id": "rehearsal-v2-user-46",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000102d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-47",
+      "user_id": "rehearsal-v2-user-47",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000102e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-48",
+      "user_id": "rehearsal-v2-user-48",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000102f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-49",
+      "user_id": "rehearsal-v2-user-49",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001030"
+    },
+    {
+      "position_id": "rehearsal-v2-position-50",
+      "user_id": "rehearsal-v2-user-50",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001031"
+    },
+    {
+      "position_id": "rehearsal-v2-position-51",
+      "user_id": "rehearsal-v2-user-51",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001032"
+    },
+    {
+      "position_id": "rehearsal-v2-position-52",
+      "user_id": "rehearsal-v2-user-52",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001033"
+    },
+    {
+      "position_id": "rehearsal-v2-position-53",
+      "user_id": "rehearsal-v2-user-53",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001034"
+    },
+    {
+      "position_id": "rehearsal-v2-position-54",
+      "user_id": "rehearsal-v2-user-54",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001035"
+    },
+    {
+      "position_id": "rehearsal-v2-position-55",
+      "user_id": "rehearsal-v2-user-55",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001036"
+    },
+    {
+      "position_id": "rehearsal-v2-position-56",
+      "user_id": "rehearsal-v2-user-56",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001037"
+    },
+    {
+      "position_id": "rehearsal-v2-position-57",
+      "user_id": "rehearsal-v2-user-57",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001038"
+    },
+    {
+      "position_id": "rehearsal-v2-position-58",
+      "user_id": "rehearsal-v2-user-58",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001039"
+    },
+    {
+      "position_id": "rehearsal-v2-position-59",
+      "user_id": "rehearsal-v2-user-59",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000103a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-60",
+      "user_id": "rehearsal-v2-user-60",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000103b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-61",
+      "user_id": "rehearsal-v2-user-61",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000103c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-62",
+      "user_id": "rehearsal-v2-user-62",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000103d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-63",
+      "user_id": "rehearsal-v2-user-63",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000103e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-64",
+      "user_id": "rehearsal-v2-user-64",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000103f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-65",
+      "user_id": "rehearsal-v2-user-65",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001040"
+    },
+    {
+      "position_id": "rehearsal-v2-position-66",
+      "user_id": "rehearsal-v2-user-66",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001041"
+    },
+    {
+      "position_id": "rehearsal-v2-position-67",
+      "user_id": "rehearsal-v2-user-67",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001042"
+    },
+    {
+      "position_id": "rehearsal-v2-position-68",
+      "user_id": "rehearsal-v2-user-68",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001043"
+    },
+    {
+      "position_id": "rehearsal-v2-position-69",
+      "user_id": "rehearsal-v2-user-69",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001044"
+    },
+    {
+      "position_id": "rehearsal-v2-position-70",
+      "user_id": "rehearsal-v2-user-70",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001045"
+    },
+    {
+      "position_id": "rehearsal-v2-position-71",
+      "user_id": "rehearsal-v2-user-71",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001046"
+    },
+    {
+      "position_id": "rehearsal-v2-position-72",
+      "user_id": "rehearsal-v2-user-72",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001047"
+    },
+    {
+      "position_id": "rehearsal-v2-position-73",
+      "user_id": "rehearsal-v2-user-73",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001048"
+    },
+    {
+      "position_id": "rehearsal-v2-position-74",
+      "user_id": "rehearsal-v2-user-74",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001049"
+    },
+    {
+      "position_id": "rehearsal-v2-position-75",
+      "user_id": "rehearsal-v2-user-75",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000104a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-76",
+      "user_id": "rehearsal-v2-user-76",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000104b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-77",
+      "user_id": "rehearsal-v2-user-77",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000104c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-78",
+      "user_id": "rehearsal-v2-user-78",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000104d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-79",
+      "user_id": "rehearsal-v2-user-79",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000104e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-80",
+      "user_id": "rehearsal-v2-user-80",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000104f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-81",
+      "user_id": "rehearsal-v2-user-81",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001050"
+    },
+    {
+      "position_id": "rehearsal-v2-position-82",
+      "user_id": "rehearsal-v2-user-82",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001051"
+    },
+    {
+      "position_id": "rehearsal-v2-position-83",
+      "user_id": "rehearsal-v2-user-83",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001052"
+    },
+    {
+      "position_id": "rehearsal-v2-position-84",
+      "user_id": "rehearsal-v2-user-84",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001053"
+    },
+    {
+      "position_id": "rehearsal-v2-position-85",
+      "user_id": "rehearsal-v2-user-85",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001054"
+    },
+    {
+      "position_id": "rehearsal-v2-position-86",
+      "user_id": "rehearsal-v2-user-86",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001055"
+    },
+    {
+      "position_id": "rehearsal-v2-position-87",
+      "user_id": "rehearsal-v2-user-87",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001056"
+    },
+    {
+      "position_id": "rehearsal-v2-position-88",
+      "user_id": "rehearsal-v2-user-88",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001057"
+    },
+    {
+      "position_id": "rehearsal-v2-position-89",
+      "user_id": "rehearsal-v2-user-89",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001058"
+    },
+    {
+      "position_id": "rehearsal-v2-position-90",
+      "user_id": "rehearsal-v2-user-90",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001059"
+    },
+    {
+      "position_id": "rehearsal-v2-position-91",
+      "user_id": "rehearsal-v2-user-91",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000105a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-92",
+      "user_id": "rehearsal-v2-user-92",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000105b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-93",
+      "user_id": "rehearsal-v2-user-93",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000105c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-94",
+      "user_id": "rehearsal-v2-user-94",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000105d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-95",
+      "user_id": "rehearsal-v2-user-95",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000105e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-96",
+      "user_id": "rehearsal-v2-user-96",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000105f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-97",
+      "user_id": "rehearsal-v2-user-97",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001060"
+    },
+    {
+      "position_id": "rehearsal-v2-position-98",
+      "user_id": "rehearsal-v2-user-98",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001061"
+    },
+    {
+      "position_id": "rehearsal-v2-position-99",
+      "user_id": "rehearsal-v2-user-99",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001062"
+    },
+    {
+      "position_id": "rehearsal-v2-position-100",
+      "user_id": "rehearsal-v2-user-100",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001063"
+    },
+    {
+      "position_id": "rehearsal-v2-position-101",
+      "user_id": "rehearsal-v2-user-101",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001064"
+    },
+    {
+      "position_id": "rehearsal-v2-position-102",
+      "user_id": "rehearsal-v2-user-102",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001065"
+    },
+    {
+      "position_id": "rehearsal-v2-position-103",
+      "user_id": "rehearsal-v2-user-103",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001066"
+    },
+    {
+      "position_id": "rehearsal-v2-position-104",
+      "user_id": "rehearsal-v2-user-104",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001067"
+    },
+    {
+      "position_id": "rehearsal-v2-position-105",
+      "user_id": "rehearsal-v2-user-105",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001068"
+    },
+    {
+      "position_id": "rehearsal-v2-position-106",
+      "user_id": "rehearsal-v2-user-106",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001069"
+    },
+    {
+      "position_id": "rehearsal-v2-position-107",
+      "user_id": "rehearsal-v2-user-107",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000106a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-108",
+      "user_id": "rehearsal-v2-user-108",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000106b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-109",
+      "user_id": "rehearsal-v2-user-109",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000106c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-110",
+      "user_id": "rehearsal-v2-user-110",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000106d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-111",
+      "user_id": "rehearsal-v2-user-111",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000106e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-112",
+      "user_id": "rehearsal-v2-user-112",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000106f"
+    },
+    {
+      "position_id": "rehearsal-v2-position-113",
+      "user_id": "rehearsal-v2-user-113",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001070"
+    },
+    {
+      "position_id": "rehearsal-v2-position-114",
+      "user_id": "rehearsal-v2-user-114",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001071"
+    },
+    {
+      "position_id": "rehearsal-v2-position-115",
+      "user_id": "rehearsal-v2-user-115",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001072"
+    },
+    {
+      "position_id": "rehearsal-v2-position-116",
+      "user_id": "rehearsal-v2-user-116",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001073"
+    },
+    {
+      "position_id": "rehearsal-v2-position-117",
+      "user_id": "rehearsal-v2-user-117",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001074"
+    },
+    {
+      "position_id": "rehearsal-v2-position-118",
+      "user_id": "rehearsal-v2-user-118",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001075"
+    },
+    {
+      "position_id": "rehearsal-v2-position-119",
+      "user_id": "rehearsal-v2-user-119",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001076"
+    },
+    {
+      "position_id": "rehearsal-v2-position-120",
+      "user_id": "rehearsal-v2-user-120",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001077"
+    },
+    {
+      "position_id": "rehearsal-v2-position-121",
+      "user_id": "rehearsal-v2-user-121",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001078"
+    },
+    {
+      "position_id": "rehearsal-v2-position-122",
+      "user_id": "rehearsal-v2-user-122",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:0000000000000000000000000000000000000000000000000000000000001079"
+    },
+    {
+      "position_id": "rehearsal-v2-position-123",
+      "user_id": "rehearsal-v2-user-123",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000107a"
+    },
+    {
+      "position_id": "rehearsal-v2-position-124",
+      "user_id": "rehearsal-v2-user-124",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000107b"
+    },
+    {
+      "position_id": "rehearsal-v2-position-125",
+      "user_id": "rehearsal-v2-user-125",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000107c"
+    },
+    {
+      "position_id": "rehearsal-v2-position-126",
+      "user_id": "rehearsal-v2-user-126",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000107d"
+    },
+    {
+      "position_id": "rehearsal-v2-position-127",
+      "user_id": "rehearsal-v2-user-127",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000107e"
+    },
+    {
+      "position_id": "rehearsal-v2-position-128",
+      "user_id": "rehearsal-v2-user-128",
+      "wave_id": 1,
+      "amount_raw": "3906250000000000",
+      "wallet": "0:000000000000000000000000000000000000000000000000000000000000107f"
+    }
+  ],
+  "allocations": {
+    "method": "equal synthetic split per pool with remainder assigned by ascending fixture index",
+    "pools": {
+      "personal": "250000000000000000",
+      "team": "125000000000000000",
+      "referral": "75000000000000000",
+      "leaderboard": "50000000000000000"
+    }
+  }
+}

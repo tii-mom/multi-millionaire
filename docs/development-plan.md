@@ -2,9 +2,9 @@
 
 ## 1. 当前链上前提
 
-- 已提供 `72H` 代币合约地址：`EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8`。
-- 该地址格式判断为 TON 生态地址，因此前端集成优先按 TON Jetton + TonConnect 方向规划。
-- 仍需确认该地址是否为 `72H Jetton Master`，以及主网/测试网环境。
+- 已确认 TON mainnet 72H V3 Jetton Master：`EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`。
+- 已确认 SeasonClaimV2 主网地址：`EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`。
+- 前端和后端集成优先按 TON Jetton + TonConnect 方向规划。
 
 ## 2. 需要新增的业务合约
 
@@ -64,7 +64,8 @@ MVP 可先由后端记录奖励、管理员人工审核和批量发放；自动�
 ### Phase 0：链上事实确认
 
 - 确认链：TON mainnet 还是 testnet。
-- 确认 `72H` 地址是 Jetton Master。
+- 确认 `72H` V3 Jetton Master：`EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`。
+- 确认 Season War 使用 SeasonClaimV2：`EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`。
 - 提供 `72HLockVault` 合约地址或合约设计。
 - 确认锁仓合约如何接收 Jetton transfer payload。
 - 确认管理员价格上传走链上还是后端。

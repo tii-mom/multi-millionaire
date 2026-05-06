@@ -27,7 +27,21 @@ function isAllowedOrigin(origin: string | undefined) {
   if (allowedOrigins.size === 0) {
     return fallbackOrigins.has(origin);
   }
-  return allowedOrigins.has(origin);
+  if (allowedOrigins.has(origin)) return true;
+  // Allow Cloudflare Pages preview subdomains (hash.${project}.pages.dev) only.
+  try {
+    const { hostname } = new URL(origin);
+    return [...allowedOrigins].some((allowed) => {
+      try {
+        const allowedHost = new URL(allowed).hostname;
+        return allowedHost.endsWith('.pages.dev') && hostname.endsWith('.' + allowedHost);
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
 }
 
 app.disable('x-powered-by');
@@ -65,10 +79,42 @@ app.get('/health', (req, res) => {
 app.get('/ready', async (req, res) => {
   try {
     await query('SELECT 1 AS ok');
+    const migrations = await query<{ ok: number }>(
+      `SELECT 1
+       FROM schema_migrations
+       WHERE filename IN ('005_production_chain_ops.sql','006_merkle_rewards.sql','007_deposit_streaks.sql')
+       GROUP BY 1
+       HAVING COUNT(*) = 3`
+    );
+    if (migrations.rows.length === 0) {
+      throw new Error('Required production migrations are not applied');
+    }
+    const tables = await query<{
+      app_controls: string | null;
+      chain_events: string | null;
+      admin_audit_logs: string | null;
+      merkle_reward_batches: string | null;
+      merkle_reward_proofs: string | null;
+      deposit_streak_goals: string | null;
+    }>(
+      `SELECT
+         to_regclass('public.app_controls') AS app_controls,
+         to_regclass('public.chain_events') AS chain_events,
+         to_regclass('public.admin_audit_logs') AS admin_audit_logs,
+         to_regclass('public.merkle_reward_batches') AS merkle_reward_batches,
+         to_regclass('public.merkle_reward_proofs') AS merkle_reward_proofs,
+         to_regclass('public.deposit_streak_goals') AS deposit_streak_goals`
+    );
+    const tableStatus = tables.rows[0];
+    if (!tableStatus || Object.values(tableStatus).some((value) => value === null)) {
+      throw new Error('Required production ops tables are missing');
+    }
     res.json({
       request_id: req.id || '',
       status: 'ready',
       database: 'ok',
+      migrations: 'ok',
+      ops_tables: 'ok',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

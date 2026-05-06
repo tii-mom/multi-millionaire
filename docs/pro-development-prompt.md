@@ -12,8 +12,9 @@
 - 开发计划：`docs/development-plan.md`。
 
 链上前提：
-- 已部署的 72H 代币合约地址：`EQDvE0ffdwvOhILjRJKFd2bIU9t5H9bG3-SKRidqavZjRsw8`。
-- 该地址格式按 TON 生态处理，视为 72H Jetton Master 地址。
+- 当前 TON mainnet 72H V3 Jetton Master：`EQAm0twD5SYndyrdIvWyNZ_7oUXlrlGOhUf6iiA7q1ph-GI3`。
+- 当前 SeasonClaimV2：`EQDBwNs-eQSUbl0XISsd9b9g-RvaZ-XWDa-PIVoG-wtMsf4b`。
+- 这些地址按 TON mainnet 生态处理。
 - 不要使用 EVM / ERC-20 / approve / wagmi / viem / ethers 的逻辑。
 - 钱包连接使用 TON 方向，优先使用 `@tonconnect/ui-react`。
 - Jetton 交互优先使用 TON SDK 方向，例如 `@ton/ton`、`@ton/core` 或同等维护良好的 TON 包。
